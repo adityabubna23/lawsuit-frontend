@@ -1,0 +1,67 @@
+{
+  "common": {
+    "submit": "Submit",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "success": "Success"
+  },
+  "auth": {
+    "login": "Login",
+    "register": "Register",
+    "logout": "Logout",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "forgotPassword": "Forgot Password?",
+    "otpVerification": "OTP Verification",
+    "enterOtp": "Enter the OTP sent to your email"
+  },
+  "lawyer": {
+    "search": "Search Lawyers",
+    "filters": {
+      "location": "Location",
+      "specialization": "Specialization",
+      "experience": "Experience",
+      "fee": "Consultation Fee"
+    },
+    "booking": {
+      "selectDateTime": "Select Date & Time",
+      "availableSlots": "Available Slots",
+      "consultationFee": "Consultation Fee",
+      "proceedToPayment": "Proceed to Payment",
+      "bookingSuccess": "Booking Successful"
+    }
+  },
+  "appointment": {
+    "upcoming": "Upcoming Appointments",
+    "past": "Past Appointments",
+    "status": {
+      "pending": "Pending",
+      "confirmed": "Confirmed",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "actions": {
+      "reschedule": "Reschedule",
+      "cancel": "Cancel",
+      "join": "Join Meeting"
+    }
+  },
+  "case": {
+    "new": "New Case",
+    "details": "Case Details",
+    "timeline": "Timeline",
+    "documents": "Documents",
+    "tasks": "Tasks",
+    "hearings": "Hearings"
+  },
+  "admin": {
+    "templates": "Templates",
+    "manageFilters": "Manage Filters",
+    "setPricing": "Set Pricing",
+    "reportedIssues": "Reported Issues"
+  }
+}
