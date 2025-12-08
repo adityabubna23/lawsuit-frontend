@@ -249,6 +249,9 @@ export const apiEndpoints = {
   },
   agreement: {
     updateAgreement: `${baseURL}/appointments/update-agreement-url`,
+  },
+  case: {
+    createCaseByLawyer: `${baseURL}/cases/create/case/details/lawyer`,
   }
 }
 
