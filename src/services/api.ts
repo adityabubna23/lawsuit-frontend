@@ -243,4 +243,10 @@ export const storageApi = {
  getPresignedUrl: `${baseURL}/storage/presigned`, 
 }
 
+export const apiEndpoints = {
+  agreement: {
+    updateAgreement: `${baseURL}/appointments/update-agreement-url`,
+  }
+}
+
 export default api
