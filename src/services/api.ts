@@ -244,6 +244,9 @@ export const storageApi = {
 }
 
 export const apiEndpoints = {
+  appointment: {
+    getAll: `${baseURL}/appointments/getall`,
+  },
   agreement: {
     updateAgreement: `${baseURL}/appointments/update-agreement-url`,
   }
