@@ -3,6 +3,9 @@ import { appointmentsApi } from '@/services/api'
 import AppointmentItem from '@/components/atoms/AppointmentItem'
 import { parseISO, isBefore, differenceInMinutes, isValid } from 'date-fns'
 import ChatTab from '@/components/atoms/ChatTab'
+import CreateCaseDetail from '@/components/molecules/CreateCaseDetail'
+import { useMutation } from '@tanstack/react-query'
+import api, { apiEndpoints } from '@/services/api'
 
 interface RawAppointment {
   id: string
@@ -20,6 +23,23 @@ const LawyerAppointments: FC = () => {
   const [activeTab, setActiveTab] = useState<'upcoming' | 'missed' | 'attended' | 'cancelled'>('upcoming')
   const [openChatId, setOpenChatId] = useState<string | null>(null)
   const [isChatOpen, setIsChatOpen] = useState(false)
+  const [selectedAppointmentForCase, setSelectedAppointmentForCase] = useState<RawAppointment | null>(null)
+
+  // Create case mutation
+  const createCaseMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await api.post(apiEndpoints.case.createCaseByLawyer, data.body)
+      return res.data
+    },
+    onSuccess: () => {
+      alert('Case created successfully!')
+      setSelectedAppointmentForCase(null)
+    },
+    onError: (error: any) => {
+      console.error('Failed to create case:', error)
+      alert('Failed to create case. Please try again.')
+    }
+  })
 
   useEffect(() => {
     let mounted = true
@@ -140,6 +160,14 @@ const LawyerAppointments: FC = () => {
     }
   }
 
+  const openCaseCreationForAppointment = (a: RawAppointment) => {
+    if (!a.client?.id) {
+      alert('No client information available for this appointment')
+      return
+    }
+    setSelectedAppointmentForCase(a)
+  }
+
   return (
     <div className="max-w-4xl mx-auto py-8">
       <h1 className="text-2xl font-semibold mb-4 text-primary">My Appointments</h1>
@@ -162,6 +190,7 @@ const LawyerAppointments: FC = () => {
                     datetime={a.datetime || (a.scheduledAt as string) || ''}
                     status={a.status}
                     onDiscussion={() => openChatForAppointment(a)}
+                    onCaseDetails={() => openCaseCreationForAppointment(a)}
                     onAttend={async () => {
                       try {
                         const res = await appointmentsApi.attend(a.id)
@@ -203,7 +232,7 @@ const LawyerAppointments: FC = () => {
                 <div className="space-y-4">
                   {upcoming.length === 0 ? <div className="text-sm text-gray-500">No upcoming appointments</div> : (
                     upcoming.map(a => (
-                      <AppointmentItem key={a.id} id={a.id} clientName={a.client?.name} lawyerName={a.lawyer?.name} datetime={a.datetime || (a.scheduledAt as string) || ''} status={a.status} onDiscussion={() => openChatForAppointment(a)} />
+                      <AppointmentItem key={a.id} id={a.id} clientName={a.client?.name} lawyerName={a.lawyer?.name} datetime={a.datetime || (a.scheduledAt as string) || ''} status={a.status} onDiscussion={() => openChatForAppointment(a)} onCaseDetails={() => openCaseCreationForAppointment(a)} />
                     ))
                   )}
                 </div>
@@ -213,7 +242,7 @@ const LawyerAppointments: FC = () => {
                 <div className="space-y-4">
                   {missed.length === 0 ? <div className="text-sm text-gray-500">No missed appointments</div> : (
                     missed.map(a => (
-                      <AppointmentItem key={a.id} id={a.id} clientName={a.client?.name} lawyerName={a.lawyer?.name} datetime={a.datetime || (a.scheduledAt as string) || ''} status={a.status} onDiscussion={() => openChatForAppointment(a)} />
+                      <AppointmentItem key={a.id} id={a.id} clientName={a.client?.name} lawyerName={a.lawyer?.name} datetime={a.datetime || (a.scheduledAt as string) || ''} status={a.status} onDiscussion={() => openChatForAppointment(a)} onCaseDetails={() => openCaseCreationForAppointment(a)} />
                     ))
                   )}
                 </div>
@@ -223,7 +252,7 @@ const LawyerAppointments: FC = () => {
                 <div className="space-y-4">
                   {attended.length === 0 ? <div className="text-sm text-gray-500">No attended appointments</div> : (
                     attended.map(a => (
-                      <AppointmentItem key={a.id} id={a.id} clientName={a.client?.name} lawyerName={a.lawyer?.name} datetime={a.datetime || (a.scheduledAt as string) || ''} status={a.status ?? 'COMPLETED'} onDiscussion={() => openChatForAppointment(a)} />
+                      <AppointmentItem key={a.id} id={a.id} clientName={a.client?.name} lawyerName={a.lawyer?.name} datetime={a.datetime || (a.scheduledAt as string) || ''} status={a.status ?? 'COMPLETED'} onDiscussion={() => openChatForAppointment(a)} onCaseDetails={() => openCaseCreationForAppointment(a)} />
                     ))
                   )}
                 </div>
@@ -233,7 +262,7 @@ const LawyerAppointments: FC = () => {
                 <div className="space-y-4">
                   {cancelled.length === 0 ? <div className="text-sm text-gray-500">No cancelled appointments</div> : (
                     cancelled.map(a => (
-                      <AppointmentItem key={a.id} id={a.id} clientName={a.client?.name} lawyerName={a.lawyer?.name} datetime={a.datetime || (a.scheduledAt as string) || ''} status={a.status ?? 'CANCELLED'} onDiscussion={() => openChatForAppointment(a)} />
+                      <AppointmentItem key={a.id} id={a.id} clientName={a.client?.name} lawyerName={a.lawyer?.name} datetime={a.datetime || (a.scheduledAt as string) || ''} status={a.status ?? 'CANCELLED'} onDiscussion={() => openChatForAppointment(a)} onCaseDetails={() => openCaseCreationForAppointment(a)} />
                     ))
                   )}
                 </div>
@@ -249,6 +278,18 @@ const LawyerAppointments: FC = () => {
           <div className="w-full max-w-4xl h-[80vh]">
             <ChatTab chatId={openChatId} onClose={() => { setIsChatOpen(false); setOpenChatId(null) }} />
           </div>
+        </div>
+      )}
+
+      {/* Create Case Modal */}
+      {selectedAppointmentForCase && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <CreateCaseDetail
+            clientId={selectedAppointmentForCase.client?.id || ''}
+            appointmentId={selectedAppointmentForCase.id}
+            mutation={createCaseMutation}
+            onClose={() => setSelectedAppointmentForCase(null)}
+          />
         </div>
       )}
     </div>

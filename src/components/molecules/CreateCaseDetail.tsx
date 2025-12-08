@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Button from "../atoms/Button";
+import { X } from "lucide-react";
 
 // Form schema without nested body
 const formSchema = z.object({
@@ -20,14 +21,16 @@ interface CreateCaseDetailProps {
   clientId: string;
   appointmentId: string;
   mutation: UseMutationResult<any, any, any, any>;
+  onClose?: () => void;
 }
 
 export default function CreateCaseDetail({
   clientId,
   appointmentId,
   mutation,
+  onClose,
 }: CreateCaseDetailProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
 
   const {
     register,
@@ -51,6 +54,7 @@ export default function CreateCaseDetail({
         onSuccess: () => {
           setOpen(false);
           reset();
+          onClose?.();
         },
       }
     );
@@ -59,62 +63,28 @@ export default function CreateCaseDetail({
   const handleClose = () => {
     setOpen(false);
     reset();
+    onClose?.();
   };
 
   return (
-    <>
-      <Button
-        variant="primary"
-        size="md"
-        onClick={() => setOpen(true)}
-        className="shadow-md hover:shadow-lg transition-shadow"
-      >
-        <svg
-          className="w-5 h-5 mr-2"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 4v16m8-8H4"
-          />
-        </svg>
-        Create Case
-      </Button>
-
-      <Modal open={open}>
-        <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <Modal open={open}>
+        <div className="bg-white rounded-lg w-full min-w-[500px] max-h-[90vh] overflow-y-auto">
           {/* Header */}
           <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
             <div>
-              <h2 className="text-2xl font-bold text-midnight">
+              <h2 className="text-lg font-bold text-midnight">
                 Create New Case
               </h2>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 mt-1">
                 Fill in the details to create a new case
               </p>
             </div>
             <button
               onClick={handleClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="text-pink-400 hover:text-pink-600 transition-colors"
               disabled={mutation.isPending}
             >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
+            <X className="w-6 h-6" />
             </button>
           </div>
 
@@ -125,7 +95,7 @@ export default function CreateCaseDetail({
               <div>
                 <label
                   htmlFor="title"
-                  className="block text-sm font-semibold text-primary mb-2"
+                  className="block text-xs font-semibold text-primary mb-2"
                 >
                   Case Title <span className="text-red-500">*</span>
                 </label>
@@ -142,7 +112,7 @@ export default function CreateCaseDetail({
                   disabled={mutation.isPending}
                 />
                 {errors.title && (
-                  <p className="mt-1 text-sm text-red-500 flex items-center">
+                  <p className="mt-1 text-xs text-red-500 flex items-center">
                     <svg
                       className="w-4 h-4 mr-1"
                       fill="currentColor"
@@ -163,7 +133,7 @@ export default function CreateCaseDetail({
               <div>
                 <label
                   htmlFor="category"
-                  className="block text-sm font-semibold text-primary mb-2"
+                  className="block text-xs font-semibold text-primary mb-2"
                 >
                   Category <span className="text-red-500">*</span>
                 </label>
@@ -192,7 +162,7 @@ export default function CreateCaseDetail({
                   <option value="Other">Other</option>
                 </select>
                 {errors.category && (
-                  <p className="mt-1 text-sm text-red-500 flex items-center">
+                  <p className="mt-1 text-xs text-red-500 flex items-center">
                     <svg
                       className="w-4 h-4 mr-1"
                       fill="currentColor"
@@ -213,7 +183,7 @@ export default function CreateCaseDetail({
               <div>
                 <label
                   htmlFor="description"
-                  className="block text-sm font-semibold text-primary mb-2"
+                  className="block text-xs font-semibold text-primary mb-2"
                 >
                   Description <span className="text-red-500">*</span>
                 </label>
@@ -278,7 +248,7 @@ export default function CreateCaseDetail({
               <Button
                 type="button"
                 variant="ghost"
-                size="md"
+                size="sm"
                 onClick={handleClose}
                 disabled={mutation.isPending}
                 className="border border-gray-300"
@@ -288,7 +258,7 @@ export default function CreateCaseDetail({
               <Button
                 type="submit"
                 variant="primary"
-                size="md"
+                size="sm"
                 disabled={mutation.isPending}
                 className="min-w-[120px] relative"
               >
@@ -338,6 +308,5 @@ export default function CreateCaseDetail({
           </form>
         </div>
       </Modal>
-    </>
   );
 }
