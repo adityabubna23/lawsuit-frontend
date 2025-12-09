@@ -37,6 +37,7 @@ import LawyerAppointments from './pages/lawyer/Appointments'
 import LawyerProfilePage from './pages/lawyer/LawyerProfilePage'
 import LexRateTable from './components/organisms/LexRatesTable'
 import ViewCasePages from './pages/app/ViewCasePages'
+import CaseDetailsClientPage from './pages/app/CaseDetailsClientPage'
 
 
 
@@ -77,7 +78,7 @@ const AppRoutes = () => {
         <Route path="wallet" element={<WalletPage />} />
         <Route path="withdraw" element={<WithdrawPage />} />
         <Route path="cases" element={<ViewCasePages />} />
-        <Route path="case/:caseId" element={<CaseDetailPage />} />
+        <Route path="case/:caseId" element={<CaseDetailsClientPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="lex-rates" element={<LexRateTable />} />
         <Route path="legal-eagle" element={<AiChatPage />} />

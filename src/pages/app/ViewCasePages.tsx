@@ -149,7 +149,7 @@ const ViewCasePages: FC = () => {
     }
 
     const handleViewDetails = (caseId: string) => {
-        navigate(`/app/cases/${caseId}`)
+        navigate(`/app/case/${caseId}`)
     }
 
     const handleDiscuss = (caseId: string) => {
