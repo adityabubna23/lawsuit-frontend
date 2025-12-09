@@ -253,6 +253,7 @@ export const apiEndpoints = {
   case: {
     createCaseByLawyer: `${baseURL}/cases/create/case/details/lawyer`,
     acceptCase: (id: string) => `${baseURL}/cases/accept/case/${id}`,
+    getAllCases: `${baseURL}/cases/getall/cases`,
   }
 }
 

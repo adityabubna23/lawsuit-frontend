@@ -18,7 +18,7 @@ import SearchPage from './pages/app/SearchPage'
 import LawyerDetailPage from './pages/app/LawyerDetailPage'
 import BookingPage from './pages/app/BookingPage'
 import AppointmentsPage from './pages/app/AppointmentsPage'
-import CasesListPage from './pages/app/CasesListPage'
+// import CasesListPage from './pages/app/CasesListPage'
 import CaseDetailPage from './pages/app/CaseDetailPage'
 import WalletPage from './pages/app/WalletPage'
 import WithdrawPage from './pages/app/WithdrawPage'
@@ -36,6 +36,7 @@ import LawyerHomePage from './pages/lawyer/LawyerHomePage'
 import LawyerAppointments from './pages/lawyer/Appointments'
 import LawyerProfilePage from './pages/lawyer/LawyerProfilePage'
 import LexRateTable from './components/organisms/LexRatesTable'
+import ViewCasePages from './pages/app/ViewCasePages'
 
 
 
@@ -75,7 +76,7 @@ const AppRoutes = () => {
         <Route path="appointments" element={<AppointmentsPage />} />
         <Route path="wallet" element={<WalletPage />} />
         <Route path="withdraw" element={<WithdrawPage />} />
-        <Route path="cases" element={<CasesListPage />} />
+        <Route path="cases" element={<ViewCasePages />} />
         <Route path="case/:caseId" element={<CaseDetailPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="lex-rates" element={<LexRateTable />} />
@@ -115,7 +116,7 @@ const AppRoutes = () => {
         {/* <Route index element={<Navigate to="appointments" replace />} /> */}
         <Route path="dashboard" element={<LawyerHomePage />} />
         <Route path="appointments" element={<LawyerAppointments />} />
-        <Route path="cases" element={<CasesListPage />} />
+        <Route path="cases" element={<ViewCasePages />} />
         <Route path="profile" element={<LawyerProfilePage />} />
       </Route>
 
