@@ -286,6 +286,7 @@ const AppointmentsPage: FC = () => {
             appointment={selectedAgreementUrl as {appointmentId: string, aggrementUrl: string}}
             isOpen={isModalOpen}
             onClose={handleCloseModal}
+            canApply={true}
           />
         ) : null : (
           <></>

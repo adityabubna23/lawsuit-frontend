@@ -9,9 +9,10 @@ interface AgreementModalProps {
   appointment: {appointmentId: string, aggrementUrl: string}
   isOpen: boolean
   onClose: () => void
+  canApply: boolean
 }
 
-const AgreementModal: FC<AgreementModalProps> = ({ appointment, isOpen, onClose }) => {
+const AgreementModal: FC<AgreementModalProps> = ({ appointment, isOpen, onClose, canApply }) => {
   const [fileType, setFileType] = useState<'image' | 'pdf' | 'document' | 'unknown'>('unknown')
   const url = appointment.aggrementUrl;
   const navigate = useNavigate();
@@ -157,12 +158,16 @@ const AgreementModal: FC<AgreementModalProps> = ({ appointment, isOpen, onClose 
               </div>
             </div>
           )}
-          <div className="flex justify-end items-end gap-4">
+          {
+            canApply ? (
+              <div className="flex justify-end items-end gap-4">
             <Button size='sm' className='border border-orange-500 text-orange-400 bg-white'>Cancel</Button>
             <Button size='sm' variant='primary' 
               onClick={() => acceptAppointmentMutation.mutate(appointment.appointmentId)}
             >Accept</Button>
             </div>
+            ) : null
+          }
         </div>
       </div>
     </div>
