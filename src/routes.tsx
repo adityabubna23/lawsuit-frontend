@@ -38,6 +38,8 @@ import LawyerProfilePage from './pages/lawyer/LawyerProfilePage'
 import LexRateTable from './components/organisms/LexRatesTable'
 import ViewCasePages from './pages/app/ViewCasePages'
 import CaseDetailsClientPage from './pages/app/CaseDetailsClientPage'
+import ViewCasePagesLawyer from './pages/lawyer/ViewCasePagesLawyer'
+import CaseDetailsLawyerPage from './pages/lawyer/CaseDetailsLawyerPage'
 
 
 
@@ -117,7 +119,8 @@ const AppRoutes = () => {
         {/* <Route index element={<Navigate to="appointments" replace />} /> */}
         <Route path="dashboard" element={<LawyerHomePage />} />
         <Route path="appointments" element={<LawyerAppointments />} />
-        <Route path="cases" element={<ViewCasePages />} />
+        <Route path="case/:caseId" element={<CaseDetailsLawyerPage />} />
+        <Route path="cases" element={<ViewCasePagesLawyer />} />
         <Route path="profile" element={<LawyerProfilePage />} />
       </Route>
 
