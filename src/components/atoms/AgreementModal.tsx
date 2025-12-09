@@ -1,14 +1,35 @@
 import { FC, useEffect, useState } from 'react'
 import { X, Download, ExternalLink } from 'lucide-react'
+import Button from './Button'
+import { useMutation } from '@tanstack/react-query'
+import api, { apiEndpoints } from '@/services/api'
+import { useNavigate } from 'react-router-dom'
 
 interface AgreementModalProps {
-  url: string
+  appointment: {appointmentId: string, aggrementUrl: string}
   isOpen: boolean
   onClose: () => void
 }
 
-const AgreementModal: FC<AgreementModalProps> = ({ url, isOpen, onClose }) => {
+const AgreementModal: FC<AgreementModalProps> = ({ appointment, isOpen, onClose }) => {
   const [fileType, setFileType] = useState<'image' | 'pdf' | 'document' | 'unknown'>('unknown')
+  const url = appointment.aggrementUrl;
+  const navigate = useNavigate();
+
+  const acceptAppointmentMutation = useMutation({
+    mutationFn: async (appointmentId: string) => {
+      const res = await api.post(apiEndpoints.case.acceptCase(appointmentId))
+      return res.data;
+    },
+    onSuccess: () => {
+      onClose();
+      alert('Case accepted successfully!');
+      navigate('/app/cases');
+    },
+    onError: (error: any) => {
+      alert('Failed to accept the case: ' + (error?.response?.data?.error || error.message || 'Unknown error'));
+    }
+  })
 
   useEffect(() => {
     if (url) {
@@ -136,6 +157,12 @@ const AgreementModal: FC<AgreementModalProps> = ({ url, isOpen, onClose }) => {
               </div>
             </div>
           )}
+          <div className="flex justify-end items-end gap-4">
+            <Button size='sm' className='border border-orange-500 text-orange-400 bg-white'>Cancel</Button>
+            <Button size='sm' variant='primary' 
+              onClick={() => acceptAppointmentMutation.mutate(appointment.appointmentId)}
+            >Accept</Button>
+            </div>
         </div>
       </div>
     </div>

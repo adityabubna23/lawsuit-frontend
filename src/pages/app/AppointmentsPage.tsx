@@ -43,7 +43,7 @@ type TabType = 'upcoming' | 'missed' | 'attended' | 'cancelled'
 const AppointmentsPage: FC = () => {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<TabType>('upcoming')
-  const [selectedAgreementUrl, setSelectedAgreementUrl] = useState<string | null>(null)
+  const [selectedAgreementUrl, setSelectedAgreementUrl] = useState<{appointmentId: string, aggrementUrl: string | null} | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
   const getAppointmentsQuery = useQuery({
@@ -73,9 +73,9 @@ const AppointmentsPage: FC = () => {
     }
   }, [appointments])
 
-  const handleViewAgreement = (aggrementUrl: string | null) => {
+  const handleViewAgreement = ({appointmentId, aggrementUrl} : {appointmentId: string, aggrementUrl: string | null}) => {
     if (aggrementUrl) {
-      setSelectedAgreementUrl(aggrementUrl)
+      setSelectedAgreementUrl({appointmentId, aggrementUrl})
       setIsModalOpen(true)
     }
   }
@@ -187,7 +187,7 @@ const AppointmentsPage: FC = () => {
 
         <div className="flex gap-3 mt-4 pt-4 border-t border-gray-100">
           <button
-            onClick={() => handleViewAgreement(appointment.aggrementUrl)}
+            onClick={() => handleViewAgreement({appointmentId: appointment.id, aggrementUrl: appointment.aggrementUrl})}
             disabled={!appointment.aggrementUrl}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
               appointment.aggrementUrl
@@ -281,13 +281,16 @@ const AppointmentsPage: FC = () => {
         </div>
 
         {/* Agreement Modal */}
-        {selectedAgreementUrl && (
+        {selectedAgreementUrl ? selectedAgreementUrl.aggrementUrl ? (
           <AgreementModal
-            url={selectedAgreementUrl}
+            appointment={selectedAgreementUrl as {appointmentId: string, aggrementUrl: string}}
             isOpen={isModalOpen}
             onClose={handleCloseModal}
           />
-        )}
+        ) : null : (
+          <></>
+        )
+        }
       </div>
     </div>
   )
