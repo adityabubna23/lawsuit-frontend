@@ -211,6 +211,24 @@ const LawyerAppointments: FC = () => {
     }
   }
 
+  const handleReschedule = (appointment: AppointmentResponse['data'][0]) => {
+    // TODO: Implement reschedule functionality
+    alert(`Reschedule appointment with ${appointment.client?.name}`)
+  }
+
+  const handleCancel = async (appointment: AppointmentResponse['data'][0]) => {
+    if (confirm(`Are you sure you want to cancel the appointment with ${appointment.client?.name}?`)) {
+      try {
+        await appointmentsApi.cancel(appointment.id)
+        getAppointmentsQuery.refetch()
+        alert('Appointment cancelled successfully')
+      } catch (err) {
+        console.error('Failed to cancel appointment', err)
+        alert('Failed to cancel appointment. Please try again.')
+      }
+    }
+  }
+
   const tabs: { key: TabType; label: string; count: number }[] = [
     { key: 'attendNow', label: 'Attend Now', count: attendNow.length },
     { key: 'upcoming', label: 'Upcoming', count: upcoming.length },
@@ -284,6 +302,7 @@ const LawyerAppointments: FC = () => {
                           key={appointment.id}
                           appointment={appointment}
                           showAttendButton={true}
+                          tabType="attendNow"
                           onAttend={handleAttend}
                           onViewAgreement={handleViewAgreement}
                           onUploadAgreement={handleUploadAgreement}
@@ -308,11 +327,14 @@ const LawyerAppointments: FC = () => {
                         <RenderAppointmentCard
                           key={appointment.id}
                           appointment={appointment}
+                          tabType="upcoming"
                           onAttend={handleAttend}
                           onViewAgreement={handleViewAgreement}
                           onUploadAgreement={handleUploadAgreement}
                           onOpenChat={openChatForAppointment}
                           onOpenCaseCreation={openCaseCreationForAppointment}
+                          onReschedule={handleReschedule}
+                          onCancel={handleCancel}
                         />
                       )}
                     </div>
@@ -332,11 +354,14 @@ const LawyerAppointments: FC = () => {
                         <RenderAppointmentCard
                           key={appointment.id}
                           appointment={appointment}
+                          tabType="missed"
                           onAttend={handleAttend}
                           onViewAgreement={handleViewAgreement}
                           onUploadAgreement={handleUploadAgreement}
                           onOpenChat={openChatForAppointment}
                           onOpenCaseCreation={openCaseCreationForAppointment}
+                          onReschedule={handleReschedule}
+                          onCancel={handleCancel}
                         />
                       )}
                     </div>
@@ -356,6 +381,7 @@ const LawyerAppointments: FC = () => {
                         <RenderAppointmentCard
                           key={appointment.id}
                           appointment={appointment}
+                          tabType="attended"
                           onAttend={handleAttend}
                           onViewAgreement={handleViewAgreement}
                           onUploadAgreement={handleUploadAgreement}
@@ -380,6 +406,7 @@ const LawyerAppointments: FC = () => {
                         <RenderAppointmentCard
                           key={appointment.id}
                           appointment={appointment}
+                          tabType="cancelled"
                           onAttend={handleAttend}
                           onViewAgreement={handleViewAgreement}
                           onUploadAgreement={handleUploadAgreement}
