@@ -5,42 +5,14 @@ import ChatTab from '@/components/atoms/ChatTab'
 import CreateCaseDetail from '@/components/molecules/CreateCaseDetail'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import api, { apiEndpoints } from '@/services/api'
-import { Calendar, Clock, FileText, MessageSquare, User, Video, Upload, X } from 'lucide-react'
+import { Upload, X } from 'lucide-react'
 import AgreementModal from '@/components/atoms/AgreementModal'
 import UploadInput from '@/components/atoms/UploadButton'
 import { UpdateAgreementUrlInput } from '@/schema/appointment.schema'
+import RenderAppointmentCard, { AppointmentData } from './RenderAppointmentCard'
 
 interface AppointmentResponse {
-  data: {
-    scheduledAt: string;
-    durationMins: number;
-    notes: string | null;
-    id: string;
-    status: "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED" | "RESCHEDULED";
-    meetingLink: string | null;
-    aggrementUrl: string | null;
-    createdAt: string;
-    updatedAt: string;
-    client: {
-        id: string;
-        email: string;
-        phone: string;
-        name: string;
-        avatarUrl: string | null;
-    };
-    lawyer: {
-        id: string;
-        email: string;
-        phone: string;
-        name: string;
-        avatarUrl: string | null;
-    };
-    payment: {
-        status: string;
-        amount: number;
-        currency: string;
-    } | null;
-  }[]
+  data: AppointmentData[]
 }
 
 type TabType = 'attendNow' | 'upcoming' | 'missed' | 'attended' | 'cancelled'
@@ -239,148 +211,6 @@ const LawyerAppointments: FC = () => {
     }
   }
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric' 
-    })
-  }
-
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    })
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'PENDING':
-        return 'text-yellow-600'
-      case 'CONFIRMED':
-        return 'text-blue-600'
-      case 'COMPLETED':
-        return 'text-green-600'
-      case 'CANCELLED':
-        return 'text-red-600'
-      default:
-        return 'text-gray-600'
-    }
-  }
-
-  const renderAppointmentCard = (appointment: AppointmentResponse['data'][0], showAttendButton: boolean = false) => {
-    const otherParty = appointment.client
-
-    return (
-      <div 
-        key={appointment.id}
-        className="border border-gray-200 bg-white p-6 mb-4 hover:border-primary transition-colors"
-      >
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                {otherParty?.avatarUrl ? (
-                  <img 
-                    src={otherParty.avatarUrl} 
-                    alt={otherParty.name}
-                    className="w-10 h-10 rounded-full object-cover"
-                  />
-                ) : (
-                  <User className="w-5 h-5 text-gray-400" />
-                )}
-              </div>
-              <div>
-                <h3 className="text-base font-medium text-primary">
-                  {otherParty?.name || 'Unknown'}
-                </h3>
-                <p className="text-sm text-secondary">{otherParty?.email}</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              <div className="flex items-center gap-2 text-sm text-secondary">
-                <Calendar className="w-4 h-4" />
-                <span>{formatDate(appointment.scheduledAt)}</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-secondary">
-                <Clock className="w-4 h-4" />
-                <span>{formatTime(appointment.scheduledAt)} ({appointment.durationMins} mins)</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-secondary">Status:</span>
-                <span className={`font-medium ${getStatusColor(appointment.status)}`}>
-                  {appointment.status}
-                </span>
-              </div>
-            </div>
-
-            {appointment.notes && (
-              <p className="text-sm text-secondary mb-4 line-clamp-2">
-                {appointment.notes}
-              </p>
-            )}
-
-            {appointment.payment && (
-              <div className="text-sm text-secondary mb-4">
-                Payment: {appointment.payment.currency} {appointment.payment.amount} - 
-                <span className={`ml-1 ${appointment.payment.status === 'COMPLETED' ? 'text-green-600' : 'text-yellow-600'}`}>
-                  {appointment.payment.status}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="flex gap-3 mt-4 pt-4 border-t border-gray-100">
-          {showAttendButton && (
-            <button
-              onClick={() => handleAttend(appointment)}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors"
-            >
-              <Video className="w-4 h-4" />
-              Attend Now
-            </button>
-          )}
-          {appointment.aggrementUrl ? (
-            <button
-              onClick={() => handleViewAgreement({appointmentId: appointment.id, aggrementUrl: appointment.aggrementUrl})}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-white hover:bg-primary/90 transition-colors"
-            >
-              <FileText className="w-4 h-4" />
-              View Agreement
-            </button>
-          ) : (
-            <button
-              onClick={() => handleUploadAgreement(appointment)}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-white transition-colors"
-            >
-              <Upload className="w-4 h-4" />
-              Upload Agreement
-            </button>
-          )}
-          <button
-            onClick={() => openChatForAppointment(appointment)}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-white transition-colors"
-          >
-            <MessageSquare className="w-4 h-4" />
-            Discuss
-          </button>
-          <button
-            onClick={() => openCaseCreationForAppointment(appointment)}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-white transition-colors"
-          >
-            <FileText className="w-4 h-4" />
-            Case Details
-          </button>
-        </div>
-      </div>
-    )
-  }
-
   const tabs: { key: TabType; label: string; count: number }[] = [
     { key: 'attendNow', label: 'Attend Now', count: attendNow.length },
     { key: 'upcoming', label: 'Upcoming', count: upcoming.length },
@@ -450,7 +280,16 @@ const LawyerAppointments: FC = () => {
                   ) : (
                     <div>
                       {attendNow.map(appointment => 
-                        renderAppointmentCard(appointment, true)
+                        <RenderAppointmentCard
+                          key={appointment.id}
+                          appointment={appointment}
+                          showAttendButton={true}
+                          onAttend={handleAttend}
+                          onViewAgreement={handleViewAgreement}
+                          onUploadAgreement={handleUploadAgreement}
+                          onOpenChat={openChatForAppointment}
+                          onOpenCaseCreation={openCaseCreationForAppointment}
+                        />
                       )}
                     </div>
                   )}
@@ -466,7 +305,15 @@ const LawyerAppointments: FC = () => {
                   ) : (
                     <div>
                       {upcoming.map(appointment => 
-                        renderAppointmentCard(appointment)
+                        <RenderAppointmentCard
+                          key={appointment.id}
+                          appointment={appointment}
+                          onAttend={handleAttend}
+                          onViewAgreement={handleViewAgreement}
+                          onUploadAgreement={handleUploadAgreement}
+                          onOpenChat={openChatForAppointment}
+                          onOpenCaseCreation={openCaseCreationForAppointment}
+                        />
                       )}
                     </div>
                   )}
@@ -482,7 +329,15 @@ const LawyerAppointments: FC = () => {
                   ) : (
                     <div>
                       {missed.map(appointment => 
-                        renderAppointmentCard(appointment)
+                        <RenderAppointmentCard
+                          key={appointment.id}
+                          appointment={appointment}
+                          onAttend={handleAttend}
+                          onViewAgreement={handleViewAgreement}
+                          onUploadAgreement={handleUploadAgreement}
+                          onOpenChat={openChatForAppointment}
+                          onOpenCaseCreation={openCaseCreationForAppointment}
+                        />
                       )}
                     </div>
                   )}
@@ -498,7 +353,15 @@ const LawyerAppointments: FC = () => {
                   ) : (
                     <div>
                       {attended.map(appointment => 
-                        renderAppointmentCard(appointment)
+                        <RenderAppointmentCard
+                          key={appointment.id}
+                          appointment={appointment}
+                          onAttend={handleAttend}
+                          onViewAgreement={handleViewAgreement}
+                          onUploadAgreement={handleUploadAgreement}
+                          onOpenChat={openChatForAppointment}
+                          onOpenCaseCreation={openCaseCreationForAppointment}
+                        />
                       )}
                     </div>
                   )}
@@ -514,7 +377,15 @@ const LawyerAppointments: FC = () => {
                   ) : (
                     <div>
                       {cancelled.map(appointment => 
-                        renderAppointmentCard(appointment)
+                        <RenderAppointmentCard
+                          key={appointment.id}
+                          appointment={appointment}
+                          onAttend={handleAttend}
+                          onViewAgreement={handleViewAgreement}
+                          onUploadAgreement={handleUploadAgreement}
+                          onOpenChat={openChatForAppointment}
+                          onOpenCaseCreation={openCaseCreationForAppointment}
+                        />
                       )}
                     </div>
                   )}
