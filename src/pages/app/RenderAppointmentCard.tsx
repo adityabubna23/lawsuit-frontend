@@ -1,5 +1,5 @@
 import { FC } from 'react'
-import { Calendar, Clock, FileText, MessageSquare, User } from 'lucide-react'
+import { Calendar, Clock, FileText, MessageSquare, User, RefreshCw, XCircle } from 'lucide-react'
 
 interface AppointmentData {
   scheduledAt: string;
@@ -32,10 +32,15 @@ interface AppointmentData {
   } | null;
 }
 
+type TabType = 'upcoming' | 'missed' | 'attended' | 'cancelled'
+
 interface RenderAppointmentCardProps {
   appointment: AppointmentData;
+  tabType?: TabType;
   onViewAgreement: (params: { appointmentId: string; aggrementUrl: string | null }) => void;
   onDiscuss: (appointmentId: string) => void;
+  onReschedule?: (appointment: AppointmentData) => void;
+  onCancel?: (appointment: AppointmentData) => void;
 }
 
 const formatDate = (dateString: string) => {
@@ -72,8 +77,11 @@ const getStatusColor = (status: string) => {
 
 const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
   appointment,
+  tabType = 'attended',
   onViewAgreement,
-  onDiscuss
+  onDiscuss,
+  onReschedule,
+  onCancel
 }) => {
   const otherParty = appointment.lawyer
 
@@ -138,25 +146,80 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
       </div>
 
       <div className="flex gap-3 mt-4 pt-4 border-t border-gray-100">
-        <button
-          onClick={() => onViewAgreement({ appointmentId: appointment.id, aggrementUrl: appointment.aggrementUrl })}
-          disabled={!appointment.aggrementUrl}
-          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
-            appointment.aggrementUrl
-              ? 'bg-primary text-white hover:bg-primary/90'
-              : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-          }`}
-        >
-          <FileText className="w-4 h-4" />
-          View Agreement
-        </button>
-        <button
-          onClick={() => onDiscuss(appointment.id)}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-white transition-colors"
-        >
-          <MessageSquare className="w-4 h-4" />
-          Discuss
-        </button>
+        {/* Upcoming Tab Buttons */}
+        {tabType === 'upcoming' && (
+          <>
+            {onReschedule && (
+              <button
+                onClick={() => onReschedule(appointment)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-white transition-colors"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Reschedule
+              </button>
+            )}
+            {onCancel && (
+              <button
+                onClick={() => onCancel(appointment)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-red-600 text-red-600 hover:bg-red-600 hover:text-white transition-colors"
+              >
+                <XCircle className="w-4 h-4" />
+                Cancel
+              </button>
+            )}
+          </>
+        )}
+
+        {/* Missed Tab Buttons */}
+        {tabType === 'missed' && (
+          <>
+            {onReschedule && (
+              <button
+                onClick={() => onReschedule(appointment)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-white transition-colors"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Reschedule
+              </button>
+            )}
+            {onCancel && (
+              <button
+                onClick={() => onCancel(appointment)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-red-600 text-red-600 hover:bg-red-600 hover:text-white transition-colors"
+              >
+                <XCircle className="w-4 h-4" />
+                Cancel
+              </button>
+            )}
+          </>
+        )}
+
+        {/* Attended Tab Buttons */}
+        {tabType === 'attended' && (
+          <>
+            <button
+              onClick={() => onViewAgreement({ appointmentId: appointment.id, aggrementUrl: appointment.aggrementUrl })}
+              disabled={!appointment.aggrementUrl}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
+                appointment.aggrementUrl
+                  ? 'bg-primary text-white hover:bg-primary/90'
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              View Agreement
+            </button>
+            <button
+              onClick={() => onDiscuss(appointment.id)}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-white transition-colors"
+            >
+              <MessageSquare className="w-4 h-4" />
+              Discuss
+            </button>
+          </>
+        )}
+
+        {/* Cancelled Tab - No buttons */}
       </div>
     </div>
   )

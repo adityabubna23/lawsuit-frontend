@@ -1,6 +1,6 @@
 import { FC, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import api, { apiEndpoints } from '@/services/api'
+import api, { apiEndpoints, appointmentsApi } from '@/services/api'
 import { useQuery } from '@tanstack/react-query'
 import AgreementModal from '@/components/atoms/AgreementModal'
 import RenderAppointmentCard, { AppointmentData } from './RenderAppointmentCard'
@@ -58,6 +58,24 @@ const AppointmentsPage: FC = () => {
 
   const handleDiscuss = (appointmentId: string) => {
     navigate(`/app/chat?appointmentId=${appointmentId}`)
+  }
+
+  const handleReschedule = (appointment: AppointmentData) => {
+    // TODO: Implement reschedule functionality
+    alert(`Reschedule appointment with ${appointment.lawyer?.name}`)
+  }
+
+  const handleCancel = async (appointment: AppointmentData) => {
+    if (confirm(`Are you sure you want to cancel the appointment with ${appointment.lawyer?.name}?`)) {
+      try {
+        await appointmentsApi.cancel(appointment.id)
+        getAppointmentsQuery.refetch()
+        alert('Appointment cancelled successfully')
+      } catch (err) {
+        console.error('Failed to cancel appointment', err)
+        alert('Failed to cancel appointment. Please try again.')
+      }
+    }
   }
 
   const tabs: { key: TabType; label: string; count: number }[] = [
@@ -127,8 +145,11 @@ const AppointmentsPage: FC = () => {
                 <RenderAppointmentCard
                   key={appointment.id}
                   appointment={appointment}
+                  tabType={activeTab}
                   onViewAgreement={handleViewAgreement}
                   onDiscuss={handleDiscuss}
+                  onReschedule={handleReschedule}
+                  onCancel={handleCancel}
                 />
               )}
             </div>
