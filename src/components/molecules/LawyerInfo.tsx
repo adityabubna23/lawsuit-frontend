@@ -136,7 +136,7 @@ const LawyerInfo: React.FC = () => {
       const uploadUrl: string = upload.uploadUrl || upload.upload_url || upload.uploadUrl
       const fileUrl: string = upload.fileUrl || upload.file_url || upload.fileUrl
       if (!uploadUrl) throw new Error('No upload url')
-      await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file })
+      await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type || 'application/octet-stream' , "x-amz-acl": "public-read" }, body: file })
       return fileUrl || null
     } catch (err) {
       console.error('Upload failed', err)

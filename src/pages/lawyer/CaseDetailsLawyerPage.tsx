@@ -82,6 +82,7 @@ export default function CaseDetailsClientPage() {
 
     const caseData = getCaseDetailsQuery.data?.data?.[0];
     const lawyer = caseData?.lawyer;
+    const client = caseData?.client;
 
     const menuItems = [
         { id: 'case-info' as MenuItem, label: 'Case Info', icon: FileText },
@@ -137,15 +138,15 @@ export default function CaseDetailsClientPage() {
         <div className="flex h-[calc(100vh-130px)] bg-gray-50">
             {/* Sidebar */}
             <aside className="w-80 bg-white border-r border-gray-200 flex flex-col">
-                {/* Lawyer Info Section */}
+                {/* Client Info Section */}
                 <div className="p-6 border-b border-gray-200 bg-gradient-to-br from-primary to-midnight">
                     <div className="flex flex-col items-center text-center">
                         {/* Avatar */}
-                        <div className="w-20 h-20  bg-white/20 backdrop-blur-sm flex items-center justify-center mb-4 overflow-hidden border-2 border-white/30">
-                            {lawyer?.avatarUrl ? (
+                        <div className="w-20 h-20 bg-white/20 backdrop-blur-sm flex items-center justify-center mb-4 overflow-hidden border-2 border-white/30">
+                            {client?.avatarUrl ? (
                                 <img 
-                                    src={lawyer.avatarUrl} 
-                                    alt={lawyer.name} 
+                                    src={client.avatarUrl} 
+                                    alt={client.name} 
                                     className="w-full h-full object-cover"
                                 />
                             ) : (
@@ -153,20 +154,20 @@ export default function CaseDetailsClientPage() {
                             )}
                         </div>
                         
-                        {/* Lawyer Details */}
+                        {/* Client Details */}
                         <div className="text-white">
                             <h2 className="text-xl font-semibold mb-1">
-                                {lawyer?.name || 'Lawyer Not Assigned'}
+                                {client?.name || 'Client Not Assigned'}
                             </h2>
-                            {lawyer && (
+                            {client && (
                                 <>
                                     <div className="flex items-center justify-center gap-2 text-sm text-white/90 mb-1">
                                         <Mail className="w-3.5 h-3.5" />
-                                        <span>{lawyer.email}</span>
+                                        <span>{client.email}</span>
                                     </div>
                                     <div className="flex items-center justify-center gap-2 text-sm text-white/90">
                                         <Phone className="w-3.5 h-3.5" />
-                                        <span>{lawyer.phone}</span>
+                                        <span>{client.phone}</span>
                                     </div>
                                 </>
                             )}

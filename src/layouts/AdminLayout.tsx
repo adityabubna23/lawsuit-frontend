@@ -23,7 +23,7 @@ const AdminLayout: FC = () => {
           <path d="M12 12a5 5 0 100-10 5 5 0 000 10zm-9 9a9 9 0 0118 0H3z" fill="currentColor" />
         </svg>
       ) },
-    { to: '/admin/user-permissions', label: 'User Permissions', icon: (
+    { to: '/admin/userManagement', label: 'User Management', icon: (
         <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M16 11c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM6 11c1.657 0 3-1.343 3-3S7.657 5 6 5 3 6.343 3 8s1.343 3 3 3zM6 13c-2.33 0-7 1.17-7 3.5V19h20v-2.5C19 14.17 14.33 13 12 13H6z" fill="currentColor" />
         </svg>

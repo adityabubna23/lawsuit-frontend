@@ -24,11 +24,14 @@ import WalletPage from './pages/app/WalletPage'
 import WithdrawPage from './pages/app/WithdrawPage'
 import ProfilePage from './pages/app/ProfilePage'
 import AiChatPage from './components/organisms/AiChatPage'
+import ViewCasePages from './pages/app/ViewCasePages'
+import CaseDetailsClientPage from './pages/app/CaseDetailsClientPage'
 
 // Admin Pages
 import AdminLayout from './layouts/AdminLayout'
 import TemplatesPage from './pages/admin/TemplatesPage'
 import AdminDashboardPage from './pages/admin/AdminDashboardPage'
+import UserManagementPage from './pages/admin/UserManagementPage'
 
 // Lawyer Pages
 import LawyerLayout from './layouts/LawyerLayout'
@@ -36,8 +39,6 @@ import LawyerHomePage from './pages/lawyer/LawyerHomePage'
 import LawyerAppointments from './pages/lawyer/Appointments'
 import LawyerProfilePage from './pages/lawyer/LawyerProfilePage'
 import LexRateTable from './components/organisms/LexRatesTable'
-import ViewCasePages from './pages/app/ViewCasePages'
-import CaseDetailsClientPage from './pages/app/CaseDetailsClientPage'
 import ViewCasePagesLawyer from './pages/lawyer/ViewCasePagesLawyer'
 import CaseDetailsLawyerPage from './pages/lawyer/CaseDetailsLawyerPage'
 
@@ -101,6 +102,7 @@ const AppRoutes = () => {
       >
         <Route path="templates" element={<TemplatesPage />} />
         <Route path="dashboard" element={<AdminDashboardPage />} />
+        <Route path="userManagement" element={<UserManagementPage />} />
       </Route>
 
       {/* Lawyer Routes */}

@@ -100,7 +100,7 @@ const HomePage: FC = () => {
                 title: "Tele Law",
                 desc: "Free government-backed legal advice in 22 Indian languages",
                 img: "https://images.unsplash.com/photo-1556155092-490a1ba16284?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80",
-                path: "/app/tele-law",
+                path: "#",
               },
               {
                 title: "Legal Eagle",

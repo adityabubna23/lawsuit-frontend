@@ -239,6 +239,13 @@ export const modelChatApi = {
     api.post('/model/chat', { messages }),
 }
 
+export const adminApi = {
+  getNotVerifiedClients: () => api.get('/admin/not-verified-client'),
+  getNotVerifiedLawyers: () => api.get('/admin/not-verified-lawyers'),
+  verifyClient: (id: string) => api.put(`/admin/${id}/verifyclient`),
+  verifyLawyer: (id: string) => api.put(`/admin/${id}/verifylawyer`),
+}
+
 export const storageApi = {
  getPresignedUrl: `${baseURL}/storage/presigned`, 
 }
