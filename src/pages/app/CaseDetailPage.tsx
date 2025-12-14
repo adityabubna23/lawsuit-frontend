@@ -38,7 +38,7 @@ const CaseDetailPage: FC = () => {
     const id = caseId ?? 'unknown'
     switch (selectedTab) {
       case 'caseInfo':
-        return <CaseInfo caseId={id} description={caseData?.details ?? caseData?.title ?? ''} />
+        return <CaseInfo caseId={id} />
       case 'timeline':
         return <CaseTimeline caseId={id} initialEvents={caseData?.timeline ?? []} />
       case 'hearings':
@@ -46,7 +46,7 @@ const CaseDetailPage: FC = () => {
       case 'chat':
         return <ChatTab caseId={id} />
       case 'documents':
-        return <DocumentsTab caseId={id} initial={caseData?.documents ?? []} />
+        return <DocumentsTab caseId={id} />
       case 'tasks':
         return <TasksTab caseId={id} initial={caseData?.tasks ?? []} />
       default:
