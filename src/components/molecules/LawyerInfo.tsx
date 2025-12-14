@@ -24,7 +24,7 @@ interface LawyerInfoShape {
   barCouncilProofUrl?: string
   barCouncil?: string
   experienceYears?: number
-  exprience?: ExperienceEntry[]
+  experience?: ExperienceEntry[]
   languages?: string[]
   bio?: string
   education?: EducationEntry[]
@@ -65,13 +65,13 @@ const LawyerInfo: React.FC = () => {
         // Backend sometimes wraps response in { lawyer: { ... } }
         const raw = data.data ?? data ?? {}
         const payload = raw.lawyer ?? raw
-        // prefer 'experience' key from backend but also accept 'exprience'
-        const rawExperience = payload.experience ?? payload.exprience
+        // prefer 'experience' key from backend but also accept 'experience'
+        const rawExperience = payload.experience ?? payload.experience
         const rawEducation = payload.education
         // normalize arrays into our object shapes
         const normalized: LawyerInfoShape = {
           ...payload,
-          exprience: Array.isArray(rawExperience)
+          experience: Array.isArray(rawExperience)
             ? rawExperience.map((e: any) => (typeof e === 'string' ? { title: e } : e))
             : rawExperience
               ? (typeof rawExperience === 'string' ? [{ title: rawExperience }] : [rawExperience])
@@ -117,15 +117,14 @@ const LawyerInfo: React.FC = () => {
 
   const updateExperience = (index: number, patch: Partial<ExperienceEntry>) => {
     setForm((s) => {
-      const list = (s.exprience || []).slice()
+      const list = (s.experience || []).slice()
       list[index] = { ...(list[index] || {}), ...patch }
-      return { ...s, exprience: list }
+      return { ...s, experience: list }
     })
   }
 
-  const addExperience = () => setForm((s) => ({ ...s, exprience: [...(s.exprience || []), {}] }))
-
-  const removeExperience = (index: number) => setForm((s) => ({ ...s, exprience: (s.exprience || []).filter((_, i) => i !== index) }))
+  const addExperience = () => setForm((s) => ({ ...s, experience: [...(s.experience || []), {}] }))
+  const removeExperience = (index: number) => setForm((s) => ({ ...s, experience: (s.experience || []).filter((_, i) => i !== index) }))
 
   const uploadFileToPresigned = async (file: File) => {
     if (!userId) throw new Error('No user id')
@@ -152,8 +151,8 @@ const LawyerInfo: React.FC = () => {
       // ensure arrays of objects
   payload.education = Array.isArray(form.education) ? form.education : []
   // send to backend using 'experience' key (backend may expect this) and also include exprience for compatibility
-  payload.experience = Array.isArray(form.exprience) ? form.exprience : []
-  payload.exprience = Array.isArray(form.exprience) ? form.exprience : []
+  payload.experience = Array.isArray(form.experience) ? form.experience : []
+  // payload.exprience = Array.isArray(form.exprience) ? form.exprience : []
       payload.languages = Array.isArray(form.languages) ? form.languages : parseArrayInput((form.languages as any)?.toString?.())
 
       // upload per-education certificates if present
@@ -185,7 +184,7 @@ const LawyerInfo: React.FC = () => {
       const payload2 = data.data ?? data ?? {}
       const normalized: LawyerInfoShape = {
         ...payload2,
-        exprience: Array.isArray(payload2.exprience) ? payload2.exprience : (payload2.exprience ? [payload2.exprience] : []),
+        experience: Array.isArray(payload2.experience) ? payload2.experience : (payload2.experience ? [payload2.experience] : []),
         education: Array.isArray(payload2.education) ? payload2.education : (payload2.education ? [payload2.education] : []),
         languages: Array.isArray(payload2.languages) ? payload2.languages : (payload2.languages ? payload2.languages.split(',').map((s: string) => s.trim()).filter(Boolean) : []),
       }
@@ -240,7 +239,7 @@ const LawyerInfo: React.FC = () => {
               )}
             </div>
             <div className="space-y-3 mt-2">
-              {(form.exprience || []).map((exp, idx) => (
+              {(form.experience || []).map((exp, idx) => (
                 <div key={idx} className="p-3 border rounded">
                   <div className="flex items-center justify-between">
                     <div className="text-sm font-medium">Experience #{idx + 1}</div>
@@ -266,7 +265,7 @@ const LawyerInfo: React.FC = () => {
                   </div>
                 </div>
               ))}
-              {(!(form.exprience || []).length) && !editing && <div className="text-sm text-gray-500">No experiences added</div>}
+              {(!(form.experience || []).length) && !editing && <div className="text-sm text-gray-500">No experiences added</div>}
             </div>
           </div>
           <div className="md:col-span-2">

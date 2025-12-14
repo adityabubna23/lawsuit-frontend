@@ -268,6 +268,7 @@ export const apiEndpoints = {
     getHearings: (caseid: string) => `${baseURL}/cases/hearings/${caseid}`,
     addDocument: (caseid: string) => `${baseURL}/cases/${caseid}/saveDocuments`,
     getDocuments: (caseid: string) => `${baseURL}/cases/${caseid}/documents`,
+    updateResolutionMethod: (caseid: string) => `${baseURL}/cases/${caseid}/resolution-method`,
   }
 }
 

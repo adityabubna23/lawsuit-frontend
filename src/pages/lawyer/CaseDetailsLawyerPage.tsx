@@ -12,7 +12,8 @@ import {
     User,
     Mail,
     Phone,
-    Loader2
+    Loader2,
+    Gavel
 } from "lucide-react";
 import CaseInfo from "@/components/atoms/CaseInfo";
 import CaseTimeline from "@/components/atoms/CaseTimeline";
@@ -20,6 +21,7 @@ import CaseHearings from "@/components/atoms/CaseHearings";
 import ChatTab from "@/components/atoms/ChatTab";
 import DocumentsTab from "@/components/atoms/DocumentsTab";
 import TasksTab from "@/components/atoms/TasksTab";
+import ResolutionTab from "@/components/atoms/ResolutionTab";
 import CaseTimelineLawyer from "@/components/atoms/lawyer/CaseTimelineLawyer";
 import CaseHearingsLawyer from "@/components/atoms/lawyer/CaseHearingsLawyer";
 
@@ -63,7 +65,7 @@ interface getCaseDetailsResponse {
 }[]
 };
 
-type MenuItem = 'case-info' | 'timeline' | 'hearings' | 'chat' | 'documents' | 'tasks';
+type MenuItem = 'case-info' | 'timeline' | 'hearings' | 'chat' | 'documents' | 'tasks' | 'resolution';
 
 export default function CaseDetailsClientPage() {
     const [activeMenu, setActiveMenu] = useState<MenuItem>('case-info');
@@ -91,6 +93,7 @@ export default function CaseDetailsClientPage() {
         { id: 'chat' as MenuItem, label: 'Chat', icon: MessageSquare },
         { id: 'documents' as MenuItem, label: 'Documents', icon: FolderOpen },
         { id: 'tasks' as MenuItem, label: 'Tasks', icon: CheckSquare },
+        { id: 'resolution' as MenuItem, label: 'Resolution', icon: Gavel },
     ];
 
     if (getCaseDetailsQuery.isLoading) {
@@ -129,6 +132,8 @@ export default function CaseDetailsClientPage() {
                 return <DocumentsTab caseId={caseData.id} />;
             case 'tasks':
                 return <TasksTab caseId={caseData.id} />;
+            case 'resolution':
+                return <ResolutionTab caseId={caseData.id} disputeResolutionMethod={caseData.disputeResolutionMethod} />;
             default:
                 return <CaseInfo caseId={caseData.id} />;
         }
@@ -137,7 +142,7 @@ export default function CaseDetailsClientPage() {
     return (
         <div className="flex h-[calc(100vh-130px)] bg-gray-50">
             {/* Sidebar */}
-            <aside className="w-80 bg-white border-r border-gray-200 flex flex-col">
+            <aside className="w-80 bg-white border border-gray-200 flex flex-col">
                 {/* Client Info Section */}
                 <div className="p-6 border-b border-gray-200 bg-gradient-to-br from-primary to-midnight">
                     <div className="flex flex-col items-center text-center">
@@ -253,7 +258,7 @@ export default function CaseDetailsClientPage() {
                         
                         {caseData.disputeResolutionMethod && (
                             <div className="bg-accent/10 text-accent px-4 py-2 rounded-lg">
-                                <div className="text-xs font-medium">Resolution Method</div>
+                                <div className="text-xs font-medium">Dispute in</div>
                                 <div className="text-sm font-semibold">{caseData.disputeResolutionMethod}</div>
                             </div>
                         )}
