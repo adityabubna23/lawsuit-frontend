@@ -33,11 +33,18 @@ const AppointmentsPage: FC = () => {
     return {
       upcoming: appointments.filter(apt => {
         const scheduledDate = new Date(apt.scheduledAt)
-        return (apt.status === 'PENDING' || apt.status === 'CONFIRMED') && scheduledDate >= now
+        // Appointment is upcoming if current time is before the end of the appointment
+        // End time = scheduled time + duration (use 30 mins as default if not specified)
+        const durationMs = (apt.durationMins || 30) * 60 * 1000
+        const appointmentEndTime = new Date(scheduledDate.getTime() + durationMs)
+        return (apt.status === 'PENDING' || apt.status === 'CONFIRMED') && now < appointmentEndTime
       }),
       missed: appointments.filter(apt => {
         const scheduledDate = new Date(apt.scheduledAt)
-        return (apt.status === 'PENDING' || apt.status === 'CONFIRMED') && scheduledDate < now
+        // Appointment is missed if current time is past the end of the appointment
+        const durationMs = (apt.durationMins || 30) * 60 * 1000
+        const appointmentEndTime = new Date(scheduledDate.getTime() + durationMs)
+        return (apt.status === 'PENDING' || apt.status === 'CONFIRMED') && now >= appointmentEndTime
       }),
       attended: appointments.filter(apt => apt.status === 'COMPLETED'),
       cancelled: appointments.filter(apt => apt.status === 'CANCELLED')
@@ -75,6 +82,27 @@ const AppointmentsPage: FC = () => {
         console.error('Failed to cancel appointment', err)
         alert('Failed to cancel appointment. Please try again.')
       }
+    }
+  }
+
+  const handleVideoCall = async (appointment: AppointmentData) => {
+    // Open the window immediately from user action to avoid popup blocker
+    const meetWindow = window.open('about:blank', '_blank')
+    
+    try {
+      await appointmentsApi.attend(appointment.id)
+      getAppointmentsQuery.refetch()
+      // Navigate the already-opened window to Google Meet
+      if (meetWindow) {
+        meetWindow.location.href = 'https://meet.google.com/avr-cdku-qtn'
+      }
+    } catch (error) {
+      console.error('Failed to mark attendance', error)
+      // Close the blank window on error
+      if (meetWindow) {
+        meetWindow.close()
+      }
+      alert('Failed to start video call. Please try again.')
     }
   }
 
@@ -150,6 +178,7 @@ const AppointmentsPage: FC = () => {
                   onDiscuss={handleDiscuss}
                   onReschedule={handleReschedule}
                   onCancel={handleCancel}
+                  onVideoCall={handleVideoCall}
                 />
               )}
             </div>

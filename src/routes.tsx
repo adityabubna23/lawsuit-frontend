@@ -10,6 +10,7 @@ import LoginPage from './pages/auth/LoginPage'
 import AdminLoginPage from './pages/auth/AdminLoginPage'
 import RegisterPage from './pages/auth/RegisterPage'
 import OtpVerifyPage from './pages/auth/OtpVerifyPage'
+import UnderDevelopmentPlaceholder from './components/organisms/UnderDevelopmentPlaceholder'
 
 // App Pages
 import AppLayout from './layouts/AppLayout'
@@ -85,6 +86,9 @@ const AppRoutes = () => {
         <Route path="profile" element={<ProfilePage />} />
         <Route path="lex-rates" element={<LexRateTable />} />
         <Route path="legal-eagle" element={<AiChatPage />} />
+
+
+        <Route path="under-development" element={<UnderDevelopmentPlaceholder />} />
       </Route>
 
       {/* Admin Routes */}
@@ -103,6 +107,9 @@ const AppRoutes = () => {
         <Route path="templates" element={<TemplatesPage />} />
         <Route path="dashboard" element={<AdminDashboardPage />} />
         <Route path="userManagement" element={<UserManagementPage />} />
+
+
+        <Route path="under-development" element={<UnderDevelopmentPlaceholder />} />
       </Route>
 
       {/* Lawyer Routes */}
@@ -124,6 +131,9 @@ const AppRoutes = () => {
         <Route path="case/:caseId" element={<CaseDetailsLawyerPage />} />
         <Route path="cases" element={<ViewCasePagesLawyer />} />
         <Route path="profile" element={<LawyerProfilePage />} />
+
+        <Route path="legal-eagle" element={<AiChatPage />} />
+        <Route path="under-development" element={<UnderDevelopmentPlaceholder />} />
       </Route>
 
       {/* Fallback route */}

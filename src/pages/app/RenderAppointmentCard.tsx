@@ -1,5 +1,5 @@
-import { FC } from 'react'
-import { Calendar, Clock, FileText, MessageSquare, User, RefreshCw, XCircle } from 'lucide-react'
+import { FC, useMemo } from 'react'
+import { Calendar, Clock, FileText, MessageSquare, User, RefreshCw, XCircle, Video } from 'lucide-react'
 
 interface AppointmentData {
   scheduledAt: string;
@@ -41,6 +41,7 @@ interface RenderAppointmentCardProps {
   onDiscuss: (appointmentId: string) => void;
   onReschedule?: (appointment: AppointmentData) => void;
   onCancel?: (appointment: AppointmentData) => void;
+  onVideoCall?: (appointment: AppointmentData) => void;
 }
 
 const formatDate = (dateString: string) => {
@@ -81,9 +82,20 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
   onViewAgreement,
   onDiscuss,
   onReschedule,
-  onCancel
+  onCancel,
+  onVideoCall
 }) => {
   const otherParty = appointment.lawyer
+
+  // Check if video call button should be active
+  // Active when current time >= appointment time AND current time < appointment time + 30 mins
+  const isVideoCallActive = useMemo(() => {
+    const now = new Date()
+    const appointmentTime = new Date(appointment.scheduledAt)
+    const appointmentEndWindow = new Date(appointmentTime.getTime() + 30 * 60 * 1000) // 30 mins after appointment
+    
+    return now >= appointmentTime && now < appointmentEndWindow
+  }, [appointment.scheduledAt])
 
   return (
     <div 
@@ -149,6 +161,18 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
         {/* Upcoming Tab Buttons */}
         {tabType === 'upcoming' && (
           <>
+            <button
+              onClick={() => onVideoCall?.(appointment)}
+              disabled={!isVideoCallActive}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
+                isVideoCallActive
+                  ? 'bg-primary text-white hover:bg-primary/90'
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              <Video className="w-4 h-4" />
+              Video Call
+            </button>
             {onReschedule && (
               <button
                 onClick={() => onReschedule(appointment)}

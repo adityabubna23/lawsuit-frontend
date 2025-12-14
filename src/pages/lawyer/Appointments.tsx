@@ -194,6 +194,7 @@ const LawyerAppointments: FC = () => {
 
   const handleAttend = async (appointment: AppointmentResponse['data'][0]) => {
     try {
+      window.open('https://meet.google.com/avr-cdku-qtn', '_blank')//temp line to be removed ASAP
       const res = await appointmentsApi.attend(appointment.id)
       const updated = (res as any).data?.appointment ?? (res as any).appointment ?? null
       
@@ -202,7 +203,7 @@ const LawyerAppointments: FC = () => {
 
       const meetingLink = (updated && updated.meetingLink) || appointment.meetingLink
       if (meetingLink) {
-        window.open(meetingLink, '_blank')
+        window.open('https://meet.google.com/avr-cdku-qtn', '_blank')
       }
     } catch (err) {
       console.error('Failed to mark attended', err)
