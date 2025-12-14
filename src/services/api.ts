@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { useAuthStore } from '@/stores/authStore'
 import storage from '@/utils/storage'
+import { UpdateAgreementUrlInput } from '@/schema/appointment.schema'
 
 // Create axios instance with default config
 // Compute base URL from VITE_API_URL. If the env value is a host (e.g. http://localhost:3000)
@@ -179,6 +180,9 @@ export const appointmentsApi = {
     // a body with GET requests, so use POST here. The backend accepts POST as well.
     availability: (lawyerId: string, date: string, options?: any) =>
       api.post('/appointments/availability', { lawyerId, date, options }),
+    updateAgreementUrl: (data: UpdateAgreementUrlInput) => {
+      api.post('/appointments/update-agreement-url', data.body);
+    }
 }
 
 export const casesApi = {
@@ -233,6 +237,39 @@ export const walletApi = {
 export const modelChatApi = {
   chatCompletion: (messages: { role: 'user' | 'assistant'; content: string }[]) =>
     api.post('/model/chat', { messages }),
+}
+
+export const adminApi = {
+  getNotVerifiedClients: () => api.get('/admin/not-verified-client'),
+  getNotVerifiedLawyers: () => api.get('/admin/not-verified-lawyers'),
+  verifyClient: (id: string) => api.put(`/admin/${id}/verifyclient`),
+  verifyLawyer: (id: string) => api.put(`/admin/${id}/verifylawyer`),
+}
+
+export const storageApi = {
+ getPresignedUrl: `${baseURL}/storage/presigned`, 
+}
+
+export const apiEndpoints = {
+  appointment: {
+    getAll: `${baseURL}/appointments/getall`,
+  },
+  agreement: {
+    updateAgreement: `${baseURL}/appointments/update-agreement-url`,
+  },
+  case: {
+    createCaseByLawyer: `${baseURL}/cases/create/case/details/lawyer`,
+    acceptCase: (id: string) => `${baseURL}/cases/accept/case/${id}`,
+    getAllCases: `${baseURL}/cases/getall/cases`,
+    getCaseDetails: (caseid: string) => `${baseURL}/cases/get/details/${caseid}`,
+    addTimeLine: (caseid: string) => `${baseURL}/cases/add/timeline/event/${caseid}`,
+    getTimeLineEvents: (caseid: string) => `${baseURL}/cases/timeline/events/${caseid}`,
+    addHearing: (caseid: string) => `${baseURL}/cases/${caseid}/hearings`,
+    getHearings: (caseid: string) => `${baseURL}/cases/hearings/${caseid}`,
+    addDocument: (caseid: string) => `${baseURL}/cases/${caseid}/saveDocuments`,
+    getDocuments: (caseid: string) => `${baseURL}/cases/${caseid}/documents`,
+    updateResolutionMethod: (caseid: string) => `${baseURL}/cases/${caseid}/resolution-method`,
+  }
 }
 
 export default api

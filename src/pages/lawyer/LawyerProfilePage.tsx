@@ -53,7 +53,7 @@ const LawyerProfilePage: FC = () => {
 
       const upload = res.data?.upload || res.data
       if (!upload?.uploadUrl) throw new Error('No upload URL received')
-
+        console.log(upload.uploadUrl);
       // Upload directly to S3 / storage
       const uploadResp = await fetch(upload.uploadUrl, {
         method: 'PUT',

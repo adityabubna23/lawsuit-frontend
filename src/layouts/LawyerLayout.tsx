@@ -27,12 +27,12 @@ const LawyerLayout: FC = () => {
   }
 
   const navigation = [
-    { name: 'dashboard', path: '/lawyer/dashboard' },
-    { name: 'appointments', path: '/lawyer/appointments' },
-    { name: 'cases', path: '/lawyer/cases' },
-    { name: 'profile', path: '/lawyer/profile' },
-    { name: 'calendar', path: '#' },
-    { name: 'earnings', path: '#' },
+    { name: 'Dashboard', path: '/lawyer/dashboard' },
+    { name: 'Appointments', path: '/lawyer/appointments' },
+    { name: 'Cases', path: '/lawyer/cases' },
+    { name: 'Agreement Templets', path: '/lawyer/under-development' },
+    { name: 'Calander', path: '/lawyer/under-development' },
+    { name: 'Legal Eagle', path: '/lawyer/legal-eagle' },
   ]
 
   return (

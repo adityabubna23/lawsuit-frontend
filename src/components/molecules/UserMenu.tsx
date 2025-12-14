@@ -62,8 +62,17 @@ const UserMenu: FC<UserMenuProps> = ({ user, onLogout }) => {
               </div>
 
               <div className="mt-6 border-t pt-4">
-                <Link to="/app/profile" className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Your Profile</Link>
-                <Link to="/app/settings" className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Settings</Link>
+                {user?.role === 'LAWYER' ? (
+                  <>
+                    <Link to="/lawyer/profile" className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Your Profile</Link>
+                    <Link to="/lawyer/under-development" className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Settings</Link>
+                  </>
+                ) : (
+                  <>
+                    <Link to="/app/profile" className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Your Profile</Link>
+                    <Link to="/app/under-development" className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Settings</Link>
+                  </>
+                )}
               </div>
 
               <div className="mt-auto">

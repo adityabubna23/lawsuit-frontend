@@ -10,6 +10,7 @@ import LoginPage from './pages/auth/LoginPage'
 import AdminLoginPage from './pages/auth/AdminLoginPage'
 import RegisterPage from './pages/auth/RegisterPage'
 import OtpVerifyPage from './pages/auth/OtpVerifyPage'
+import UnderDevelopmentPlaceholder from './components/organisms/UnderDevelopmentPlaceholder'
 
 // App Pages
 import AppLayout from './layouts/AppLayout'
@@ -18,17 +19,20 @@ import SearchPage from './pages/app/SearchPage'
 import LawyerDetailPage from './pages/app/LawyerDetailPage'
 import BookingPage from './pages/app/BookingPage'
 import AppointmentsPage from './pages/app/AppointmentsPage'
-import CasesListPage from './pages/app/CasesListPage'
+// import CasesListPage from './pages/app/CasesListPage'
 import CaseDetailPage from './pages/app/CaseDetailPage'
 import WalletPage from './pages/app/WalletPage'
 import WithdrawPage from './pages/app/WithdrawPage'
 import ProfilePage from './pages/app/ProfilePage'
 import AiChatPage from './components/organisms/AiChatPage'
+import ViewCasePages from './pages/app/ViewCasePages'
+import CaseDetailsClientPage from './pages/app/CaseDetailsClientPage'
 
 // Admin Pages
 import AdminLayout from './layouts/AdminLayout'
 import TemplatesPage from './pages/admin/TemplatesPage'
 import AdminDashboardPage from './pages/admin/AdminDashboardPage'
+import UserManagementPage from './pages/admin/UserManagementPage'
 
 // Lawyer Pages
 import LawyerLayout from './layouts/LawyerLayout'
@@ -36,6 +40,8 @@ import LawyerHomePage from './pages/lawyer/LawyerHomePage'
 import LawyerAppointments from './pages/lawyer/Appointments'
 import LawyerProfilePage from './pages/lawyer/LawyerProfilePage'
 import LexRateTable from './components/organisms/LexRatesTable'
+import ViewCasePagesLawyer from './pages/lawyer/ViewCasePagesLawyer'
+import CaseDetailsLawyerPage from './pages/lawyer/CaseDetailsLawyerPage'
 
 
 
@@ -75,11 +81,14 @@ const AppRoutes = () => {
         <Route path="appointments" element={<AppointmentsPage />} />
         <Route path="wallet" element={<WalletPage />} />
         <Route path="withdraw" element={<WithdrawPage />} />
-        <Route path="cases" element={<CasesListPage />} />
-        <Route path="case/:caseId" element={<CaseDetailPage />} />
+        <Route path="cases" element={<ViewCasePages />} />
+        <Route path="case/:caseId" element={<CaseDetailsClientPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="lex-rates" element={<LexRateTable />} />
         <Route path="legal-eagle" element={<AiChatPage />} />
+
+
+        <Route path="under-development" element={<UnderDevelopmentPlaceholder />} />
       </Route>
 
       {/* Admin Routes */}
@@ -97,6 +106,10 @@ const AppRoutes = () => {
       >
         <Route path="templates" element={<TemplatesPage />} />
         <Route path="dashboard" element={<AdminDashboardPage />} />
+        <Route path="userManagement" element={<UserManagementPage />} />
+
+
+        <Route path="under-development" element={<UnderDevelopmentPlaceholder />} />
       </Route>
 
       {/* Lawyer Routes */}
@@ -115,8 +128,12 @@ const AppRoutes = () => {
         {/* <Route index element={<Navigate to="appointments" replace />} /> */}
         <Route path="dashboard" element={<LawyerHomePage />} />
         <Route path="appointments" element={<LawyerAppointments />} />
-        <Route path="cases" element={<CasesListPage />} />
+        <Route path="case/:caseId" element={<CaseDetailsLawyerPage />} />
+        <Route path="cases" element={<ViewCasePagesLawyer />} />
         <Route path="profile" element={<LawyerProfilePage />} />
+
+        <Route path="legal-eagle" element={<AiChatPage />} />
+        <Route path="under-development" element={<UnderDevelopmentPlaceholder />} />
       </Route>
 
       {/* Fallback route */}
