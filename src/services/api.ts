@@ -240,7 +240,8 @@ export const modelChatApi = {
 }
 
 export const agreementTemplatesApi = {
-  getAll: () => api.get('/agreement-templates'),
+  getAll: (params?: { page?: number; limit?: number; category?: string }) =>
+    api.get('/agreement-templates', { params }),
   getById: (id: string) => api.get(`/agreement-templates/${id}`),
   create: (data: { title: string; description?: string; content: string; category?: string }) =>
     api.post('/agreement-templates', data),

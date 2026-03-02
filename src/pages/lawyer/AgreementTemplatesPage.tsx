@@ -104,6 +104,7 @@ const TemplateModal: FC<ModalProps> = ({ open, template, onClose, onSave, saving
                         <input
                             type="text"
                             required
+                            maxLength={200}
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition"
@@ -133,6 +134,7 @@ const TemplateModal: FC<ModalProps> = ({ open, template, onClose, onSave, saving
                         <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                         <input
                             type="text"
+                            maxLength={1000}
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition"
@@ -425,8 +427,8 @@ const AgreementTemplatesPage: FC = () => {
                             key={cat}
                             onClick={() => setActiveCategory(cat)}
                             className={`px-3 py-1.5 text-xs font-medium rounded-full border transition ${activeCategory === cat
-                                    ? 'bg-blue-600 text-white border-blue-600'
-                                    : 'bg-white text-gray-600 border-gray-300 hover:border-blue-300 hover:text-blue-600'
+                                ? 'bg-blue-600 text-white border-blue-600'
+                                : 'bg-white text-gray-600 border-gray-300 hover:border-blue-300 hover:text-blue-600'
                                 }`}
                         >
                             {cat}
