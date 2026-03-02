@@ -69,3 +69,15 @@ export interface TimelineEvent {
   description?: string;
   type: 'hearing' | 'task' | 'document';
 }
+
+export interface AgreementTemplate {
+  id: string
+  lawyerId: string
+  title: string
+  description?: string
+  content: string
+  category?: string
+  isDefault: boolean
+  createdAt: string
+  updatedAt: string
+}

@@ -18,7 +18,7 @@ const LawyerLayout: FC = () => {
   const fetchWallet = useWalletStore((s) => s.fetchWallet)
 
   useEffect(() => {
-    fetchWallet().catch(() => {})
+    fetchWallet().catch(() => { })
   }, [])
 
   const handleLogout = () => {
@@ -30,7 +30,7 @@ const LawyerLayout: FC = () => {
     { name: 'Dashboard', path: '/lawyer/dashboard' },
     { name: 'Appointments', path: '/lawyer/appointments' },
     { name: 'Cases', path: '/lawyer/cases' },
-    { name: 'Agreement Templets', path: '/lawyer/under-development' },
+    { name: 'Agreement Templates', path: '/lawyer/agreement-templates' },
     { name: 'Calander', path: '/lawyer/under-development' },
     { name: 'Legal Eagle', path: '/lawyer/legal-eagle' },
   ]
@@ -54,11 +54,10 @@ const LawyerLayout: FC = () => {
                   <Link
                     key={item.name}
                     to={item.path}
-                    className={`$${
-                      location.pathname === item.path
+                    className={`$${location.pathname === item.path
                         ? 'border-primary text-gray-900'
                         : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                    } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+                      } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
                   >
                     {item.name}
                   </Link>
@@ -71,8 +70,8 @@ const LawyerLayout: FC = () => {
               <Link to="/app/wallet" className="ml-3 relative p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
                 <span className="sr-only">Open wallet</span>
                 <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M2 7a2 2 0 012-2h14a2 2 0 012 2v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  <rect x="2" y="10" width="20" height="10" rx="2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M2 7a2 2 0 012-2h14a2 2 0 012 2v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <rect x="2" y="10" width="20" height="10" rx="2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   <circle cx="18" cy="15" r="1.5" fill="currentColor" />
                 </svg>
                 {balance > 0 && (
@@ -163,11 +162,10 @@ const LawyerLayout: FC = () => {
                   <Link
                     key={item.name}
                     to={item.path}
-                    className={`$${
-                      location.pathname === item.path
+                    className={`$${location.pathname === item.path
                         ? 'bg-primary-50 border-primary text-primary'
                         : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
-                    } block pl-3 pr-4 py-2 border-l-4 text-base font-medium`}
+                      } block pl-3 pr-4 py-2 border-l-4 text-base font-medium`}
                   >
                     {item.name}
                   </Link>
@@ -202,12 +200,12 @@ const LawyerLayout: FC = () => {
                   >
                     Your Profile
                   </Link>
-                    <Link
-                      to="/app/wallet"
-                      className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
-                    >
-                      Wallet
-                    </Link>
+                  <Link
+                    to="/app/wallet"
+                    className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                  >
+                    Wallet
+                  </Link>
                   <button
                     onClick={handleLogout}
                     className="block w-full text-left px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"

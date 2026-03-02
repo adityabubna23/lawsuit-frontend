@@ -72,14 +72,14 @@ api.interceptors.response.use(
 
     if (originalRequest && (originalRequest as any)._retry) {
       // already retried once -> force logout
-      try { useAuthStore.getState().logout() } catch (e) {}
+      try { useAuthStore.getState().logout() } catch (e) { }
       if (typeof window !== 'undefined') window.location.href = '/auth/login'
       return Promise.reject(error)
     }
 
     const storedRefresh = storage.getRefreshToken()
     if (!storedRefresh) {
-      try { useAuthStore.getState().logout() } catch (e) {}
+      try { useAuthStore.getState().logout() } catch (e) { }
       if (typeof window !== 'undefined') window.location.href = '/auth/login'
       return Promise.reject(error)
     }
@@ -100,7 +100,7 @@ api.interceptors.response.use(
           return res
         })
         .catch((err) => {
-          try { useAuthStore.getState().logout() } catch (e) {}
+          try { useAuthStore.getState().logout() } catch (e) { }
           if (typeof window !== 'undefined') window.location.href = '/auth/login'
           return Promise.reject(err)
         })
@@ -112,7 +112,7 @@ api.interceptors.response.use(
     return refreshPromise!
       .then(() => {
         if (originalRequest) {
-          ;(originalRequest as any)._retry = true
+          ; (originalRequest as any)._retry = true
           const token = useAuthStore.getState().token
           if (token) {
             originalRequest.headers = originalRequest.headers || {}
@@ -176,13 +176,13 @@ export const appointmentsApi = {
   cancel: (id: string) => api.put(`/appointments/${id}/cancel`),
   updateStatus: (id: string, status: string) => api.patch(`/appointments/${id}`, { status }),
   attend: (id: string) => api.post(`/appointments/${id}/attend`),
-    // availability: call backend availability endpoint. Browsers do not reliably send
-    // a body with GET requests, so use POST here. The backend accepts POST as well.
-    availability: (lawyerId: string, date: string, options?: any) =>
-      api.post('/appointments/availability', { lawyerId, date, options }),
-    updateAgreementUrl: (data: UpdateAgreementUrlInput) => {
-      api.post('/appointments/update-agreement-url', data.body);
-    }
+  // availability: call backend availability endpoint. Browsers do not reliably send
+  // a body with GET requests, so use POST here. The backend accepts POST as well.
+  availability: (lawyerId: string, date: string, options?: any) =>
+    api.post('/appointments/availability', { lawyerId, date, options }),
+  updateAgreementUrl: (data: UpdateAgreementUrlInput) => {
+    api.post('/appointments/update-agreement-url', data.body);
+  }
 }
 
 export const casesApi = {
@@ -239,6 +239,16 @@ export const modelChatApi = {
     api.post('/model/chat', { messages }),
 }
 
+export const agreementTemplatesApi = {
+  getAll: () => api.get('/agreement-templates'),
+  getById: (id: string) => api.get(`/agreement-templates/${id}`),
+  create: (data: { title: string; description?: string; content: string; category?: string }) =>
+    api.post('/agreement-templates', data),
+  update: (id: string, data: { title?: string; description?: string; content?: string; category?: string }) =>
+    api.put(`/agreement-templates/${id}`, data),
+  delete: (id: string) => api.delete(`/agreement-templates/${id}`),
+}
+
 export const adminApi = {
   getNotVerifiedClients: () => api.get('/admin/not-verified-client'),
   getNotVerifiedLawyers: () => api.get('/admin/not-verified-lawyers'),
@@ -247,7 +257,7 @@ export const adminApi = {
 }
 
 export const storageApi = {
- getPresignedUrl: `${baseURL}/storage/presigned`, 
+  getPresignedUrl: `${baseURL}/storage/presigned`,
 }
 
 export const apiEndpoints = {
