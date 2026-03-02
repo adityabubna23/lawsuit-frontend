@@ -21,6 +21,7 @@ export interface Lawyer {
   avatar?: string;
   isVerified?: boolean;
   reviewsCount?: number;
+  distance?: number; // km — only present in geo search
 }
 
 export interface Appointment {

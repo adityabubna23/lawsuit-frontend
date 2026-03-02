@@ -11,11 +11,27 @@ interface Filters {
   language?: string
 }
 
+const RADIUS_OPTIONS = [10, 25, 50, 100]
+const SORT_OPTIONS: { value: string; label: string; geoOnly?: boolean }[] = [
+  { value: 'rating', label: 'Rating' },
+  { value: 'experience', label: 'Experience' },
+  { value: 'fee', label: 'Fee' },
+  { value: 'distance', label: 'Distance (nearest)', geoOnly: true },
+]
+
 const SearchPage: FC = () => {
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
   const [filters, setFilters] = useState<Filters>({})
   const [page, setPage] = useState(1)
+
+  /* ─── Geo state ─── */
+  const [geoCoords, setGeoCoords] = useState<{ latitude: number; longitude: number } | null>(null)
+  const [geoLoading, setGeoLoading] = useState(false)
+  const [geoError, setGeoError] = useState<string | null>(null)
+  const [radiusKm, setRadiusKm] = useState(50)
+  const [sortBy, setSortBy] = useState('rating')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
   const {
     lawyers,
@@ -33,7 +49,7 @@ const SearchPage: FC = () => {
     fetchLawyers: s.fetchLawyers,
   }))
 
-  // Fetch lawyers based on search and filters (delegated to store)
+  // Fetch lawyers based on search, filters, and geo coords
   const load = async (p = 1) => {
     const mappedFilters: any = {}
     if (searchQuery) mappedFilters.q = searchQuery
@@ -42,12 +58,23 @@ const SearchPage: FC = () => {
     if (filters.maxFee) mappedFilters.maxFee = Number(filters.maxFee)
     if (filters.language) mappedFilters.languages = filters.language.split(',').map((s) => s.trim())
 
+    // Geo params
+    if (geoCoords) {
+      mappedFilters.latitude = geoCoords.latitude
+      mappedFilters.longitude = geoCoords.longitude
+      mappedFilters.radiusKm = radiusKm
+    }
+
+    // Sort
+    mappedFilters.sortBy = sortBy
+    mappedFilters.order = sortOrder
+
     await fetchLawyers(mappedFilters, p, limit)
   }
 
   useEffect(() => {
     load(page)
-  }, [searchQuery, filters, page])
+  }, [searchQuery, filters, page, geoCoords, radiusKm, sortBy, sortOrder])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -63,7 +90,7 @@ const SearchPage: FC = () => {
     setPage(1)
   }
 
-  const hasActiveFilters = Object.values(filters).some(value => value !== undefined)
+  const hasActiveFilters = Object.values(filters).some(value => value !== undefined) || geoCoords !== null
 
   const removeFilter = (key: keyof Filters) => {
     setFilters(prev => {
@@ -71,6 +98,48 @@ const SearchPage: FC = () => {
       delete updated[key]
       return updated
     })
+    setPage(1)
+  }
+
+  /* ─── Geolocation handler ─── */
+  const handleUseMyLocation = () => {
+    if (!navigator.geolocation) {
+      setGeoError('Geolocation is not supported by your browser')
+      return
+    }
+    setGeoLoading(true)
+    setGeoError(null)
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setGeoCoords({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        })
+        // Auto-switch to sort by distance when location is enabled
+        setSortBy('distance')
+        setSortOrder('asc')
+        setGeoLoading(false)
+        setPage(1)
+      },
+      (err) => {
+        setGeoError(
+          err.code === 1
+            ? 'Location permission denied. Please allow location access.'
+            : 'Unable to retrieve your location. Please try again.'
+        )
+        setGeoLoading(false)
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+  }
+
+  const clearLocation = () => {
+    setGeoCoords(null)
+    setGeoError(null)
+    if (sortBy === 'distance') {
+      setSortBy('rating')
+      setSortOrder('desc')
+    }
     setPage(1)
   }
 
@@ -100,6 +169,108 @@ const SearchPage: FC = () => {
               <Button variant='secondary' type="submit">Search</Button>
             </div>
           </form>
+
+          {/* Location & Sort controls */}
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            {/* Use My Location button */}
+            {!geoCoords ? (
+              <button
+                onClick={handleUseMyLocation}
+                disabled={geoLoading}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 transition disabled:opacity-50"
+              >
+                {geoLoading ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Locating…
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Use My Location
+                  </>
+                )}
+              </button>
+            ) : (
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-full bg-green-50 border border-green-300 text-green-700">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </span>
+                Location active
+                <button
+                  onClick={clearLocation}
+                  className="ml-1 text-green-500 hover:text-green-700"
+                  title="Clear location"
+                >
+                  ×
+                </button>
+              </div>
+            )}
+
+            {/* Radius selector — shown only when geo is active */}
+            {geoCoords && (
+              <div className="inline-flex items-center gap-2">
+                <label className="text-sm text-gray-600">Radius:</label>
+                <select
+                  value={radiusKm}
+                  onChange={(e) => { setRadiusKm(Number(e.target.value)); setPage(1) }}
+                  className="text-sm rounded-lg border border-gray-300 px-2 py-1.5 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                >
+                  {RADIUS_OPTIONS.map((r) => (
+                    <option key={r} value={r}>{r} km</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Sort */}
+            <div className="inline-flex items-center gap-2 ml-auto">
+              <label className="text-sm text-gray-600">Sort by:</label>
+              <select
+                value={sortBy}
+                onChange={(e) => {
+                  setSortBy(e.target.value)
+                  // Default order for distance is asc, for others desc
+                  setSortOrder(e.target.value === 'distance' ? 'asc' : 'desc')
+                  setPage(1)
+                }}
+                className="text-sm rounded-lg border border-gray-300 px-2 py-1.5 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+              >
+                {SORT_OPTIONS.filter((o) => !o.geoOnly || geoCoords).map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+                className="p-1.5 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-100 transition"
+                title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+              >
+                {sortOrder === 'asc' ? '↑' : '↓'}
+              </button>
+            </div>
+          </div>
+
+          {/* Geo status messages */}
+          {geoError && (
+            <div className="mt-2 text-sm text-red-600 flex items-center gap-1">
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {geoError}
+            </div>
+          )}
+          {geoCoords && !loading && (
+            <div className="mt-2 text-sm text-gray-500">
+              📍 Showing lawyers within <strong>{radiusKm} km</strong> of your location · {total} result{total !== 1 ? 's' : ''}
+            </div>
+          )}
         </div>
       </div>
 
@@ -109,7 +280,7 @@ const SearchPage: FC = () => {
           <div className="col-span-3">
             <div className="bg-white rounded-lg shadow p-4 sticky top-24">
               <h3 className="font-medium text-lg mb-4">Filters</h3>
-              
+
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -239,8 +410,21 @@ const SearchPage: FC = () => {
                       </div>
                     )
                   ))}
+                  {geoCoords && (
+                    <div className="inline-flex items-center bg-blue-100 rounded-full px-3 py-1 text-sm">
+                      <span className="text-blue-700">
+                        📍 Within {radiusKm} km
+                      </span>
+                      <button
+                        onClick={clearLocation}
+                        className="ml-2 text-blue-500 hover:text-blue-700"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )}
                   <button
-                    onClick={() => setFilters({})}
+                    onClick={() => { setFilters({}); clearLocation() }}
                     className="text-primary hover:text-primary-dark text-sm ml-auto"
                   >
                     Clear all filters
@@ -279,6 +463,7 @@ const SearchPage: FC = () => {
                             location={lawyer.location}
                             languages={lawyer.languages || []}
                             avatar={lawyer.avatar}
+                            distance={lawyer.distance}
                             onView={() => navigate(`/app/lawyers/${lawyer.id}`)}
                           />
                         </div>
@@ -293,8 +478,18 @@ const SearchPage: FC = () => {
                       </div>
                       <h3 className="text-lg font-medium text-gray-900 mb-2">No lawyers found</h3>
                       <p className="text-gray-500">
-                        Try adjusting your filters or search criteria to find more results.
+                        {geoCoords
+                          ? `No lawyers found within ${radiusKm} km. Try increasing the radius.`
+                          : 'Try adjusting your filters or search criteria to find more results.'}
                       </p>
+                      {geoCoords && (
+                        <button
+                          onClick={() => { setRadiusKm(100); setPage(1) }}
+                          className="mt-3 text-sm text-blue-600 hover:underline"
+                        >
+                          Expand to 100 km radius
+                        </button>
+                      )}
                     </div>
                   )}
 

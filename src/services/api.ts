@@ -150,6 +150,10 @@ export const lawyersApi = {
     q?: string
     specialization?: string
     city?: string
+    state?: string
+    latitude?: number
+    longitude?: number
+    radiusKm?: number
     minExperience?: number
     maxFee?: number
     languages?: string | string[]

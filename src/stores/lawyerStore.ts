@@ -19,7 +19,7 @@ interface LawyerStore {
   limit: number
   filterOptions: FilterOptions
   allFilterOptions: FilterOptions
-  fetchLawyers: (filters?: { q?: string; specialization?: string; location?: string; maxFee?: number; languages?: string[] }, page?: number, limit?: number) => Promise<void>
+  fetchLawyers: (filters?: { q?: string; specialization?: string; location?: string; maxFee?: number; languages?: string[]; latitude?: number; longitude?: number; radiusKm?: number; state?: string; sortBy?: string; order?: 'asc' | 'desc' }, page?: number, limit?: number) => Promise<void>
   fetchLawyerById: (id: string) => Promise<Lawyer | null>
 }
 
@@ -46,8 +46,14 @@ export const useLawyerStore = create<LawyerStore>((set, get) => ({
         if (filters.q) params.q = filters.q
         if (filters.specialization) params.specialization = filters.specialization
         if (filters.location) params.city = filters.location
+        if (filters.state) params.state = filters.state
         if (filters.maxFee) params.maxFee = filters.maxFee
         if (filters.languages) params.languages = Array.isArray(filters.languages) ? filters.languages.join(',') : filters.languages
+        if (filters.latitude != null) params.latitude = filters.latitude
+        if (filters.longitude != null) params.longitude = filters.longitude
+        if (filters.radiusKm) params.radiusKm = filters.radiusKm
+        if (filters.sortBy) params.sortBy = filters.sortBy
+        if (filters.order) params.order = filters.order
       }
 
       const res = await lawyersApi.getAll(params)
@@ -58,9 +64,9 @@ export const useLawyerStore = create<LawyerStore>((set, get) => ({
       const total = payload.total || 0
       const respPage = payload.page || page
       const respLimit = payload.limit || limit
-  const filtersResp = payload.filters || payload.filterOptions || {}
+      const filtersResp = payload.filters || payload.filterOptions || {}
 
-  // Map backend items to our frontend Lawyer type
+      // Map backend items to our frontend Lawyer type
       const lawyers: Lawyer[] = items.map((it: any) => ({
         id: it.id,
         name: it.user?.name || it.user?.fullName || it.name || it.user?.email || 'Unknown',
@@ -70,7 +76,10 @@ export const useLawyerStore = create<LawyerStore>((set, get) => ({
         fee: it.feePerConsultation || it.fee || 0,
         location: it.city || it.location || '',
         languages: it.languages || [],
-        avatar: it.user?.avatar || undefined,
+        avatar: it.user?.avatar || it.avatarUrl || it.user?.avatarUrl || undefined,
+        isVerified: it.isVerified ?? false,
+        reviewsCount: it.totalReviews ?? 0,
+        distance: it.distance ?? undefined,
       }))
 
       // If backend didn't provide filterOptions, derive them from returned items

@@ -16,6 +16,7 @@ interface LawyerCardProps {
   location: string;
   languages: string[];
   avatar?: string;
+  distance?: number;
   onView: (id: string) => void;
 }
 
@@ -29,6 +30,7 @@ const LawyerCard: FC<LawyerCardProps> = ({
   location,
   languages,
   avatar,
+  distance,
   onView,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -193,19 +195,27 @@ const LawyerCard: FC<LawyerCardProps> = ({
 
               <div className="mt-2 flex items-center gap-4 text-sm text-gray-600">
                 <span className="flex items-center">
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    {experienceYears} years experience
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {experienceYears} years experience
                 </span>
                 <span>•</span>
                 <span className="flex items-center">
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    {location}
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  {location}
                 </span>
+                {distance != null && (
+                  <>
+                    <span>•</span>
+                    <span className="inline-flex items-center text-blue-600 font-medium">
+                      📍 {distance < 1 ? `${Math.round(distance * 1000)} m` : `${distance.toFixed(1)} km`} away
+                    </span>
+                  </>
+                )}
               </div>
             </div>
 
@@ -218,12 +228,12 @@ const LawyerCard: FC<LawyerCardProps> = ({
                 <span className="text-sm text-gray-500">(out of 5)</span>
               </div> */}
               <div className="flex items-center justify-end gap-1 text-sm text-green-600">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                  </span>
-                  Available Now
-                </div>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </span>
+                Available Now
+              </div>
 
               {/* Fee */}
               <div className="text-lg font-semibold text-primary">
@@ -258,11 +268,11 @@ const LawyerCard: FC<LawyerCardProps> = ({
           </div>
 
           {/* Rating */}
-              <div className="flex items-center gap-1 mt-2">
-                <span className="text-yellow-400">★</span>
-                <span className="font-medium text-gray-900">{rating}</span>
-                <span className="text-sm text-gray-500 ml-2">(261 Reviews)</span>
-              </div>
+          <div className="flex items-center gap-1 mt-2">
+            <span className="text-yellow-400">★</span>
+            <span className="font-medium text-gray-900">{rating}</span>
+            <span className="text-sm text-gray-500 ml-2">(261 Reviews)</span>
+          </div>
         </div>
       </div>
 
@@ -274,7 +284,7 @@ const LawyerCard: FC<LawyerCardProps> = ({
             selectedSlot={selectedSlot}
             onDateChange={setSelectedDate}
             onSlotChange={setSelectedSlot}
-              lawyerId={id}
+            lawyerId={id}
           />
 
           <div className="mt-4 flex justify-end">
