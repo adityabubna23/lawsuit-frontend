@@ -210,6 +210,8 @@ export const usersApi = {
   updateMe: (payload: { name?: string; phone?: string; avatarUrl?: string }) => api.put('/users/me', payload),
   getPresignedUrl: (userId: string, params?: { fileName?: string; mimeType?: string; size?: number }) =>
     api.get(`/cases/${userId}/getpresignedUrl`, { params }),
+  // Cloudinary signed upload: returns { timestamp, signature, cloudName, apiKey, folder }
+  getUploadSignature: () => api.get('/users/me/upload-signature'),
   // Client information (read & update)
   getClientInformation: () => api.get('/users/client-information'),
   postClientInformation: (payload: any) => api.post('/users/client-information', payload),

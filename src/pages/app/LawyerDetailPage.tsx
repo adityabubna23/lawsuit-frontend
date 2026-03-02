@@ -22,7 +22,7 @@ const tabs = [
 
 const LawyerDetailPage: FC = () => {
   const { id } = useParams<{ id: string }>()
-  
+
 
   const [lawyer, setLawyer] = useState<Lawyer | null>(null)
   const [loading, setLoading] = useState(true)
@@ -246,24 +246,24 @@ const LawyerDetailPage: FC = () => {
 
         {/* RIGHT: 1/3 */}
         <div className="lg:col-span-1">
-            <h1 className="mt-3 mb-3 text-lg text-gray-600 font-semibold">Select your slot</h1>
+          <h1 className="mt-3 mb-3 text-lg text-gray-600 font-semibold">Select your slot</h1>
           <div className="mt-2 sticky top-6 bg-white rounded-xl shadow-sm ">
             <div className="bg-primary rounded-t-xl p-4 text-white">
-                <h2 className="text-lg font-semibold">Book a Consultation</h2>
+              <h2 className="text-lg font-semibold">Book a Consultation</h2>
             </div>
             <div className="p-6">
-                <SlotSelect
-                    selectedDate={selectedDate}
-                    selectedSlot={selectedSlot}
-                    onDateChange={(d) => {
-                    setSelectedDate(d)
-                    setSelectedSlot(null)
-                    }}
-          onSlotChange={(s) => setSelectedSlot(s)}
-          lawyerId={lawyer.id}
-                />
+              <SlotSelect
+                selectedDate={selectedDate}
+                selectedSlot={selectedSlot}
+                onDateChange={(d) => {
+                  setSelectedDate(d)
+                  setSelectedSlot(null)
+                }}
+                onSlotChange={(s) => setSelectedSlot(s)}
+                lawyerId={lawyer.id}
+              />
             </div>
-            
+
 
             <Button
               onClick={handleBook}

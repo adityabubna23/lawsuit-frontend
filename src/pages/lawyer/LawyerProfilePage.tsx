@@ -37,7 +37,7 @@ const LawyerProfilePage: FC = () => {
     }
   }, [storeUser, authUser])
 
-  // Upload avatar immediately when file is selected
+  // Upload avatar via Cloudinary signed upload
   const handleFileSelect = async (file: File) => {
     if (!file) return
 
@@ -45,29 +45,40 @@ const LawyerProfilePage: FC = () => {
     setError(null)
 
     try {
-      const res = await usersApi.getPresignedUrl(user?.id || '', {
-        fileName: file.name,
-        mimeType: file.type || 'application/octet-stream',
-        size: file.size,
-      })
+      // Step 1: Get Cloudinary upload signature from backend
+      const sigRes = await usersApi.getUploadSignature()
+      const sigData = sigRes.data || {}
+      const { timestamp, signature, cloudName, apiKey, folder } = sigData
 
-      const upload = res.data?.upload || res.data
-      if (!upload?.uploadUrl) throw new Error('No upload URL received')
-        console.log(upload.uploadUrl);
-      // Upload directly to S3 / storage
-      const uploadResp = await fetch(upload.uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': file.type || 'application/octet-stream' },
-        body: file,
-      })
+      if (!cloudName || !signature) {
+        throw new Error('Failed to get upload signature from server')
+      }
 
-      if (!uploadResp.ok) throw new Error(`Upload failed: ${uploadResp.status}`)
+      // Step 2: Upload file directly to Cloudinary
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('timestamp', String(timestamp))
+      formData.append('signature', signature)
+      formData.append('api_key', apiKey)
+      formData.append('folder', folder || 'profiles')
 
-      const fileUrl = upload.fileUrl || upload.fileURL || upload.file_url
-      if (!fileUrl) throw new Error('No file URL returned')
+      const uploadRes = await fetch(
+        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+        { method: 'POST', body: formData }
+      )
+
+      if (!uploadRes.ok) {
+        const errBody = await uploadRes.text()
+        throw new Error(`Cloudinary upload failed: ${errBody}`)
+      }
+
+      const uploadData = await uploadRes.json()
+      const imageUrl = uploadData.secure_url
+
+      if (!imageUrl) throw new Error('No image URL returned from Cloudinary')
 
       // Success → update preview + mark unsaved
-      setAvatarUrl(fileUrl)
+      setAvatarUrl(imageUrl)
       setUnsavedChanges(true)
     } catch (err: any) {
       console.error(err)
@@ -256,8 +267,8 @@ const LawyerProfilePage: FC = () => {
       </div>
       {/* additional info */}
       <section>
-        <div className="bg-white rounded-b-lg p-8 gap-8 "> 
-          <hr className='mx-12'/>
+        <div className="bg-white rounded-b-lg p-8 gap-8 ">
+          <hr className='mx-12' />
           <div className="mt-6">
             <h1 className=" flex justify-center text-lg font-semibold text-midnight mb-2">Additional Information</h1>
             <LawyerInfo />
