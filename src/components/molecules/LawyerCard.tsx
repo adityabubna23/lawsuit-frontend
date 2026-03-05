@@ -1,10 +1,11 @@
-import { FC, MouseEvent, useState } from 'react'
+import { FC, MouseEvent, useState, useEffect } from 'react'
 import { appointmentsApi } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
-import { useNavigate } from 'react-router-dom';
-// import Button from '../atoms/Button'
+import useWalletStore from '@/stores/walletStore'
+import { useNavigate } from 'react-router-dom'
+import { Wallet, CreditCard } from 'lucide-react'
 
-import SlotSelect from '../molecules/SlotSelect';
+import SlotSelect from '../molecules/SlotSelect'
 
 interface LawyerCardProps {
   id: string;
@@ -19,6 +20,9 @@ interface LawyerCardProps {
   distance?: number;
   onView: (id: string) => void;
 }
+
+const fmt = (n: number) =>
+  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
 
 const LawyerCard: FC<LawyerCardProps> = ({
   id,
@@ -38,8 +42,19 @@ const LawyerCard: FC<LawyerCardProps> = ({
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'wallet'>('razorpay')
   const authUser = useAuthStore((s) => s.user)
+  const walletBalance = useWalletStore((s) => s.balance)
+  const fetchBalance = useWalletStore((s) => s.fetchBalance)
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isExpanded) {
+      fetchBalance()
+    }
+  }, [isExpanded])
+
+  const insufficientBalance = walletBalance < fee
 
   const handleConsultNow = (e: MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
@@ -67,10 +82,29 @@ const LawyerCard: FC<LawyerCardProps> = ({
     try {
       const scheduledAt = parseSlotToISO(selectedDate, selectedSlot)
 
-      // Call backend to create appointment and payment/order record
-      const res = await appointmentsApi.book({ lawyerId: id, scheduledAt, durationMins: 30 })
+      if (paymentMethod === 'wallet') {
+        // Wallet payment — instant booking
+        await appointmentsApi.book({
+          lawyerId: id,
+          scheduledAt,
+          durationMins: 30,
+          meetingType: 'VIDEO_CALL',
+          paymentMethod: 'wallet',
+        })
+        // Refresh wallet balance
+        try { await fetchBalance() } catch { }
+        setIsExpanded(false)
+        setSelectedDate(null)
+        setSelectedSlot(null)
+        setIsProcessing(false)
+        navigate('/app/appointments', { replace: true })
+        return
+      }
+
+      // Razorpay flow — book then open checkout
+      const res = await appointmentsApi.book({ lawyerId: id, scheduledAt, durationMins: 30, meetingType: 'VIDEO_CALL' })
       const payload = res.data || res
-      const appointment = payload.appointment ?? payload.appointment ?? payload
+      const appointment = payload.appointment ?? payload
       const payment = payload.payment ?? payload
       const order = payload.payment.order ?? payload
       // Try to open Razorpay checkout if provider returned an order id
@@ -87,7 +121,6 @@ const LawyerCard: FC<LawyerCardProps> = ({
           name: 'LawSuit',
           description: `Consultation with ${name}`,
           order_id: order?.id,
-          // callback_url: 'http://localhost:3000/app/home', 
           handler: async (resp: any) => {
             try {
               // resp contains razorpay_payment_id, razorpay_order_id, razorpay_signature
@@ -116,7 +149,7 @@ const LawyerCard: FC<LawyerCardProps> = ({
             contact: (authUser as any)?.phone,
           },
           notes: { appointmentId: appointment.id },
-          theme: { color: '#0ea5a4' },
+          theme: { color: '#0B4D64' },
         }
 
         const rzp = new (window as any).Razorpay(options)
@@ -125,8 +158,7 @@ const LawyerCard: FC<LawyerCardProps> = ({
         return
       }
 
-      // Fallback: backend didn't create a provider order (local provider id).
-      // We'll treat appointment as created and show success. Optionally try to confirm payment via API if provider data exists.
+      // Fallback
       setIsExpanded(false)
       setSelectedDate(null)
       setSelectedSlot(null)
@@ -221,12 +253,6 @@ const LawyerCard: FC<LawyerCardProps> = ({
 
             {/* ==== RIGHT: Rating, Fee, Availability, Consult ==== */}
             <div className="text-right space-y-2">
-              {/* Rating */}
-              {/* <div className="flex items-center justify-end gap-1">
-                <span className="text-yellow-400">★</span>
-                <span className="font-medium text-gray-900">{rating}</span>
-                <span className="text-sm text-gray-500">(out of 5)</span>
-              </div> */}
               <div className="flex items-center justify-end gap-1 text-sm text-green-600">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -242,14 +268,6 @@ const LawyerCard: FC<LawyerCardProps> = ({
 
               {/* Availability + Consult Now */}
               <div className="flex items-center justify-end gap-2 mt-2">
-                {/* <div className="flex items-center gap-1 text-sm text-green-600">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                  </span>
-                  Available Now
-                </div> */}
-
                 <button
                   onClick={handleConsultNow}
                   className="px-4 py-1.5 text-sm font-medium text-white bg-primary rounded-md
@@ -287,6 +305,41 @@ const LawyerCard: FC<LawyerCardProps> = ({
             lawyerId={id}
           />
 
+          {/* Payment Method Toggle */}
+          {selectedDate && selectedSlot && (
+            <div className="mt-4 pt-4 border-t">
+              <div className="text-sm font-medium text-gray-700 mb-2">Payment Method</div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setPaymentMethod('razorpay')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 transition-all ${paymentMethod === 'razorpay'
+                      ? 'border-primary bg-primary/5'
+                      : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                >
+                  <CreditCard className={`w-4 h-4 ${paymentMethod === 'razorpay' ? 'text-primary' : 'text-gray-400'}`} />
+                  <span className={`text-sm font-medium ${paymentMethod === 'razorpay' ? 'text-primary' : 'text-gray-700'}`}>Razorpay</span>
+                </button>
+                <button
+                  onClick={() => !insufficientBalance && setPaymentMethod('wallet')}
+                  disabled={insufficientBalance}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 transition-all ${paymentMethod === 'wallet'
+                      ? 'border-primary bg-primary/5'
+                      : insufficientBalance
+                        ? 'border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                >
+                  <Wallet className={`w-4 h-4 ${paymentMethod === 'wallet' ? 'text-primary' : 'text-gray-400'}`} />
+                  <span className={`text-sm font-medium ${paymentMethod === 'wallet' ? 'text-primary' : 'text-gray-700'}`}>Wallet ({fmt(walletBalance)})</span>
+                </button>
+              </div>
+              {insufficientBalance && (
+                <p className="text-xs text-amber-600 mt-1.5">Insufficient wallet balance.</p>
+              )}
+            </div>
+          )}
+
           <div className="mt-4 flex justify-end">
             <button
               onClick={handleConfirm}
@@ -299,7 +352,7 @@ const LawyerCard: FC<LawyerCardProps> = ({
                 }
               `}
             >
-              {isProcessing ? 'Processing…' : 'Confirm Booking'}
+              {isProcessing ? 'Processing…' : paymentMethod === 'wallet' ? 'Pay from Wallet' : 'Confirm Booking'}
             </button>
           </div>
           {errorMsg && <div className="mt-2 text-red-500 text-sm">{errorMsg}</div>}

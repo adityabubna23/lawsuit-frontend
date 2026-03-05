@@ -46,18 +46,18 @@ interface RenderAppointmentCardProps {
 
 const formatDate = (dateString: string) => {
   const date = new Date(dateString)
-  return date.toLocaleDateString('en-US', { 
-    month: 'short', 
-    day: 'numeric', 
-    year: 'numeric' 
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
   })
 }
 
 const formatTime = (dateString: string) => {
   const date = new Date(dateString)
-  return date.toLocaleTimeString('en-US', { 
-    hour: '2-digit', 
-    minute: '2-digit' 
+  return date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit'
   })
 }
 
@@ -87,96 +87,97 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
 }) => {
   const otherParty = appointment.lawyer
 
-  // Check if video call button should be active
-  // Active when current time >= appointment time AND current time < appointment time + 30 mins
   const isVideoCallActive = useMemo(() => {
     const now = new Date()
     const appointmentTime = new Date(appointment.scheduledAt)
-    const appointmentEndWindow = new Date(appointmentTime.getTime() + 30 * 60 * 1000) // 30 mins after appointment
-    
+    const appointmentEndWindow = new Date(appointmentTime.getTime() + 30 * 60 * 1000)
+
     return now >= appointmentTime && now < appointmentEndWindow
   }, [appointment.scheduledAt])
 
   return (
-    <div 
-      className="border border-gray-200 bg-white p-6 mb-4 hover:border-primary transition-colors"
+    <div
+      className="border border-gray-200 bg-white p-4 sm:p-6 mb-4 rounded-lg sm:rounded-none hover:border-primary transition-colors"
     >
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-              {otherParty?.avatarUrl ? (
-                <img 
-                  src={otherParty.avatarUrl} 
-                  alt={otherParty.name}
-                  className="w-10 h-10 rounded-full object-cover"
-                />
-              ) : (
-                <User className="w-5 h-5 text-gray-400" />
-              )}
-            </div>
-            <div>
-              <h3 className="text-base font-medium text-primary">
-                {otherParty?.name || 'Unknown'}
-              </h3>
-              <p className="text-sm text-secondary">{otherParty?.email}</p>
-            </div>
+      {/* Header — lawyer info + status */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+            {otherParty?.avatarUrl ? (
+              <img
+                src={otherParty.avatarUrl}
+                alt={otherParty.name}
+                className="w-10 h-10 rounded-full object-cover"
+              />
+            ) : (
+              <User className="w-5 h-5 text-gray-400" />
+            )}
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div className="flex items-center gap-2 text-sm text-secondary">
-              <Calendar className="w-4 h-4" />
-              <span>{formatDate(appointment.scheduledAt)}</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-secondary">
-              <Clock className="w-4 h-4" />
-              <span>{formatTime(appointment.scheduledAt)} ({appointment.durationMins} mins)</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-secondary">Status:</span>
-              <span className={`font-medium ${getStatusColor(appointment.status)}`}>
-                {appointment.status}
-              </span>
-            </div>
+          <div className="min-w-0">
+            <h3 className="text-base font-medium text-primary truncate">
+              {otherParty?.name || 'Unknown'}
+            </h3>
+            <p className="text-sm text-secondary truncate">{otherParty?.email}</p>
           </div>
+        </div>
 
-          {appointment.notes && (
-            <p className="text-sm text-secondary mb-4 line-clamp-2">
-              {appointment.notes}
-            </p>
-          )}
-
-          {appointment.payment && (
-            <div className="text-sm text-secondary mb-4">
-              Payment: {appointment.payment.currency} {appointment.payment.amount} - 
-              <span className={`ml-1 ${appointment.payment.status === 'COMPLETED' ? 'text-green-600' : 'text-yellow-600'}`}>
-                {appointment.payment.status}
-              </span>
-            </div>
-          )}
+        {/* Status badge — visible inline on mobile */}
+        <div className="flex items-center gap-2 text-sm sm:flex-shrink-0">
+          <span className="text-secondary">Status:</span>
+          <span className={`font-medium ${getStatusColor(appointment.status)}`}>
+            {appointment.status}
+          </span>
         </div>
       </div>
 
-      <div className="flex gap-3 mt-4 pt-4 border-t border-gray-100">
+      {/* Info grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 mt-4 mb-4">
+        <div className="flex items-center gap-2 text-sm text-secondary">
+          <Calendar className="w-4 h-4 flex-shrink-0" />
+          <span>{formatDate(appointment.scheduledAt)}</span>
+        </div>
+        <div className="flex items-center gap-2 text-sm text-secondary">
+          <Clock className="w-4 h-4 flex-shrink-0" />
+          <span>{formatTime(appointment.scheduledAt)} ({appointment.durationMins} mins)</span>
+        </div>
+      </div>
+
+      {appointment.notes && (
+        <p className="text-sm text-secondary mb-4 line-clamp-2">
+          {appointment.notes}
+        </p>
+      )}
+
+      {appointment.payment && (
+        <div className="text-sm text-secondary mb-4">
+          Payment: {appointment.payment.currency} {appointment.payment.amount} -
+          <span className={`ml-1 ${appointment.payment.status === 'COMPLETED' ? 'text-green-600' : 'text-yellow-600'}`}>
+            {appointment.payment.status}
+          </span>
+        </div>
+      )}
+
+      {/* Action buttons — wrap on mobile */}
+      <div className="flex flex-wrap gap-2 sm:gap-3 mt-4 pt-4 border-t border-gray-100">
         {/* Upcoming Tab Buttons */}
         {tabType === 'upcoming' && (
           <>
             <button
               onClick={() => onVideoCall?.(appointment)}
               disabled={!isVideoCallActive}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
-                isVideoCallActive
+              className={`flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium rounded-md transition-colors ${isVideoCallActive
                   ? 'bg-primary text-white hover:bg-primary/90'
                   : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              }`}
+                }`}
             >
               <Video className="w-4 h-4" />
-              Video Call
+              <span className="hidden xs:inline sm:inline">Video Call</span>
+              <span className="xs:hidden sm:hidden">Call</span>
             </button>
             {onReschedule && (
               <button
                 onClick={() => onReschedule(appointment)}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-white transition-colors"
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-white rounded-md transition-colors"
               >
                 <RefreshCw className="w-4 h-4" />
                 Reschedule
@@ -185,7 +186,7 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
             {onCancel && (
               <button
                 onClick={() => onCancel(appointment)}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-red-600 text-red-600 hover:bg-red-600 hover:text-white transition-colors"
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium border border-red-600 text-red-600 hover:bg-red-600 hover:text-white rounded-md transition-colors"
               >
                 <XCircle className="w-4 h-4" />
                 Cancel
@@ -200,7 +201,7 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
             {onReschedule && (
               <button
                 onClick={() => onReschedule(appointment)}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-white transition-colors"
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-white rounded-md transition-colors"
               >
                 <RefreshCw className="w-4 h-4" />
                 Reschedule
@@ -209,7 +210,7 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
             {onCancel && (
               <button
                 onClick={() => onCancel(appointment)}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-red-600 text-red-600 hover:bg-red-600 hover:text-white transition-colors"
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium border border-red-600 text-red-600 hover:bg-red-600 hover:text-white rounded-md transition-colors"
               >
                 <XCircle className="w-4 h-4" />
                 Cancel
@@ -224,26 +225,23 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
             <button
               onClick={() => onViewAgreement({ appointmentId: appointment.id, aggrementUrl: appointment.aggrementUrl })}
               disabled={!appointment.aggrementUrl}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
-                appointment.aggrementUrl
+              className={`flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium rounded-md transition-colors ${appointment.aggrementUrl
                   ? 'bg-primary text-white hover:bg-primary/90'
                   : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              }`}
+                }`}
             >
               <FileText className="w-4 h-4" />
-              View Agreement
+              Agreement
             </button>
             <button
               onClick={() => onDiscuss(appointment.id)}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-white transition-colors"
+              className="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-white rounded-md transition-colors"
             >
               <MessageSquare className="w-4 h-4" />
               Discuss
             </button>
           </>
         )}
-
-        {/* Cancelled Tab - No buttons */}
       </div>
     </div>
   )

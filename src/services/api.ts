@@ -168,8 +168,8 @@ export const lawyersApi = {
 export const appointmentsApi = {
   create: (data: { lawyerId: string; datetime: string; paymentId?: string }) =>
     api.post('/appointments', data),
-  // Book endpoint: backend expects { lawyerId, scheduledAt, durationMins?, notes? }
-  book: (payload: { lawyerId: string; scheduledAt: string; durationMins?: number; notes?: string }) =>
+  // Book endpoint: backend expects { lawyerId, scheduledAt, durationMins?, meetingType?, paymentMethod?, notes? }
+  book: (payload: { lawyerId: string; scheduledAt: string; durationMins?: number; meetingType?: string; paymentMethod?: string; notes?: string }) =>
     api.post('/appointments/book', payload),
   // Confirm payment for an appointment
   confirmPayment: (appointmentId: string, body: { appointmentId: string; razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) =>
@@ -230,14 +230,30 @@ export const chatApi = {
 }
 
 export const notificationsApi = {
-  getAll: () => api.get('/notifications'),
-  markRead: (id: string) => api.patch(`/notifications/${id}/read`),
-  markAll: () => api.patch('/notifications/mark-all'),
+  getAll: (params?: { page?: number; limit?: number }) =>
+    api.get('/notifications', { params }),
+  getUnreadCount: () => api.get('/notifications/unread-count'),
+  markRead: (id: string) => api.put(`/notifications/${id}/read`),
+  markAllRead: () => api.put('/notifications/read-all'),
+  delete: (id: string) => api.delete(`/notifications/${id}`),
 }
 
 export const walletApi = {
-  get: () => api.get('/wallet'),
-  buyGiftCard: (payload: { amount: number; cardType: string }) => api.post('/wallet/buy-giftcard', payload),
+  getBalance: () => api.get('/wallet/balance'),
+  getTransactions: (params?: { page?: number; limit?: number }) =>
+    api.get('/wallet/transactions', { params }),
+  addMoney: (payload: { amount: number }) =>
+    api.post('/wallet/add-money', payload),
+  confirmAddMoney: (payload: {
+    paymentId: string;
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }) => api.post('/wallet/confirm-add-money', payload),
+  withdraw: (payload: { amount: number; bankAccountId?: string }) =>
+    api.post('/wallet/withdraw', payload),
+  transfer: (payload: { toUserId: string; amount: number; description?: string }) =>
+    api.post('/wallet/transfer', payload),
 }
 
 export const modelChatApi = {

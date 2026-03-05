@@ -2,60 +2,60 @@ import { FC, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api, { apiEndpoints } from "@/services/api"
 import { useQuery } from "@tanstack/react-query"
-import { 
-  Scale, 
-  Handshake, 
-  Gavel, 
-  User, 
-  Calendar, 
-  Briefcase, 
-  FileText, 
-  Clock, 
-  Building2,
-  MessageSquare,
-  CheckCircle2,
-  XCircle,
-  AlertCircle
+import {
+    Scale,
+    Handshake,
+    Gavel,
+    User,
+    Calendar,
+    Briefcase,
+    FileText,
+    Clock,
+    Building2,
+    MessageSquare,
+    CheckCircle2,
+    XCircle,
+    AlertCircle
 } from 'lucide-react'
 
 interface getAllCasesResponse {
     data: {
-    title: string;
-    description: string;
-    category: string;
-    id: string;
-    status: "OPEN" | "IN_PROGRESS" | "CLOSED" | "PENDING_DOCUMENTS" | "UNDER_REVIEW" | "HEARING_SCHEDULED" | "WON" | "LOST" | "SETTLED";
-    caseNumber: string | null;
-    courtName: string | null;
-    isAccepted: boolean;
-    startedAt: Date | null;
-    closedAt: Date | null;
-    createdAt: Date;
-    updatedAt: Date;
-    disputeResolutionMethod: "TRIAL" | "MEDIATION" | "ARBITRATION" | null;
-    client: {
+        title: string;
+        description: string;
+        category: string;
         id: string;
-        name: string;
-        email: string;
-        phone: string;
-        avatarUrl: string | null;
-    };
-    lawyer: {
-        id: string;
-        name: string;
-        email: string;
-        phone: string;
-        avatarUrl: string | null;
-    } | null;
-    appointment: {
-        id: string;
-        status: "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED" | "RESCHEDULED";
-        notes: string | null;
-        scheduledAt: Date;
-        durationMins: number;
-        meetingLink: string | null;
-    } | null;
-}[]
+        status: "OPEN" | "IN_PROGRESS" | "CLOSED" | "PENDING_DOCUMENTS" | "UNDER_REVIEW" | "HEARING_SCHEDULED" | "WON" | "LOST" | "SETTLED";
+        caseNumber: string | null;
+        courtName: string | null;
+        isAccepted: boolean;
+        startedAt: Date | null;
+        closedAt: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
+        disputeResolutionMethod: "TRIAL" | "MEDIATION" | "ARBITRATION" | null;
+        client: {
+            id: string;
+            name: string;
+            email: string;
+            phone: string;
+            avatarUrl: string | null;
+        };
+        lawyer: {
+            id: string;
+            name: string;
+            email: string;
+            phone: string;
+            avatarUrl: string | null;
+        } | null;
+        appointment: {
+            id: string;
+            status: "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED" | "RESCHEDULED";
+            notes: string | null;
+            scheduledAt: Date;
+            durationMins: number;
+            meetingLink: string | null;
+        } | null;
+    }[]
 
 }
 
@@ -87,10 +87,10 @@ const ViewCasePages: FC = () => {
     const formatDate = (dateString: Date | null) => {
         if (!dateString) return 'Not set'
         const date = new Date(dateString)
-        return date.toLocaleDateString('en-US', { 
-            month: 'short', 
-            day: 'numeric', 
-            year: 'numeric' 
+        return date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
         })
     }
 
@@ -158,137 +158,136 @@ const ViewCasePages: FC = () => {
 
     const renderCaseCard = (caseItem: getAllCasesResponse['data'][0]) => {
         return (
-            <div 
+            <div
                 key={caseItem.id}
-                className="border border-gray-200 bg-white p-6 mb-4 hover:border-primary transition-colors"
+                className="border border-gray-200 bg-white p-4 sm:p-6 mb-4 rounded-lg sm:rounded-none hover:border-primary transition-colors"
             >
-                <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                        <div className="flex items-start justify-between mb-3">
-                            <div className="flex-1">
-                                <h3 className="text-lg font-semibold text-primary mb-1">
-                                    {caseItem.title}
-                                </h3>
-                                {caseItem.caseNumber && (
-                                    <p className="text-sm text-secondary mb-2">
-                                        Case No: {caseItem.caseNumber}
-                                    </p>
-                                )}
-                            </div>
-                            <div className="flex items-center gap-2 ml-4">
-                                <span className={`flex items-center gap-1.5 text-sm font-medium ${getStatusColor(caseItem.status)}`}>
-                                    {getStatusIcon(caseItem.status)}
-                                    {caseItem.status.replace(/_/g, ' ')}
-                                </span>
-                            </div>
-                        </div>
-
-                        <p className="text-sm text-secondary mb-4 line-clamp-2">
-                            {caseItem.description}
-                        </p>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-                            <div className="flex items-center gap-2 text-sm text-secondary">
-                                <Briefcase className="w-4 h-4" />
-                                <span className="font-medium">Category:</span>
-                                <span>{caseItem.category}</span>
-                            </div>
-
-                            {caseItem.disputeResolutionMethod && (
-                                <div className="flex items-center gap-2 text-sm text-secondary">
-                                    {getResolutionMethodIcon(caseItem.disputeResolutionMethod)}
-                                    <span className="font-medium">Method:</span>
-                                    <span>{caseItem.disputeResolutionMethod}</span>
-                                </div>
-                            )}
-
-                            {caseItem.courtName && (
-                                <div className="flex items-center gap-2 text-sm text-secondary">
-                                    <Building2 className="w-4 h-4" />
-                                    <span className="font-medium">Court:</span>
-                                    <span className="truncate">{caseItem.courtName}</span>
-                                </div>
-                            )}
-
-                            <div className="flex items-center gap-2 text-sm text-secondary">
-                                <Calendar className="w-4 h-4" />
-                                <span className="font-medium">Created:</span>
-                                <span>{formatDate(caseItem.createdAt)}</span>
-                            </div>
-
-                            {caseItem.startedAt && (
-                                <div className="flex items-center gap-2 text-sm text-secondary">
-                                    <Clock className="w-4 h-4" />
-                                    <span className="font-medium">Started:</span>
-                                    <span>{formatDate(caseItem.startedAt)}</span>
-                                </div>
-                            )}
-
-                            {caseItem.closedAt && (
-                                <div className="flex items-center gap-2 text-sm text-secondary">
-                                    <CheckCircle2 className="w-4 h-4" />
-                                    <span className="font-medium">Closed:</span>
-                                    <span>{formatDate(caseItem.closedAt)}</span>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Client and Lawyer Info */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-100">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                                    {caseItem.client.avatarUrl ? (
-                                        <img 
-                                            src={caseItem.client.avatarUrl} 
-                                            alt={caseItem.client.name}
-                                            className="w-10 h-10 rounded-full object-cover"
-                                        />
-                                    ) : (
-                                        <User className="w-5 h-5 text-gray-400" />
-                                    )}
-                                </div>
-                                <div>
-                                    <p className="text-xs text-secondary">Client</p>
-                                    <p className="text-sm font-medium text-primary">{caseItem.client.name}</p>
-                                    <p className="text-xs text-secondary">{caseItem.client.email}</p>
-                                </div>
-                            </div>
-
-                            {caseItem.lawyer && (
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                                        {caseItem.lawyer.avatarUrl ? (
-                                            <img 
-                                                src={caseItem.lawyer.avatarUrl} 
-                                                alt={caseItem.lawyer.name}
-                                                className="w-10 h-10 rounded-full object-cover"
-                                            />
-                                        ) : (
-                                            <User className="w-5 h-5 text-gray-400" />
-                                        )}
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-secondary">Lawyer</p>
-                                        <p className="text-sm font-medium text-primary">{caseItem.lawyer.name}</p>
-                                        <p className="text-xs text-secondary">{caseItem.lawyer.email}</p>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                {/* Title + Status */}
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3">
+                    <div className="min-w-0 flex-1">
+                        <h3 className="text-base sm:text-lg font-semibold text-primary mb-1 break-words">
+                            {caseItem.title}
+                        </h3>
+                        {caseItem.caseNumber && (
+                            <p className="text-sm text-secondary">
+                                Case No: {caseItem.caseNumber}
+                            </p>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <span className={`flex items-center gap-1.5 text-sm font-medium ${getStatusColor(caseItem.status)}`}>
+                            {getStatusIcon(caseItem.status)}
+                            {caseItem.status.replace(/_/g, ' ')}
+                        </span>
                     </div>
                 </div>
 
-                <div className="flex gap-3 pt-4 border-t border-gray-100">
+                <p className="text-sm text-secondary mb-4 line-clamp-2">
+                    {caseItem.description}
+                </p>
+
+                {/* Case metadata grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4 mb-4">
+                    <div className="flex items-center gap-2 text-sm text-secondary">
+                        <Briefcase className="w-4 h-4 flex-shrink-0" />
+                        <span className="font-medium">Category:</span>
+                        <span className="truncate">{caseItem.category}</span>
+                    </div>
+
+                    {caseItem.disputeResolutionMethod && (
+                        <div className="flex items-center gap-2 text-sm text-secondary">
+                            {getResolutionMethodIcon(caseItem.disputeResolutionMethod)}
+                            <span className="font-medium">Method:</span>
+                            <span>{caseItem.disputeResolutionMethod}</span>
+                        </div>
+                    )}
+
+                    {caseItem.courtName && (
+                        <div className="flex items-center gap-2 text-sm text-secondary">
+                            <Building2 className="w-4 h-4 flex-shrink-0" />
+                            <span className="font-medium">Court:</span>
+                            <span className="truncate">{caseItem.courtName}</span>
+                        </div>
+                    )}
+
+                    <div className="flex items-center gap-2 text-sm text-secondary">
+                        <Calendar className="w-4 h-4 flex-shrink-0" />
+                        <span className="font-medium">Created:</span>
+                        <span>{formatDate(caseItem.createdAt)}</span>
+                    </div>
+
+                    {caseItem.startedAt && (
+                        <div className="flex items-center gap-2 text-sm text-secondary">
+                            <Clock className="w-4 h-4 flex-shrink-0" />
+                            <span className="font-medium">Started:</span>
+                            <span>{formatDate(caseItem.startedAt)}</span>
+                        </div>
+                    )}
+
+                    {caseItem.closedAt && (
+                        <div className="flex items-center gap-2 text-sm text-secondary">
+                            <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                            <span className="font-medium">Closed:</span>
+                            <span>{formatDate(caseItem.closedAt)}</span>
+                        </div>
+                    )}
+                </div>
+
+                {/* Client and Lawyer Info */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-4 border-t border-gray-100">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+                            {caseItem.client.avatarUrl ? (
+                                <img
+                                    src={caseItem.client.avatarUrl}
+                                    alt={caseItem.client.name}
+                                    className="w-10 h-10 rounded-full object-cover"
+                                />
+                            ) : (
+                                <User className="w-5 h-5 text-gray-400" />
+                            )}
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-xs text-secondary">Client</p>
+                            <p className="text-sm font-medium text-primary truncate">{caseItem.client.name}</p>
+                            <p className="text-xs text-secondary truncate">{caseItem.client.email}</p>
+                        </div>
+                    </div>
+
+                    {caseItem.lawyer && (
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                {caseItem.lawyer.avatarUrl ? (
+                                    <img
+                                        src={caseItem.lawyer.avatarUrl}
+                                        alt={caseItem.lawyer.name}
+                                        className="w-10 h-10 rounded-full object-cover"
+                                    />
+                                ) : (
+                                    <User className="w-5 h-5 text-gray-400" />
+                                )}
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-xs text-secondary">Lawyer</p>
+                                <p className="text-sm font-medium text-primary truncate">{caseItem.lawyer.name}</p>
+                                <p className="text-xs text-secondary truncate">{caseItem.lawyer.email}</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-wrap gap-2 sm:gap-3 pt-4 border-t border-gray-100 mt-4">
                     <button
                         onClick={() => handleViewDetails(caseItem.id)}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-white hover:bg-primary/90 transition-colors"
+                        className="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium bg-primary text-white hover:bg-primary/90 rounded-md transition-colors"
                     >
                         <FileText className="w-4 h-4" />
                         View Details
                     </button>
                     <button
                         onClick={() => handleDiscuss(caseItem.id)}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-white transition-colors"
+                        className="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-white rounded-md transition-colors"
                     >
                         <MessageSquare className="w-4 h-4" />
                         Discuss
@@ -306,34 +305,33 @@ const ViewCasePages: FC = () => {
     ]
 
     return (
-        <div className="min-h-screen bg-gray-50 p-6">
+        <div className="min-h-screen bg-gray-50 px-3 py-4 sm:p-6">
             <div className="max-w-7xl mx-auto">
-                <div className="mb-8">
-                    <h1 className="text-3xl font-semibold text-primary mb-2">Cases</h1>
-                    <p className="text-secondary">View and manage all your legal cases</p>
+                <div className="mb-6 sm:mb-8">
+                    <h1 className="text-2xl sm:text-3xl font-semibold text-primary mb-1 sm:mb-2">Cases</h1>
+                    <p className="text-sm sm:text-base text-secondary">View and manage all your legal cases</p>
                 </div>
 
-                {/* Tabs */}
-                <div className="bg-white border-b border-gray-200 mb-6">
-                    <div className="flex gap-0">
+                {/* Tabs — horizontal scroll on mobile */}
+                <div className="bg-white border-b border-gray-200 mb-4 sm:mb-6 -mx-3 sm:mx-0 overflow-x-auto">
+                    <div className="flex min-w-max sm:min-w-0">
                         {tabs.map(tab => (
                             <button
                                 key={tab.key}
                                 onClick={() => setActiveTab(tab.key)}
-                                className={`px-6 py-4 text-sm font-medium transition-colors relative ${
-                                    activeTab === tab.key
+                                className={`px-3 sm:px-6 py-3 sm:py-4 text-sm font-medium transition-colors relative whitespace-nowrap ${activeTab === tab.key
                                         ? 'text-primary'
                                         : 'text-secondary hover:text-primary'
-                                }`}
+                                    }`}
                             >
-                                <span className="flex items-center gap-2">
+                                <span className="flex items-center gap-1.5 sm:gap-2">
                                     {tab.icon}
-                                    {tab.label}
-                                    <span className={`px-2 py-0.5 text-xs rounded-full ${
-                                        activeTab === tab.key
+                                    <span className="hidden sm:inline">{tab.label}</span>
+                                    <span className="sm:hidden">{tab.label.replace('All Cases', 'All')}</span>
+                                    <span className={`px-1.5 sm:px-2 py-0.5 text-xs rounded-full ${activeTab === tab.key
                                             ? 'bg-primary text-white'
                                             : 'bg-gray-100 text-gray-600'
-                                    }`}>
+                                        }`}>
                                         {tab.count}
                                     </span>
                                 </span>
@@ -361,8 +359,8 @@ const ViewCasePages: FC = () => {
                             <p className="text-secondary">No cases found in this category</p>
                         </div>
                     ) : (
-                        <div>
-                            {categorizedCases[activeTab].map(caseItem => 
+                        <div className="space-y-4">
+                            {categorizedCases[activeTab].map(caseItem =>
                                 renderCaseCard(caseItem)
                             )}
                         </div>

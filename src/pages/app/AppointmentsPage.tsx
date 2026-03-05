@@ -14,7 +14,7 @@ type TabType = 'upcoming' | 'missed' | 'attended' | 'cancelled'
 const AppointmentsPage: FC = () => {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<TabType>('upcoming')
-  const [selectedAgreementUrl, setSelectedAgreementUrl] = useState<{appointmentId: string, aggrementUrl: string | null} | null>(null)
+  const [selectedAgreementUrl, setSelectedAgreementUrl] = useState<{ appointmentId: string, aggrementUrl: string | null } | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
   const getAppointmentsQuery = useQuery({
@@ -29,19 +29,16 @@ const AppointmentsPage: FC = () => {
 
   const categorizedAppointments = useMemo(() => {
     const now = new Date()
-    
+
     return {
       upcoming: appointments.filter(apt => {
         const scheduledDate = new Date(apt.scheduledAt)
-        // Appointment is upcoming if current time is before the end of the appointment
-        // End time = scheduled time + duration (use 30 mins as default if not specified)
         const durationMs = (apt.durationMins || 30) * 60 * 1000
         const appointmentEndTime = new Date(scheduledDate.getTime() + durationMs)
         return (apt.status === 'PENDING' || apt.status === 'CONFIRMED') && now < appointmentEndTime
       }),
       missed: appointments.filter(apt => {
         const scheduledDate = new Date(apt.scheduledAt)
-        // Appointment is missed if current time is past the end of the appointment
         const durationMs = (apt.durationMins || 30) * 60 * 1000
         const appointmentEndTime = new Date(scheduledDate.getTime() + durationMs)
         return (apt.status === 'PENDING' || apt.status === 'CONFIRMED') && now >= appointmentEndTime
@@ -51,9 +48,9 @@ const AppointmentsPage: FC = () => {
     }
   }, [appointments])
 
-  const handleViewAgreement = ({appointmentId, aggrementUrl} : {appointmentId: string, aggrementUrl: string | null}) => {
+  const handleViewAgreement = ({ appointmentId, aggrementUrl }: { appointmentId: string, aggrementUrl: string | null }) => {
     if (aggrementUrl) {
-      setSelectedAgreementUrl({appointmentId, aggrementUrl})
+      setSelectedAgreementUrl({ appointmentId, aggrementUrl })
       setIsModalOpen(true)
     }
   }
@@ -68,7 +65,6 @@ const AppointmentsPage: FC = () => {
   }
 
   const handleReschedule = (appointment: AppointmentData) => {
-    // TODO: Implement reschedule functionality
     alert(`Reschedule appointment with ${appointment.lawyer?.name}`)
   }
 
@@ -86,19 +82,16 @@ const AppointmentsPage: FC = () => {
   }
 
   const handleVideoCall = async (appointment: AppointmentData) => {
-    // Open the window immediately from user action to avoid popup blocker
     const meetWindow = window.open('about:blank', '_blank')
-    
+
     try {
       await appointmentsApi.attend(appointment.id)
       getAppointmentsQuery.refetch()
-      // Navigate the already-opened window to Google Meet
       if (meetWindow) {
         meetWindow.location.href = 'https://meet.google.com/avr-cdku-qtn'
       }
     } catch (error) {
       console.error('Failed to mark attendance', error)
-      // Close the blank window on error
       if (meetWindow) {
         meetWindow.close()
       }
@@ -114,33 +107,31 @@ const AppointmentsPage: FC = () => {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-50 px-3 py-4 sm:p-6">
       <div className="max-w-6xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold text-primary mb-2">Appointments</h1>
-          <p className="text-secondary">Manage and track all your appointments</p>
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-semibold text-primary mb-1 sm:mb-2">Appointments</h1>
+          <p className="text-sm sm:text-base text-secondary">Manage and track all your appointments</p>
         </div>
 
-        {/* Tabs */}
-        <div className="bg-white border-b border-gray-200 mb-6">
-          <div className="flex gap-0">
+        {/* Tabs — horizontal scroll on mobile */}
+        <div className="bg-white border-b border-gray-200 mb-4 sm:mb-6 -mx-3 sm:mx-0 overflow-x-auto">
+          <div className="flex min-w-max sm:min-w-0">
             {tabs.map(tab => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`px-6 py-4 text-sm font-medium transition-colors relative ${
-                  activeTab === tab.key
+                className={`px-4 sm:px-6 py-3 sm:py-4 text-sm font-medium transition-colors relative whitespace-nowrap ${activeTab === tab.key
                     ? 'text-primary'
                     : 'text-secondary hover:text-primary'
-                }`}
+                  }`}
               >
-                <span className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5 sm:gap-2">
                   {tab.label}
-                  <span className={`px-2 py-0.5 text-xs rounded-full ${
-                    activeTab === tab.key
+                  <span className={`px-1.5 sm:px-2 py-0.5 text-xs rounded-full ${activeTab === tab.key
                       ? 'bg-primary text-white'
                       : 'bg-gray-100 text-gray-600'
-                  }`}>
+                    }`}>
                     {tab.count}
                   </span>
                 </span>
@@ -168,8 +159,8 @@ const AppointmentsPage: FC = () => {
               <p className="text-secondary">No {activeTab} appointments</p>
             </div>
           ) : (
-            <div>
-              {categorizedAppointments[activeTab].map(appointment => 
+            <div className="space-y-4">
+              {categorizedAppointments[activeTab].map(appointment =>
                 <RenderAppointmentCard
                   key={appointment.id}
                   appointment={appointment}
@@ -188,7 +179,7 @@ const AppointmentsPage: FC = () => {
         {/* Agreement Modal */}
         {selectedAgreementUrl ? selectedAgreementUrl.aggrementUrl ? (
           <AgreementModal
-            appointment={selectedAgreementUrl as {appointmentId: string, aggrementUrl: string}}
+            appointment={selectedAgreementUrl as { appointmentId: string, aggrementUrl: string }}
             isOpen={isModalOpen}
             onClose={handleCloseModal}
             canApply={true}

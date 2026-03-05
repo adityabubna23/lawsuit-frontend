@@ -11,7 +11,9 @@ import Articles from '@/components/molecules/Articles'
 import { lawyersApi, appointmentsApi } from '@/services/api'
 import { useNotificationStore } from '../../stores/notificationStore'
 import { useAppointmentStore } from '../../stores/appointmentStore'
-import { Shield } from 'lucide-react'
+import useWalletStore from '../../stores/walletStore'
+import { useAuthStore } from '../../stores/authStore'
+import { Shield, Wallet, CreditCard } from 'lucide-react'
 
 const tabs = [
   { id: 'info', label: 'Info' },
@@ -20,9 +22,11 @@ const tabs = [
   { id: 'articles', label: 'Articles' },
 ]
 
+const fmt = (n: number) =>
+  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
+
 const LawyerDetailPage: FC = () => {
   const { id } = useParams<{ id: string }>()
-
 
   const [lawyer, setLawyer] = useState<Lawyer | null>(null)
   const [loading, setLoading] = useState(true)
@@ -37,7 +41,16 @@ const LawyerDetailPage: FC = () => {
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [paymentSuccess, setPaymentSuccess] = useState(false)
   const [toastVisible, setToastVisible] = useState(false)
+  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'wallet'>('razorpay')
   const navigate = useNavigate()
+
+  const walletBalance = useWalletStore((s) => s.balance)
+  const fetchBalance = useWalletStore((s) => s.fetchBalance)
+  const authUser = useAuthStore((s) => s.user)
+
+  useEffect(() => {
+    fetchBalance()
+  }, [])
 
   useEffect(() => {
     if (!id) return
@@ -46,7 +59,6 @@ const LawyerDetailPage: FC = () => {
       setLoading(true)
       try {
         const res = await lawyersApi.getById(id)
-        // Backend may return different envelopes. Normalise to our frontend `Lawyer` shape.
         const raw = (res as any).data?.lawyer ?? (res as any).data?.data ?? (res as any).data ?? res
 
         const mapped = {
@@ -76,77 +88,135 @@ const LawyerDetailPage: FC = () => {
 
   const handleBook = () => {
     if (!lawyer) return
-    // Open booking modal instead of navigating
     setIsModalOpen(true)
     setPaymentSuccess(false)
+    setPaymentMethod('razorpay')
+  }
+
+  const parseSlotToISO = (date: Date, slot: string) => {
+    const [time, period] = slot.split(' ')
+    const [hStr, mStr] = time.split(':')
+    let h = parseInt(hStr, 10)
+    const m = parseInt(mStr || '0', 10)
+    if (period === 'PM' && h < 12) h += 12
+    if (period === 'AM' && h === 12) h = 0
+    const d = new Date(date)
+    d.setHours(h, m, 0, 0)
+    return d.toISOString()
   }
 
   const handlePayNow = async () => {
     if (!lawyer || !selectedDate || !selectedSlot) return
-    try {
-      setPaymentLoading(true)
 
-      // Create a mock razorpay order client-side (server would create real order)
-      const order = {
-        id: `razorpay_mock_${Date.now()}`,
-        amount: Math.round((lawyer.fee || 0) * 100),
-        currency: 'INR',
-      }
-
-      // simulate checkout flow
-      await new Promise((res) => setTimeout(res, 900))
-
-      // Simulate success
-      const paymentResult = { success: true, paymentId: `pay_mock_${Date.now()}`, orderId: order.id }
-      console.log('Mock Razorpay payment success', paymentResult)
-
-      // Optionally call paymentService to confirm (mocked) - skipped in this mock
-      setPaymentSuccess(true)
-      setPaymentLoading(false)
-
-      // Create appointment record via API (mocked)
+    if (paymentMethod === 'wallet') {
+      // Wallet payment — instant booking
       try {
-        const parseSlotToISO = (date: Date, slot: string) => {
-          const [time, period] = slot.split(' ')
-          const [hStr, mStr] = time.split(':')
-          let h = parseInt(hStr, 10)
-          const m = parseInt(mStr || '0', 10)
-          if (period === 'PM' && h < 12) h += 12
-          if (period === 'AM' && h === 12) h = 0
-          const d = new Date(date)
-          d.setHours(h, m, 0, 0)
-          return d.toISOString()
-        }
+        setPaymentLoading(true)
+        const datetimeIso = parseSlotToISO(selectedDate, selectedSlot)
+        await appointmentsApi.book({
+          lawyerId: lawyer.id,
+          scheduledAt: datetimeIso,
+          durationMins: 30,
+          meetingType: 'VIDEO_CALL',
+          paymentMethod: 'wallet',
+        })
+        setPaymentSuccess(true)
 
-        const datetimeIso = parseSlotToISO(selectedDate as Date, selectedSlot as string)
-        await appointmentsApi.create({ lawyerId: lawyer.id, datetime: datetimeIso, paymentId: paymentResult.paymentId })
-        // Refresh notifications so the unread badge updates immediately and show toast
-        try {
-          await useNotificationStore.getState().fetchNotifications()
-        } catch (e) {
-          // ignore
-        }
+        // Refresh stores
+        try { await useNotificationStore.getState().fetchNotifications() } catch { }
+        try { await useAppointmentStore.getState().fetchAppointments() } catch { }
+        try { await fetchBalance() } catch { }
 
-        // Refresh appointment store so header wallet balance updates immediately
-        try {
-          await useAppointmentStore.getState().fetchAppointments()
-        } catch (e) {
-          // ignore
-        }
-      } catch (e) {
-        console.warn('Failed to create appointment in mock', e)
+        setToastVisible(true)
+        setTimeout(() => {
+          setIsModalOpen(false)
+          setToastVisible(false)
+          navigate('/app/appointments')
+        }, 900)
+      } catch (err: any) {
+        const msg = err?.response?.data?.error || err?.message || 'Wallet payment failed'
+        alert(msg)
+      } finally {
+        setPaymentLoading(false)
       }
+    } else {
+      // Razorpay payment — book then open checkout
+      try {
+        setPaymentLoading(true)
+        const datetimeIso = parseSlotToISO(selectedDate, selectedSlot)
+        const res = await appointmentsApi.book({
+          lawyerId: lawyer.id,
+          scheduledAt: datetimeIso,
+          durationMins: 30,
+          meetingType: 'VIDEO_CALL',
+        })
+        const payload = res.data || res
+        const appointment = payload.appointment ?? payload
+        const payment = payload.payment ?? payload
 
-      // show a small toast then redirect to appointments page
-      setToastVisible(true)
-      setTimeout(() => {
-        setIsModalOpen(false)
-        setToastVisible(false)
-        navigate('/app/appointments')
-      }, 900)
-    } catch (err) {
-      console.error('Mock payment error', err)
-      setPaymentLoading(false)
+        const providerOrderId = payment?.providerOrderId || payment?.order?.id
+
+        if ((window as any).Razorpay && providerOrderId) {
+          const rzpKey = (import.meta.env.VITE_RAZORPAY_KEY as string) || ''
+          const options: any = {
+            key: rzpKey,
+            amount: (payment?.amount ?? Math.round((lawyer.fee || 0) * 100)),
+            currency: payment?.currency ?? 'INR',
+            name: 'LawSuit',
+            description: `Consultation with ${lawyer.name}`,
+            order_id: providerOrderId,
+            handler: async (resp: any) => {
+              try {
+                await appointmentsApi.confirmPayment(appointment.id, {
+                  appointmentId: appointment.id,
+                  razorpay_order_id: resp.razorpay_order_id,
+                  razorpay_payment_id: resp.razorpay_payment_id,
+                  razorpay_signature: resp.razorpay_signature,
+                })
+                setPaymentSuccess(true)
+                try { await useNotificationStore.getState().fetchNotifications() } catch { }
+                try { await useAppointmentStore.getState().fetchAppointments() } catch { }
+
+                setToastVisible(true)
+                setTimeout(() => {
+                  setIsModalOpen(false)
+                  setToastVisible(false)
+                  navigate('/app/appointments')
+                }, 900)
+              } catch {
+                alert('Payment succeeded but confirming failed. Please contact support.')
+              } finally {
+                setPaymentLoading(false)
+              }
+            },
+            prefill: {
+              name: authUser?.name,
+              email: (authUser as any)?.email,
+              contact: (authUser as any)?.phone,
+            },
+            notes: { appointmentId: appointment.id },
+            theme: { color: '#0B4D64' },
+          }
+          const rzp = new (window as any).Razorpay(options)
+          rzp.on('payment.failed', () => setPaymentLoading(false))
+          rzp.open()
+          return
+        }
+
+        // Fallback: no Razorpay SDK or no order id
+        setPaymentSuccess(true)
+        setToastVisible(true)
+        setTimeout(() => {
+          setIsModalOpen(false)
+          setToastVisible(false)
+          navigate('/app/appointments')
+        }, 900)
+      } catch (err: any) {
+        console.error('Booking error', err)
+        alert(err?.response?.data?.error || err?.message || 'Booking failed')
+      } finally {
+        setPaymentLoading(false)
+      }
     }
   }
 
@@ -156,6 +226,8 @@ const LawyerDetailPage: FC = () => {
     experience: lawyer?.experienceYears ?? 0,
     fee: lawyer?.fee ?? 0,
   }), [lawyer])
+
+  const insufficientBalance = walletBalance < headerStats.fee
 
   if (loading) return <div className="text-center py-12">Loading...</div>
   if (error) return <div className="text-red-500 text-center py-12">{error}</div>
@@ -189,11 +261,6 @@ const LawyerDetailPage: FC = () => {
                   <h1 className="text-2xl font-semibold text-gray-900">{lawyer.name}</h1>
                   <div className="mt-2 text-sm text-gray-600">{Array.isArray(lawyer.specialization) ? lawyer.specialization.join(' • ') : (lawyer.specialization ?? '')}</div>
                   <div className="mt-3 flex items-center gap-4 text-sm text-gray-600">
-                    {/* <div className="flex items-center gap-1">
-                      <span className="text-yellow-400">★</span>
-                      <span className="font-medium">{headerStats.rating}</span>
-                      <span className="text-gray-500">({headerStats.reviews})</span>
-                    </div> */}
                     <div>{headerStats.experience} years of experience </div>
                     <div>|</div>
                     <div>{lawyer.location}</div>
@@ -264,7 +331,6 @@ const LawyerDetailPage: FC = () => {
               />
             </div>
 
-
             <Button
               onClick={handleBook}
               disabled={!selectedDate || !selectedSlot}
@@ -275,31 +341,73 @@ const LawyerDetailPage: FC = () => {
           </div>
         </div>
       </div>
-      {/* Modal: Booking + Mock Razorpay */}
+
+      {/* Modal: Booking + Payment Method Selection */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setIsModalOpen(false)} />
-          <div role="dialog" aria-modal="true" className="relative bg-white rounded-lg shadow-lg max-w-md w-full mx-4 overflow-hidden">
-            <div className="p-4 border-b">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
+          <div role="dialog" aria-modal="true" className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            <div className="p-5 border-b">
               <h3 className="text-lg font-semibold">Confirm & Pay</h3>
             </div>
-            <div className="p-4 space-y-3">
+            <div className="p-5 space-y-3">
               <div className="text-sm text-gray-600">Lawyer: <span className="font-medium">{lawyer.name}</span></div>
               <div className="text-sm text-gray-600">Date: <span className="font-medium">{selectedDate ? format(selectedDate, 'PPP') : '-'}</span></div>
               <div className="text-sm text-gray-600">Slot: <span className="font-medium">{selectedSlot ?? '-'}</span></div>
               <div className="text-sm text-gray-800">Amount: <span className="font-medium">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(headerStats.fee)}</span></div>
+
+              {/* Payment Method Toggle */}
+              <div className="mt-4 pt-4 border-t">
+                <div className="text-sm font-medium text-gray-700 mb-3">Payment Method</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setPaymentMethod('razorpay')}
+                    className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all ${paymentMethod === 'razorpay'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                  >
+                    <CreditCard className={`w-5 h-5 ${paymentMethod === 'razorpay' ? 'text-primary' : 'text-gray-400'}`} />
+                    <div className="text-left">
+                      <div className={`text-sm font-medium ${paymentMethod === 'razorpay' ? 'text-primary' : 'text-gray-700'}`}>Razorpay</div>
+                      <div className="text-xs text-gray-400">Card / UPI / Bank</div>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => !insufficientBalance && setPaymentMethod('wallet')}
+                    disabled={insufficientBalance}
+                    className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all ${paymentMethod === 'wallet'
+                        ? 'border-primary bg-primary/5'
+                        : insufficientBalance
+                          ? 'border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                  >
+                    <Wallet className={`w-5 h-5 ${paymentMethod === 'wallet' ? 'text-primary' : 'text-gray-400'}`} />
+                    <div className="text-left">
+                      <div className={`text-sm font-medium ${paymentMethod === 'wallet' ? 'text-primary' : 'text-gray-700'}`}>Wallet</div>
+                      <div className="text-xs text-gray-400">Bal: {fmt(walletBalance)}</div>
+                    </div>
+                  </button>
+                </div>
+                {insufficientBalance && paymentMethod !== 'wallet' && (
+                  <p className="text-xs text-amber-600 mt-2">Insufficient wallet balance for this appointment.</p>
+                )}
+              </div>
+
               {paymentSuccess && <div className="text-sm text-green-600">Payment successful ✅</div>}
             </div>
 
-            <div className="p-4 border-t flex items-center gap-3">
+            <div className="p-5 border-t flex items-center gap-3">
               <Button onClick={() => setIsModalOpen(false)} variant="ghost">Cancel</Button>
               <Button onClick={handlePayNow} className="ml-auto" disabled={paymentLoading || paymentSuccess || !selectedDate || !selectedSlot}>
-                {paymentLoading ? 'Processing…' : paymentSuccess ? 'Paid' : 'Pay Now'}
+                {paymentLoading ? 'Processing…' : paymentSuccess ? 'Paid' : paymentMethod === 'wallet' ? 'Pay from Wallet' : 'Pay Now'}
               </Button>
             </div>
           </div>
         </div>
       )}
+
       {/* Small toast */}
       {toastVisible && (
         <div className="fixed right-6 bottom-6 z-50">

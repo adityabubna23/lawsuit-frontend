@@ -1,55 +1,136 @@
 import { create } from 'zustand'
-
-interface Tx {
-  id: string
-  type: string
-  amount: number
-  meta?: any
-  createdAt: string
-}
+import type { WalletTransaction } from '@/types'
+import { walletApi } from '@/services/api'
 
 interface WalletState {
   balance: number
-  transactions: Tx[]
+  transactions: WalletTransaction[]
+  totalTransactions: number
+  currentPage: number
   loading: boolean
-  fetchWallet: () => Promise<void>
-  buyGiftCard: (amount: number, cardType: string) => Promise<{ success: boolean; message?: string }>
+  error: string | null
+
+  fetchBalance: () => Promise<void>
+  fetchTransactions: (page?: number, limit?: number) => Promise<void>
+  addMoney: (amount: number) => Promise<{ paymentId: string; orderId: string; amount: number; currency: string }>
+  confirmAddMoney: (payload: {
+    paymentId: string
+    razorpay_order_id: string
+    razorpay_payment_id: string
+    razorpay_signature: string
+  }) => Promise<{ success: boolean; balance: number }>
+  withdraw: (amount: number, bankAccountId?: string) => Promise<{ success: boolean; message?: string }>
+  transfer: (toUserId: string, amount: number, description?: string) => Promise<{ success: boolean; balance?: number; message?: string }>
 }
 
-export const useWalletStore = create<WalletState>((set) => ({
+export const useWalletStore = create<WalletState>((set, get) => ({
   balance: 0,
   transactions: [],
+  totalTransactions: 0,
+  currentPage: 1,
   loading: false,
+  error: null,
 
-  fetchWallet: async () => {
-    set({ loading: true })
+  fetchBalance: async () => {
     try {
-      const mod = await import('../services/api')
-      const res = await mod.walletApi.get()
-      const data = (res as any).data?.data ?? (res as any).data ?? res
-      set({ balance: data.balance ?? 0, transactions: data.transactions ?? [] })
-    } catch (e) {
-      // ignore in mock
+      const res = await walletApi.getBalance()
+      const data = res.data?.data ?? res.data ?? res
+      set({ balance: data.balance ?? 0 })
+    } catch {
+      // ignore — wallet may not be created yet
+    }
+  },
+
+  fetchTransactions: async (page = 1, limit = 20) => {
+    set({ loading: true, error: null })
+    try {
+      const res = await walletApi.getTransactions({ page, limit })
+      const data = res.data?.data ?? res.data ?? res
+      set({
+        transactions: data.items ?? [],
+        totalTransactions: data.total ?? 0,
+        currentPage: data.page ?? page,
+      })
+    } catch {
+      set({ error: 'Failed to load transactions' })
     } finally {
       set({ loading: false })
     }
   },
 
-  buyGiftCard: async (amount: number, cardType: string) => {
-    set({ loading: true })
+  addMoney: async (amount: number) => {
+    set({ loading: true, error: null })
     try {
-      const mod = await import('../services/api')
-      const res = await mod.walletApi.buyGiftCard({ amount, cardType })
-      const tx = (res as any).data?.data ?? (res as any).data ?? res
-      // update local state
-      set((state) => ({ balance: state.balance - tx.amount, transactions: [tx, ...state.transactions] }))
-      return { success: true }
+      const res = await walletApi.addMoney({ amount })
+      // Return the response body directly — avoid over-unwrapping that can lose fields
+      return res.data
     } catch (err: any) {
-      return { success: false, message: err.response?.data?.message || 'Failed' }
+      const msg = err.response?.data?.error || err.message || 'Failed to initiate top-up'
+      set({ error: msg })
+      throw new Error(msg)
     } finally {
       set({ loading: false })
     }
-  }
+  },
+
+  confirmAddMoney: async (payload) => {
+    set({ loading: true, error: null })
+    try {
+      const res = await walletApi.confirmAddMoney(payload)
+      const data = res.data?.data ?? res.data ?? res
+      if (data.balance != null) {
+        set({ balance: data.balance })
+      }
+      return data
+    } catch (err: any) {
+      const msg = err.response?.data?.error || err.message || 'Failed to confirm payment'
+      set({ error: msg })
+      throw new Error(msg)
+    } finally {
+      set({ loading: false })
+    }
+  },
+
+  withdraw: async (amount: number, bankAccountId?: string) => {
+    set({ loading: true, error: null })
+    try {
+      const res = await walletApi.withdraw({ amount, bankAccountId })
+      const data = res.data?.data ?? res.data ?? res
+      const newBalance = data.wallet?.balance
+      if (newBalance != null) {
+        set({ balance: newBalance })
+      }
+      // Refresh transactions
+      get().fetchTransactions(1)
+      return { success: true }
+    } catch (err: any) {
+      const msg = err.response?.data?.error || err.message || 'Withdrawal failed'
+      set({ error: msg })
+      return { success: false, message: msg }
+    } finally {
+      set({ loading: false })
+    }
+  },
+
+  transfer: async (toUserId: string, amount: number, description?: string) => {
+    set({ loading: true, error: null })
+    try {
+      const res = await walletApi.transfer({ toUserId, amount, description })
+      const data = res.data?.data ?? res.data ?? res
+      if (data.balance != null) {
+        set({ balance: data.balance })
+      }
+      // Refresh transactions
+      get().fetchTransactions(1)
+      return { success: true, balance: data.balance }
+    } catch (err: any) {
+      const msg = err.response?.data?.error || err.message || 'Transfer failed'
+      set({ error: msg })
+      return { success: false, message: msg }
+    } finally {
+      set({ loading: false })
+    }
+  },
 }))
 
 export default useWalletStore

@@ -1,5 +1,6 @@
 import { io, Socket } from 'socket.io-client'
 import { useAuthStore } from '@/stores/authStore'
+import type { Notification as AppNotification } from '@/types'
 
 // Compute socket URL from VITE_API_URL (same host, different path)
 const _envUrl = (import.meta.env.VITE_API_URL as string) || ''
@@ -22,6 +23,8 @@ type TypingHandler = (data: { user: { id: string; name?: string } }) => void
 type ReadReceiptHandler = (data: { messageId: string; readerId: string; readAt: string }) => void
 type OnlineStatusHandler = (data: { usersOnline: string[] }) => void
 type UserStatusHandler = (data: { userId: string; online: boolean }) => void
+type NotificationHandler = (notification: AppNotification) => void
+type UnreadCountHandler = (data: { unreadCount: number }) => void
 
 export interface ChatMessage {
   id: string
@@ -45,6 +48,8 @@ class SocketService {
   private readReceiptHandlers: ReadReceiptHandler[] = []
   private onlineStatusHandlers: OnlineStatusHandler[] = []
   private userStatusHandlers: UserStatusHandler[] = []
+  private notificationHandlers: NotificationHandler[] = []
+  private unreadCountHandlers: UnreadCountHandler[] = []
   private onlineUsers: Set<string> = new Set()
 
   private constructor() {}
@@ -122,6 +127,16 @@ class SocketService {
     this.socket.on('user:offline', (data: { userId: string }) => {
       this.onlineUsers.delete(data.userId)
       this.userStatusHandlers.forEach((handler) => handler({ userId: data.userId, online: false }))
+    })
+
+    // Listen for push notifications
+    this.socket.on('notification', (notification: AppNotification) => {
+      this.notificationHandlers.forEach((handler) => handler(notification))
+    })
+
+    // Listen for unread count updates
+    this.socket.on('notification:unread-count', (data: { unreadCount: number }) => {
+      this.unreadCountHandlers.forEach((handler) => handler(data))
     })
 
     return this.socket
@@ -219,6 +234,20 @@ class SocketService {
     this.userStatusHandlers.push(handler)
     return () => {
       this.userStatusHandlers = this.userStatusHandlers.filter((h) => h !== handler)
+    }
+  }
+
+  onNotification(handler: NotificationHandler) {
+    this.notificationHandlers.push(handler)
+    return () => {
+      this.notificationHandlers = this.notificationHandlers.filter((h) => h !== handler)
+    }
+  }
+
+  onUnreadCountUpdate(handler: UnreadCountHandler) {
+    this.unreadCountHandlers.push(handler)
+    return () => {
+      this.unreadCountHandlers = this.unreadCountHandlers.filter((h) => h !== handler)
     }
   }
 

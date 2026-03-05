@@ -3,9 +3,18 @@
 
 import { FC, useState } from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
+import NotificationModal from '../components/molecules/NotificationModal'
+import NotificationToast from '../components/atoms/NotificationToast'
+import { useNotificationStore } from '../stores/notificationStore'
+import { useNotificationSocket } from '../hooks/useNotificationSocket'
 
 const AdminLayout: FC = () => {
   const [collapsed, setCollapsed] = useState(false)
+  const [showNotifications, setShowNotifications] = useState(false)
+  const unreadCount = useNotificationStore((s) => s.unreadCount)
+
+  // Boot socket connection + notification listeners
+  useNotificationSocket()
 
   const navItems = [
     { to: '/admin/dashboard', label: 'Dashboard', icon: (
@@ -86,12 +95,16 @@ const AdminLayout: FC = () => {
 
             <div className="flex items-center gap-4">
               {/* Notification icon */}
-              <button className="relative p-2 rounded hover:bg-gray-100">
+              <button className="relative p-2 rounded hover:bg-gray-100" onClick={() => setShowNotifications(true)}>
                 <svg className="w-6 h-6 text-gray-600" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   <path d="M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-medium leading-none text-white bg-red-600 rounded-full">3</span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-medium leading-none text-white bg-red-600 rounded-full">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
               </button>
 
               {/* Profile placeholder */}
@@ -106,6 +119,8 @@ const AdminLayout: FC = () => {
           <Outlet />
         </main>
       </div>
+      <NotificationModal open={showNotifications} onClose={() => setShowNotifications(false)} />
+      <NotificationToast />
     </div>
   )
 }

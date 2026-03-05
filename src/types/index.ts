@@ -82,3 +82,66 @@ export interface AgreementTemplate {
   createdAt: string
   updatedAt: string
 }
+
+export type TransactionType = 'CREDIT' | 'DEBIT' | 'WITHDRAWAL' | 'REFUND' | 'PAYMENT' | 'TRANSFER'
+export type TransactionStatus = 'COMPLETED' | 'FAILED'
+
+export interface WalletTransaction {
+  id: string
+  walletId: string
+  userId: string
+  amount: number
+  type: TransactionType
+  status: TransactionStatus
+  description: string
+  referenceId?: string | null
+  counterpartyId?: string | null
+  bankAccountId?: string | null
+  createdAt: string
+}
+
+// ── Push Notifications ───────────────────────────────────────────────
+
+export type NotificationType =
+  | 'APPOINTMENT_BOOKED'
+  | 'APPOINTMENT_CONFIRMED'
+  | 'APPOINTMENT_CANCELLED'
+  | 'APPOINTMENT_REMINDER'
+  | 'APPOINTMENT_RESCHEDULED'
+  | 'NEW_MESSAGE'
+  | 'PAYMENT_RECEIVED'
+  | 'WALLET_CREDIT'
+  | 'WALLET_DEBIT'
+  | 'CONSULTATION_COMPLETED'
+  | 'REVIEW_RECEIVED'
+  | 'CASE_UPDATE'
+  | 'DOCUMENT_UPLOADED'
+  | 'VIDEO_CALL'
+  | 'TASK_ASSIGNED'
+
+export interface NotificationData {
+  appointmentId?: string
+  chatId?: string
+  caseId?: string
+  referenceId?: string
+}
+
+export interface Notification {
+  id: string
+  userId?: string
+  title: string
+  body: string
+  type: NotificationType
+  data: NotificationData
+  isRead: boolean
+  readAt?: string | null
+  createdAt: string
+}
+
+export interface NotificationListResponse {
+  items: Notification[]
+  total: number
+  unreadCount: number
+  page: number
+  limit: number
+}

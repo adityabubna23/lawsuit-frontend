@@ -1,7 +1,8 @@
-import { FC, useState } from 'react'
+import { FC, useState, useEffect } from 'react'
 import NotificationModal from '../components/molecules/NotificationModal'
+import NotificationToast from '../components/atoms/NotificationToast'
 import { useNotificationStore } from '../stores/notificationStore'
-import { useEffect } from 'react'
+import { useNotificationSocket } from '../hooks/useNotificationSocket'
 import useWalletStore from '../stores/walletStore'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
@@ -13,13 +14,15 @@ const AppLayout: FC = () => {
   const { user, logout } = useAuthStore()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
-  const unread = useNotificationStore((s) => s.notifications.filter(n => !n.read).length)
-  const toast = useNotificationStore((s) => s.toast)
+  const unreadCount = useNotificationStore((s) => s.unreadCount)
   const balance = useWalletStore((s) => s.balance)
-  const fetchWallet = useWalletStore((s) => s.fetchWallet)
+  const fetchBalance = useWalletStore((s) => s.fetchBalance)
+
+  // Boot socket connection + notification listeners
+  useNotificationSocket()
 
   useEffect(() => {
-    fetchWallet().catch(() => {})
+    fetchBalance().catch(() => { })
   }, [])
 
   // const balance = Array.isArray(appointments)
@@ -58,7 +61,7 @@ const AppLayout: FC = () => {
                     alt="Lawsuit"
                   /> */}
                   <h1 className="text-2xl font-bold text-primary">Lawsuit</h1>
-                  
+
                 </Link>
               </div>
 
@@ -68,11 +71,10 @@ const AppLayout: FC = () => {
                   <Link
                     key={item.name}
                     to={item.path}
-                    className={`${
-                      location.pathname === item.path
+                    className={`${location.pathname === item.path
                         ? 'border-primary text-gray-900'
                         : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                    } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+                      } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
                   >
                     {item.name}
                   </Link>
@@ -86,8 +88,8 @@ const AppLayout: FC = () => {
               <Link to="/app/wallet" className="ml-3 relative p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
                 <span className="sr-only">Open wallet</span>
                 <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M2 7a2 2 0 012-2h14a2 2 0 012 2v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  <rect x="2" y="10" width="20" height="10" rx="2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M2 7a2 2 0 012-2h14a2 2 0 012 2v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <rect x="2" y="10" width="20" height="10" rx="2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   <circle cx="18" cy="15" r="1.5" fill="currentColor" />
                 </svg>
                 {balance > 0 && (
@@ -118,14 +120,14 @@ const AppLayout: FC = () => {
                     d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
                   />
                 </svg>
-                {unread > 0 && (
+                {unreadCount > 0 && (
                   <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-xs font-semibold bg-red-500 text-white">
-                    {unread}
+                    {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 )}
               </button>
 
-              
+
 
               {/* Profile Menu */}
               <UserMenu user={user} onLogout={handleLogout} />
@@ -182,11 +184,10 @@ const AppLayout: FC = () => {
                   <Link
                     key={item.name}
                     to={item.path}
-                    className={`${
-                      location.pathname === item.path
+                    className={`${location.pathname === item.path
                         ? 'bg-primary-50 border-primary text-primary'
                         : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
-                    } block pl-3 pr-4 py-2 border-l-4 text-base font-medium`}
+                      } block pl-3 pr-4 py-2 border-l-4 text-base font-medium`}
                   >
                     {item.name}
                   </Link>
@@ -221,12 +222,12 @@ const AppLayout: FC = () => {
                   >
                     Your Profile
                   </Link>
-                    <Link
-                      to="/app/wallet"
-                      className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
-                    >
-                      Wallet
-                    </Link>
+                  <Link
+                    to="/app/wallet"
+                    className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                  >
+                    Wallet
+                  </Link>
                   <button
                     onClick={handleLogout}
                     className="block w-full text-left px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
@@ -244,11 +245,7 @@ const AppLayout: FC = () => {
         <Outlet />
       </main>
       <NotificationModal open={showNotifications} onClose={() => setShowNotifications(false)} />
-      {toast && (
-        <div className="fixed right-6 bottom-6 z-50">
-          <div className="bg-primary text-white px-4 py-2 rounded shadow">{toast}</div>
-        </div>
-      )}
+      <NotificationToast />
     </div>
   )
 }

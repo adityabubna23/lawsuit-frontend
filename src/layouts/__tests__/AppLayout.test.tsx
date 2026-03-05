@@ -8,6 +8,64 @@ jest.mock('../../stores/authStore', () => ({
   useAuthStore: jest.fn()
 }))
 
+// Mock the notification store
+jest.mock('../../stores/notificationStore', () => ({
+  useNotificationStore: Object.assign(
+    jest.fn((selector?: any) => {
+      const state = {
+        notifications: [],
+        unreadCount: 0,
+        toast: null,
+        fetchNotifications: jest.fn(),
+        fetchNextPage: jest.fn(),
+        fetchUnreadCount: jest.fn(),
+        markRead: jest.fn(),
+        markAllRead: jest.fn(),
+        deleteNotification: jest.fn(),
+        clearToast: jest.fn(),
+        initSocketListeners: jest.fn(() => jest.fn()),
+        isLoading: false,
+        hasMore: false,
+      }
+      return selector ? selector(state) : state
+    }),
+    { getState: jest.fn(() => ({ notifications: [], unreadCount: 0, initSocketListeners: jest.fn(() => jest.fn()), fetchNotifications: jest.fn(), fetchUnreadCount: jest.fn() })) }
+  ),
+}))
+
+// Mock the wallet store
+jest.mock('../../stores/walletStore', () => ({
+  __esModule: true,
+  default: Object.assign(
+    jest.fn((selector?: any) => {
+      const state = { balance: 0, fetchBalance: jest.fn().mockResolvedValue(undefined) }
+      return selector ? selector(state) : state
+    }),
+    { getState: jest.fn(() => ({ balance: 0, fetchBalance: jest.fn() })) }
+  ),
+}))
+
+// Mock the notification socket hook
+jest.mock('../../hooks/useNotificationSocket', () => ({
+  useNotificationSocket: jest.fn(),
+}))
+
+// Mock socket service
+jest.mock('../../services/socketService', () => ({
+  __esModule: true,
+  default: {
+    connect: jest.fn(),
+    disconnect: jest.fn(),
+    onNotification: jest.fn(() => jest.fn()),
+    onUnreadCountUpdate: jest.fn(() => jest.fn()),
+    getOnlineUsers: jest.fn(() => []),
+  },
+  socketService: {
+    connect: jest.fn(),
+    disconnect: jest.fn(),
+  },
+}))
+
 // Mock the Outlet component from react-router-dom
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),

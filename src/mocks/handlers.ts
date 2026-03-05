@@ -69,17 +69,31 @@ interface MockCase {
 
 const mockCases: MockCase[] = []
 
-// Simple mock notifications
+// Simple mock notifications (new shape matching backend)
 interface MockNotification {
   id: string
+  userId: string
   title: string
-  body?: string
-  read?: boolean
+  body: string
+  type: string
+  data: Record<string, any>
+  isRead: boolean
+  readAt: string | null
   createdAt: string
 }
 
 const mockNotifications: MockNotification[] = [
-  { id: 'n1', title: 'Welcome to Lawsuit', body: 'Thanks for joining our platform', read: false, createdAt: new Date().toISOString() },
+  {
+    id: 'n1',
+    userId: 'user_001',
+    title: 'Welcome to Lawsuit',
+    body: 'Thanks for joining our platform',
+    type: 'APPOINTMENT_CONFIRMED',
+    data: {},
+    isRead: false,
+    readAt: null,
+    createdAt: new Date().toISOString(),
+  },
 ]
 
 // Simple wallet model derived from appointments/payments
@@ -307,11 +321,15 @@ export const handlers = [
     mockAppointments.push(appt)
 
     // Create a notification for the new appointment so users see it immediately in the UI
-    const notif = {
+    const notif: MockNotification = {
       id: `n_${Date.now()}`,
+      userId: 'user_001',
       title: `Appointment confirmed with ${lawyer?.name ?? 'your lawyer'}`,
       body: `Your consultation is scheduled on ${new Date(datetime).toLocaleString()}. Join here: https://meet.example.com/${appointmentId}`,
-      read: false,
+      type: 'APPOINTMENT_CONFIRMED',
+      data: { appointmentId },
+      isRead: false,
+      readAt: null,
       createdAt: new Date().toISOString(),
     }
     // add to the front so it appears newest-first
@@ -377,23 +395,50 @@ export const handlers = [
     return HttpResponse.json({ data: tx })
   })
 
-  // Notifications
-  ,http.get('/api/notifications', () => {
-    // return all notifications
-    return HttpResponse.json({ data: mockNotifications })
+  // Notifications — new shape matching REST spec
+  ,http.get('/api/notifications', ({ request }) => {
+    const url = new URL(request.url)
+    const page = parseInt(url.searchParams.get('page') || '1')
+    const limit = parseInt(url.searchParams.get('limit') || '20')
+    const start = (page - 1) * limit
+    const end = start + limit
+    const items = mockNotifications.slice(start, end)
+    const unreadCount = mockNotifications.filter(n => !n.isRead).length
+    return HttpResponse.json({
+      items,
+      total: mockNotifications.length,
+      unreadCount,
+      page,
+      limit,
+    })
   })
 
-  ,http.patch('/api/notifications/:id/read', ({ params }) => {
+  ,http.get('/api/notifications/unread-count', () => {
+    const unreadCount = mockNotifications.filter(n => !n.isRead).length
+    return HttpResponse.json({ unreadCount })
+  })
+
+  ,http.put('/api/notifications/:id/read', ({ params }) => {
     const { id } = params
     const n = mockNotifications.find(x => x.id === id)
     if (!n) return new HttpResponse(JSON.stringify({ message: 'Not found' }), { status: 404 })
-    n.read = true
-    return HttpResponse.json({ data: n })
+    n.isRead = true
+    n.readAt = new Date().toISOString()
+    return HttpResponse.json({ count: 1 })
   })
 
-  ,http.patch('/api/notifications/mark-all', () => {
-    mockNotifications.forEach(n => { n.read = true })
-    return HttpResponse.json({ success: true })
+  ,http.put('/api/notifications/read-all', () => {
+    let count = 0
+    mockNotifications.forEach(n => { if (!n.isRead) { n.isRead = true; n.readAt = new Date().toISOString(); count++ } })
+    return HttpResponse.json({ count })
+  })
+
+  ,http.delete('/api/notifications/:id', ({ params }) => {
+    const { id } = params
+    const idx = mockNotifications.findIndex(x => x.id === id)
+    if (idx === -1) return new HttpResponse(JSON.stringify({ message: 'Not found' }), { status: 404 })
+    mockNotifications.splice(idx, 1)
+    return HttpResponse.json({ count: 1 })
   })
 
   // Patch appointment status (e.g., reject)
