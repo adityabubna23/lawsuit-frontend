@@ -263,7 +263,7 @@ const LawyerCard: FC<LawyerCardProps> = ({
 
               {/* Fee */}
               <div className="text-lg font-semibold text-primary">
-                ${fee}/hr
+                {fmt(fee)}/hr
               </div>
 
               {/* Availability + Consult Now */}
@@ -313,8 +313,8 @@ const LawyerCard: FC<LawyerCardProps> = ({
                 <button
                   onClick={() => setPaymentMethod('razorpay')}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 transition-all ${paymentMethod === 'razorpay'
-                      ? 'border-primary bg-primary/5'
-                      : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-gray-200 hover:border-gray-300'
                     }`}
                 >
                   <CreditCard className={`w-4 h-4 ${paymentMethod === 'razorpay' ? 'text-primary' : 'text-gray-400'}`} />
@@ -324,10 +324,10 @@ const LawyerCard: FC<LawyerCardProps> = ({
                   onClick={() => !insufficientBalance && setPaymentMethod('wallet')}
                   disabled={insufficientBalance}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 transition-all ${paymentMethod === 'wallet'
-                      ? 'border-primary bg-primary/5'
-                      : insufficientBalance
-                        ? 'border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed'
-                        : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-primary bg-primary/5'
+                    : insufficientBalance
+                      ? 'border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed'
+                      : 'border-gray-200 hover:border-gray-300'
                     }`}
                 >
                   <Wallet className={`w-4 h-4 ${paymentMethod === 'wallet' ? 'text-primary' : 'text-gray-400'}`} />

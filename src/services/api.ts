@@ -163,6 +163,7 @@ export const lawyersApi = {
     order?: 'asc' | 'desc'
   }) => api.get('/lawyers', { params }),
   getById: (id: string) => api.get(`/lawyers/${id}`),
+  getProfile: (id: string) => api.get(`/lawyers/${id}/profile`),
 }
 
 export const appointmentsApi = {

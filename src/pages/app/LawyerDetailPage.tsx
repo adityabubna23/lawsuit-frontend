@@ -68,7 +68,7 @@ const LawyerDetailPage: FC = () => {
           experienceYears: raw.experienceYears ?? raw.experience ?? 0,
           rating: raw.rating ?? raw.user?.rating ?? 0,
           reviewsCount: raw.totalReviews ?? raw.reviewsCount ?? 0,
-          fee: raw.feePerConsultation ?? raw.fee ?? raw.price ?? 0,
+          fee: (raw.feePerConsultation ?? raw.fee ?? raw.price ?? 0) / 100,
           location: [raw.city, raw.state].filter(Boolean).join(', ') || raw.address || '',
           languages: Array.isArray(raw.languages) ? raw.languages : (raw.language ? [raw.language] : []),
           avatar: raw.user?.avatarUrl ?? raw.avatarUrl ?? raw.avatar ?? undefined,
@@ -304,8 +304,8 @@ const LawyerDetailPage: FC = () => {
 
           {/* Tab Content */}
           <div className="bg-white rounded-b-xl rounded-tr-xl">
-            {activeTab === 'info' && <Info />}
-            {activeTab === 'reviews' && <Reviews />}
+            {activeTab === 'info' && <Info lawyerId={lawyer.id} />}
+            {activeTab === 'reviews' && <Reviews lawyerId={lawyer.id} />}
             {activeTab === 'qa' && <QA />}
             {activeTab === 'articles' && <Articles />}
           </div>
@@ -363,8 +363,8 @@ const LawyerDetailPage: FC = () => {
                   <button
                     onClick={() => setPaymentMethod('razorpay')}
                     className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all ${paymentMethod === 'razorpay'
-                        ? 'border-primary bg-primary/5'
-                        : 'border-gray-200 hover:border-gray-300'
+                      ? 'border-primary bg-primary/5'
+                      : 'border-gray-200 hover:border-gray-300'
                       }`}
                   >
                     <CreditCard className={`w-5 h-5 ${paymentMethod === 'razorpay' ? 'text-primary' : 'text-gray-400'}`} />
@@ -377,10 +377,10 @@ const LawyerDetailPage: FC = () => {
                     onClick={() => !insufficientBalance && setPaymentMethod('wallet')}
                     disabled={insufficientBalance}
                     className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all ${paymentMethod === 'wallet'
-                        ? 'border-primary bg-primary/5'
-                        : insufficientBalance
-                          ? 'border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed'
-                          : 'border-gray-200 hover:border-gray-300'
+                      ? 'border-primary bg-primary/5'
+                      : insufficientBalance
+                        ? 'border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed'
+                        : 'border-gray-200 hover:border-gray-300'
                       }`}
                   >
                     <Wallet className={`w-5 h-5 ${paymentMethod === 'wallet' ? 'text-primary' : 'text-gray-400'}`} />
