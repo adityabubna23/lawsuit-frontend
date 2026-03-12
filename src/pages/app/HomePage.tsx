@@ -17,7 +17,7 @@ const HomePage: FC = () => {
               <span className="block text-primary">Deserves the Best</span>
             </h1>
             <p className="mt-6 text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-              Connect with India’s top verified lawyers in minutes. Track every hearing, document, and deadline — 
+              Connect with India’s top verified lawyers in minutes. Track every hearing, document, and deadline —
               with complete privacy and control.
             </p>
 
@@ -70,7 +70,7 @@ const HomePage: FC = () => {
       <div className="bg-gradient-to-r from-accent to-orange-600 py-4">
         <div className="max-w-7xl mx-auto px-6 text-center">
           <p className="text-white font-semibold text-lg">
-            Limited Period: Get ₹2,999 First Consultation FREE + Lifetime Case Vault Access 
+            Limited Period: Get ₹2,999 First Consultation FREE + Lifetime Case Vault Access
             <a href="#" className="underline ml-3 font-bold">Claim Offer →</a>
           </p>
         </div>
@@ -100,7 +100,7 @@ const HomePage: FC = () => {
                 title: "Tele Law",
                 desc: "Free government-backed legal advice in 22 Indian languages",
                 img: "https://images.unsplash.com/photo-1556155092-490a1ba16284?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80",
-                path: "#",
+                path: "/app/tele-law",
               },
               {
                 title: "Legal Eagle",
@@ -136,17 +136,17 @@ const HomePage: FC = () => {
 
                 {/* Text – 40% */}
                 <Link to={feature.path} className="block p-6 bg-white">
-                    <div className="p-6 bg-white">
-                      <h3 className="text-2xl font-semibold text-gray-800 mb-2">
-                        {feature.title}
-                      </h3>
-                      <p className="text-sm font-light text-gray-500 leading-relaxed">
-                        {feature.desc}
-                      </p>
-                      {/* <div className="mt-4 flex justify-center">
+                  <div className="p-6 bg-white">
+                    <h3 className="text-2xl font-semibold text-gray-800 mb-2">
+                      {feature.title}
+                    </h3>
+                    <p className="text-sm font-light text-gray-500 leading-relaxed">
+                      {feature.desc}
+                    </p>
+                    {/* <div className="mt-4 flex justify-center">
                         <ChevronRight className="w-6 h-6 text-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                       </div> */}
-                    </div>
+                  </div>
                 </Link>
               </div>
             ))}
@@ -154,17 +154,17 @@ const HomePage: FC = () => {
         </div>
       </section>
       <div className="relative bg-gradient-to-br from-midnight to-primary rounded-2xl overflow-hidden shadow-2xl">
-          <div className="absolute inset-0 bg-black/40"></div>
-          <div className="relative p-12 text-white">
-              <h3 className="text-3xl font-bold mb-4">Get Free Consultation through - Tele Law</h3>
-              <p className="text-lg opacity-90 mb-8">Daily updates on New judgments • Government schemes • Rights explained in simple language</p>
-              {/* <a href="#" className="inline-flex items-center text-accent font-semibold hover:underline">
+        <div className="absolute inset-0 bg-black/40"></div>
+        <div className="relative p-12 text-white">
+          <h3 className="text-3xl font-bold mb-4">Get Free Consultation through - Tele Law</h3>
+          <p className="text-lg opacity-90 mb-8">Daily updates on New judgments • Government schemes • Rights explained in simple language</p>
+          {/* <a href="#" className="inline-flex items-center text-accent font-semibold hover:underline">
                 Start Learning Free <ChevronRight className="ml-2 w-5 h-5" />
               </a> */}
-              <span className="flex justify-end">
-                <Link to="/app/home" className="inline-flex items-center text-accent font-semibold hover:underline"> Check Your Eligibility <ChevronRight className="ml-2 w-5 h-5" /> </Link>
-              </span>
-          </div>
+          <span className="flex justify-end">
+            <Link to="/app/tele-law" className="inline-flex items-center text-accent font-semibold hover:underline"> Check Your Eligibility <ChevronRight className="ml-2 w-5 h-5" /> </Link>
+          </span>
+        </div>
       </div>
 
       {/* Core Benefits – Elegant Cards */}
@@ -193,28 +193,28 @@ const HomePage: FC = () => {
           </div>
         </div>
       </section>
-      
+
       <div className="relative bg-gradient-to-br from-primary to-midnight rounded-2xl overflow-hidden shadow-2xl">
-          <div className="absolute inset-0 bg-black/40"></div>
-            <div className="relative p-12 text-white">
-              <h3 className="text-3xl font-bold mb-4">Manage Your Entire Case in One View</h3>
-              <p className="text-lg opacity-90 mb-8">Next hearing • Documents • Lawyer notes • Timeline — always updated</p>
-              {/* <a href="#" className="inline-flex items-center text-accent font-semibold hover:underline">
+        <div className="absolute inset-0 bg-black/40"></div>
+        <div className="relative p-12 text-white">
+          <h3 className="text-3xl font-bold mb-4">Manage Your Entire Case in One View</h3>
+          <p className="text-lg opacity-90 mb-8">Next hearing • Documents • Lawyer notes • Timeline — always updated</p>
+          {/* <a href="#" className="inline-flex items-center text-accent font-semibold hover:underline">
                 Explore Your Case Dashboard <ChevronRight className="ml-2 w-5 h-5" />
               </a> */}
-              <span>
-                <Link to="/app/home" className="inline-flex items-center text-accent font-semibold hover:underline"> Explore Your Case Dashboard <ChevronRight className="ml-2 w-5 h-5" /> </Link>
-              </span>
-            </div>
-          <div className="absolute bottom-0 right-0 w-80 h-80 bg-accent/20 rounded-rounded blur-3xl"></div>
-          <div className="absolute top-48 left-48 w-80 h-80 bg-accent/20 rounded-rounded blur-3xl"></div>
+          <span>
+            <Link to="/app/home" className="inline-flex items-center text-accent font-semibold hover:underline"> Explore Your Case Dashboard <ChevronRight className="ml-2 w-5 h-5" /> </Link>
+          </span>
+        </div>
+        <div className="absolute bottom-0 right-0 w-80 h-80 bg-accent/20 rounded-rounded blur-3xl"></div>
+        <div className="absolute top-48 left-48 w-80 h-80 bg-accent/20 rounded-rounded blur-3xl"></div>
       </div>
 
       {/* Premium Feature Showcases (In-App Advertising – Elegant) */}
       {/* <section className="py-24 px-6"> */}
-        {/* <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12"> */}
-          {/* Case Dashboard Preview */}
-          {/* <div className="relative bg-gradient-to-br from-primary to-midnight rounded-2xl overflow-hidden shadow-2xl">
+      {/* <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12"> */}
+      {/* Case Dashboard Preview */}
+      {/* <div className="relative bg-gradient-to-br from-primary to-midnight rounded-2xl overflow-hidden shadow-2xl">
             <div className="absolute inset-0 bg-black/40"></div>
             <div className="relative p-12 text-white">
               <h3 className="text-3xl font-bold mb-4">Your Entire Case in One View</h3>
@@ -226,8 +226,8 @@ const HomePage: FC = () => {
             <div className="absolute bottom-0 right-0 w-80 h-80 bg-accent/20 rounded-full blur-3xl"></div>
           </div> */}
 
-          {/* Legal Awareness Hub */}
-          {/* <div className="relative bg-gradient-to-br from-midnight to-primary rounded-2xl overflow-hidden shadow-2xl">
+      {/* Legal Awareness Hub */}
+      {/* <div className="relative bg-gradient-to-br from-midnight to-primary rounded-2xl overflow-hidden shadow-2xl">
             <div className="absolute inset-0 bg-black/40"></div>
             <div className="relative p-12 text-white">
               <h3 className="text-3xl font-bold mb-4">Know your Rights - For Free</h3>
@@ -237,7 +237,7 @@ const HomePage: FC = () => {
               </a>
             </div>
           </div> */}
-        {/* </div> */}
+      {/* </div> */}
       {/* </section> */}
 
       {/* Social Proof – Premium Testimonials */}

@@ -82,19 +82,12 @@ const AppointmentsPage: FC = () => {
   }
 
   const handleVideoCall = async (appointment: AppointmentData) => {
-    const meetWindow = window.open('about:blank', '_blank')
-
     try {
       await appointmentsApi.attend(appointment.id)
       getAppointmentsQuery.refetch()
-      if (meetWindow) {
-        meetWindow.location.href = 'https://meet.google.com/avr-cdku-qtn'
-      }
+      navigate(`/app/consultation/${appointment.id}`)
     } catch (error) {
       console.error('Failed to mark attendance', error)
-      if (meetWindow) {
-        meetWindow.close()
-      }
       alert('Failed to start video call. Please try again.')
     }
   }
@@ -122,15 +115,15 @@ const AppointmentsPage: FC = () => {
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
                 className={`px-4 sm:px-6 py-3 sm:py-4 text-sm font-medium transition-colors relative whitespace-nowrap ${activeTab === tab.key
-                    ? 'text-primary'
-                    : 'text-secondary hover:text-primary'
+                  ? 'text-primary'
+                  : 'text-secondary hover:text-primary'
                   }`}
               >
                 <span className="flex items-center gap-1.5 sm:gap-2">
                   {tab.label}
                   <span className={`px-1.5 sm:px-2 py-0.5 text-xs rounded-full ${activeTab === tab.key
-                      ? 'bg-primary text-white'
-                      : 'bg-gray-100 text-gray-600'
+                    ? 'bg-primary text-white'
+                    : 'bg-gray-100 text-gray-600'
                     }`}>
                     {tab.count}
                   </span>
@@ -166,10 +159,10 @@ const AppointmentsPage: FC = () => {
                   appointment={appointment}
                   tabType={activeTab}
                   onViewAgreement={handleViewAgreement}
-                  onDiscuss={handleDiscuss}
                   onReschedule={handleReschedule}
                   onCancel={handleCancel}
                   onVideoCall={handleVideoCall}
+                  userRole="client"
                 />
               )}
             </div>

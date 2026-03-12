@@ -337,7 +337,7 @@ const SearchPage: FC = () => {
                     Maximum Fee
                   </label>
                   <div className="space-y-2">
-                    {['200', '300', '400', '500'].map(fee => (
+                    {['50000', '100000', '150000', '250000'].map(fee => (
                       <label key={fee} className="flex items-center space-x-2">
                         <input
                           type="checkbox"
@@ -351,7 +351,7 @@ const SearchPage: FC = () => {
                           }}
                           className="text-primary focus:ring-primary rounded"
                         />
-                        <span className="text-sm">Up to ${fee}</span>
+                        <span className="text-sm">Up to ₹{(Number(fee) / 100).toLocaleString('en-IN')}</span>
                       </label>
                     ))}
                   </div>

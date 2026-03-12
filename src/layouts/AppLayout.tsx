@@ -43,6 +43,7 @@ const AppLayout: FC = () => {
     { name: 'Appointments', path: '/app/appointments' },
     { name: 'Cases', path: '/app/cases' },
     { name: 'Lex Rates', path: '/app/lex-rates' },
+    { name: 'Tele Law', path: '/app/tele-law' },
     { name: 'Legal Eagle', path: '/app/legal-eagle' },
   ]
 
@@ -72,8 +73,8 @@ const AppLayout: FC = () => {
                     key={item.name}
                     to={item.path}
                     className={`${location.pathname === item.path
-                        ? 'border-primary text-gray-900'
-                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                      ? 'border-primary text-gray-900'
+                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
                       } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
                   >
                     {item.name}
@@ -185,8 +186,8 @@ const AppLayout: FC = () => {
                     key={item.name}
                     to={item.path}
                     className={`${location.pathname === item.path
-                        ? 'bg-primary-50 border-primary text-primary'
-                        : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
+                      ? 'bg-primary-50 border-primary text-primary'
+                      : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
                       } block pl-3 pr-4 py-2 border-l-4 text-base font-medium`}
                   >
                     {item.name}

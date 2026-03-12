@@ -13,7 +13,9 @@ import {
     Mail,
     Phone,
     Loader2,
-    Gavel
+    Gavel,
+    Lock,
+    XOctagon
 } from "lucide-react";
 import CaseInfo from "@/components/atoms/CaseInfo";
 import CaseTimeline from "@/components/atoms/CaseTimeline";
@@ -24,6 +26,8 @@ import TasksTab from "@/components/atoms/TasksTab";
 import ResolutionTab from "@/components/atoms/ResolutionTab";
 import CaseTimelineLawyer from "@/components/atoms/lawyer/CaseTimelineLawyer";
 import CaseHearingsLawyer from "@/components/atoms/lawyer/CaseHearingsLawyer";
+import CaseClosureModal from "@/components/atoms/CaseClosureModal";
+import CaseClosureInfo from "@/components/atoms/CaseClosureInfo";
 
 interface getCaseDetailsResponse {
     data: {
@@ -37,6 +41,10 @@ interface getCaseDetailsResponse {
     isAccepted: boolean;
     startedAt: Date | null;
     closedAt: Date | null;
+    closedById: string | null;
+    closureNotes: string | null;
+    settlementAmount: number | null;
+    settlementTerms: string | null;
     createdAt: Date;
     updatedAt: Date;
     disputeResolutionMethod: "TRIAL" | "MEDIATION" | "ARBITRATION" | null;
@@ -65,10 +73,11 @@ interface getCaseDetailsResponse {
 }[]
 };
 
-type MenuItem = 'case-info' | 'timeline' | 'hearings' | 'chat' | 'documents' | 'tasks' | 'resolution';
+type MenuItem = 'case-info' | 'timeline' | 'hearings' | 'chat' | 'documents' | 'tasks' | 'resolution' | 'closure';
 
 export default function CaseDetailsClientPage() {
     const [activeMenu, setActiveMenu] = useState<MenuItem>('case-info');
+    const [showClosureModal, setShowClosureModal] = useState(false);
     const { caseId } = useParams<{ caseId: string }>();
     
     if (!caseId) return <div>case id not found</div>;
@@ -86,6 +95,8 @@ export default function CaseDetailsClientPage() {
     const lawyer = caseData?.lawyer;
     const client = caseData?.client;
 
+    const isCaseClosed = ['CLOSED', 'WON', 'LOST', 'SETTLED'].includes(caseData?.status || '');
+
     const menuItems = [
         { id: 'case-info' as MenuItem, label: 'Case Info', icon: FileText },
         { id: 'timeline' as MenuItem, label: 'Timeline', icon: Clock },
@@ -94,6 +105,7 @@ export default function CaseDetailsClientPage() {
         { id: 'documents' as MenuItem, label: 'Documents', icon: FolderOpen },
         { id: 'tasks' as MenuItem, label: 'Tasks', icon: CheckSquare },
         { id: 'resolution' as MenuItem, label: 'Resolution', icon: Gavel },
+        ...(isCaseClosed ? [{ id: 'closure' as MenuItem, label: 'Case Closure', icon: Lock }] : []),
     ];
 
     if (getCaseDetailsQuery.isLoading) {
@@ -134,6 +146,16 @@ export default function CaseDetailsClientPage() {
                 return <TasksTab caseId={caseData.id} />;
             case 'resolution':
                 return <ResolutionTab caseId={caseData.id} disputeResolutionMethod={caseData.disputeResolutionMethod} />;
+            case 'closure':
+                return (
+                    <CaseClosureInfo
+                        status={caseData.status as 'CLOSED' | 'WON' | 'LOST' | 'SETTLED'}
+                        closedAt={caseData.closedAt as unknown as string}
+                        closureNotes={caseData.closureNotes}
+                        settlementAmount={caseData.settlementAmount}
+                        settlementTerms={caseData.settlementTerms}
+                    />
+                );
             default:
                 return <CaseInfo caseId={caseData.id} />;
         }
@@ -262,6 +284,16 @@ export default function CaseDetailsClientPage() {
                                 <div className="text-sm font-semibold">{caseData.disputeResolutionMethod}</div>
                             </div>
                         )}
+
+                        {!isCaseClosed && (
+                            <button
+                                onClick={() => setShowClosureModal(true)}
+                                className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+                            >
+                                <XOctagon className="w-4 h-4" />
+                                Close Case
+                            </button>
+                        )}
                     </div>
                 </header>
 
@@ -272,6 +304,14 @@ export default function CaseDetailsClientPage() {
                     </div>
                 </div>
             </main>
+
+            {/* Case Closure Modal */}
+            <CaseClosureModal
+                caseId={caseData.id}
+                caseTitle={caseData.title}
+                isOpen={showClosureModal}
+                onClose={() => setShowClosureModal(false)}
+            />
         </div>
     )
 }

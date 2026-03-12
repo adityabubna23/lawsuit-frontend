@@ -1,5 +1,6 @@
-import { FC, useMemo } from 'react'
-import { Calendar, Clock, FileText, MessageSquare, User, RefreshCw, XCircle, Video } from 'lucide-react'
+import { FC, useMemo, useState } from 'react'
+import { Calendar, Clock, FileText, MessageSquare, User, RefreshCw, XCircle, Video, ChevronDown, ChevronUp } from 'lucide-react'
+import AppointmentDiscussionPanel from '@/components/organisms/AppointmentDiscussionPanel'
 
 interface AppointmentData {
   scheduledAt: string;
@@ -30,6 +31,10 @@ interface AppointmentData {
     amount: number;
     currency: string;
   } | null;
+  case?: {
+    id: string;
+    status: string;
+  } | null;
 }
 
 type TabType = 'upcoming' | 'missed' | 'attended' | 'cancelled'
@@ -38,10 +43,12 @@ interface RenderAppointmentCardProps {
   appointment: AppointmentData;
   tabType?: TabType;
   onViewAgreement: (params: { appointmentId: string; aggrementUrl: string | null }) => void;
-  onDiscuss: (appointmentId: string) => void;
+  onDiscuss?: (appointmentId: string) => void;
   onReschedule?: (appointment: AppointmentData) => void;
   onCancel?: (appointment: AppointmentData) => void;
   onVideoCall?: (appointment: AppointmentData) => void;
+  userRole?: 'client' | 'lawyer';
+  onEscalateToCase?: (appointment: AppointmentData) => void;
 }
 
 const formatDate = (dateString: string) => {
@@ -83,9 +90,12 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
   onDiscuss,
   onReschedule,
   onCancel,
-  onVideoCall
+  onVideoCall,
+  userRole = 'client',
+  onEscalateToCase,
 }) => {
-  const otherParty = appointment.lawyer
+  const [discussionOpen, setDiscussionOpen] = useState(false)
+  const otherParty = userRole === 'client' ? appointment.lawyer : appointment.client
 
   const isVideoCallActive = useMemo(() => {
     const now = new Date()
@@ -166,8 +176,8 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
               onClick={() => onVideoCall?.(appointment)}
               disabled={!isVideoCallActive}
               className={`flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium rounded-md transition-colors ${isVideoCallActive
-                  ? 'bg-primary text-white hover:bg-primary/90'
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                ? 'bg-primary text-white hover:bg-primary/90'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 }`}
             >
               <Video className="w-4 h-4" />
@@ -226,15 +236,15 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
               onClick={() => onViewAgreement({ appointmentId: appointment.id, aggrementUrl: appointment.aggrementUrl })}
               disabled={!appointment.aggrementUrl}
               className={`flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium rounded-md transition-colors ${appointment.aggrementUrl
-                  ? 'bg-primary text-white hover:bg-primary/90'
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                ? 'bg-primary text-white hover:bg-primary/90'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 }`}
             >
               <FileText className="w-4 h-4" />
               Agreement
             </button>
             <button
-              onClick={() => onDiscuss(appointment.id)}
+              onClick={() => onDiscuss?.(appointment.id)}
               className="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-white rounded-md transition-colors"
             >
               <MessageSquare className="w-4 h-4" />
@@ -243,7 +253,34 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
           </>
         )}
       </div>
-    </div>
+      {/* Discussion Thread — expandable */}
+      {
+        (appointment.status === 'CONFIRMED' || appointment.status === 'PENDING' || appointment.status === 'COMPLETED') && (
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <button
+              onClick={() => setDiscussionOpen(prev => !prev)}
+              className="flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition"
+            >
+              <MessageSquare className="w-4 h-4" />
+              Discussion Thread
+              {discussionOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
+            {discussionOpen && (
+              <AppointmentDiscussionPanel
+                appointmentId={appointment.id}
+                otherPartyName={otherParty?.name || 'Unknown'}
+                otherPartyRole={userRole === 'client' ? 'Lawyer' : 'Client'}
+                userRole={userRole}
+                onEscalateToCase={onEscalateToCase ? () => onEscalateToCase?.(appointment) : undefined}
+                caseId={appointment.case?.id || null}
+                meetingLink={appointment.meetingLink}
+                appointmentStatus={appointment.status}
+              />
+            )}
+          </div>
+        )
+      }
+    </div >
   )
 }
 

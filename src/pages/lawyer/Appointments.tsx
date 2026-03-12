@@ -1,6 +1,7 @@
 import { FC, useMemo, useState } from 'react'
 import { appointmentsApi } from '@/services/api'
 import { parseISO, differenceInMinutes, isValid } from 'date-fns'
+import { useNavigate } from 'react-router-dom'
 import ChatTab from '@/components/atoms/ChatTab'
 import CreateCaseDetail from '@/components/molecules/CreateCaseDetail'
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -18,11 +19,12 @@ interface AppointmentResponse {
 type TabType = 'attendNow' | 'upcoming' | 'missed' | 'attended' | 'cancelled'
 
 const LawyerAppointments: FC = () => {
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<TabType>('attendNow')
   const [openChatId, setOpenChatId] = useState<string | null>(null)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [selectedAppointmentForCase, setSelectedAppointmentForCase] = useState<AppointmentResponse['data'][0] | null>(null)
-  const [selectedAgreementUrl, setSelectedAgreementUrl] = useState<{appointmentId: string, aggrementUrl: string | null} | null>(null)
+  const [selectedAgreementUrl, setSelectedAgreementUrl] = useState<{ appointmentId: string, aggrementUrl: string | null } | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
   const [selectedAppointmentForUpload, setSelectedAppointmentForUpload] = useState<AppointmentResponse['data'][0] | null>(null)
@@ -87,7 +89,7 @@ const LawyerAppointments: FC = () => {
       const status = a.status
       // Don't render pending appointments anywhere
       if (status === 'PENDING') return
-      
+
       const dt = parseISO(a.scheduledAt)
       const validDate = dt && isValid(dt)
 
@@ -162,9 +164,9 @@ const LawyerAppointments: FC = () => {
     setSelectedAppointmentForCase(a)
   }
 
-  const handleViewAgreement = ({appointmentId, aggrementUrl} : {appointmentId: string, aggrementUrl: string | null}) => {
+  const handleViewAgreement = ({ appointmentId, aggrementUrl }: { appointmentId: string, aggrementUrl: string | null }) => {
     if (aggrementUrl) {
-      setSelectedAgreementUrl({appointmentId, aggrementUrl})
+      setSelectedAgreementUrl({ appointmentId, aggrementUrl })
       setIsModalOpen(true)
     }
   }
@@ -194,21 +196,12 @@ const LawyerAppointments: FC = () => {
 
   const handleAttend = async (appointment: AppointmentResponse['data'][0]) => {
     try {
-      window.open('https://meet.google.com/avr-cdku-qtn', '_blank')//temp line to be removed ASAP
-      const res = await appointmentsApi.attend(appointment.id)
-      const updated = (res as any).data?.appointment ?? (res as any).appointment ?? null
-      
-      // Refetch appointments to update the list
+      await appointmentsApi.attend(appointment.id)
       getAppointmentsQuery.refetch()
-
-      const meetingLink = (updated && updated.meetingLink) || appointment.meetingLink
-      if (meetingLink) {
-        window.open('https://meet.google.com/avr-cdku-qtn', '_blank')
-      }
+      navigate(`/lawyer/consultation/${appointment.id}`)
     } catch (err) {
       console.error('Failed to mark attended', err)
-      const meetingLink = appointment.meetingLink
-      if (meetingLink) window.open(meetingLink, '_blank')
+      alert('Failed to start video call. Please try again.')
     }
   }
 
@@ -253,19 +246,17 @@ const LawyerAppointments: FC = () => {
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`px-6 py-4 text-sm font-medium transition-colors relative ${
-                  activeTab === tab.key
+                className={`px-6 py-4 text-sm font-medium transition-colors relative ${activeTab === tab.key
                     ? 'text-primary'
                     : 'text-secondary hover:text-primary'
-                }`}
+                  }`}
               >
                 <span className="flex items-center gap-2">
                   {tab.label}
-                  <span className={`px-2 py-0.5 text-xs rounded-full ${
-                    activeTab === tab.key
+                  <span className={`px-2 py-0.5 text-xs rounded-full ${activeTab === tab.key
                       ? 'bg-primary text-white'
                       : 'bg-gray-100 text-gray-600'
-                  }`}>
+                    }`}>
                     {tab.count}
                   </span>
                 </span>
@@ -298,7 +289,7 @@ const LawyerAppointments: FC = () => {
                     </div>
                   ) : (
                     <div>
-                      {attendNow.map(appointment => 
+                      {attendNow.map(appointment =>
                         <RenderAppointmentCard
                           key={appointment.id}
                           appointment={appointment}
@@ -324,7 +315,7 @@ const LawyerAppointments: FC = () => {
                     </div>
                   ) : (
                     <div>
-                      {upcoming.map(appointment => 
+                      {upcoming.map(appointment =>
                         <RenderAppointmentCard
                           key={appointment.id}
                           appointment={appointment}
@@ -351,7 +342,7 @@ const LawyerAppointments: FC = () => {
                     </div>
                   ) : (
                     <div>
-                      {missed.map(appointment => 
+                      {missed.map(appointment =>
                         <RenderAppointmentCard
                           key={appointment.id}
                           appointment={appointment}
@@ -378,7 +369,7 @@ const LawyerAppointments: FC = () => {
                     </div>
                   ) : (
                     <div>
-                      {attended.map(appointment => 
+                      {attended.map(appointment =>
                         <RenderAppointmentCard
                           key={appointment.id}
                           appointment={appointment}
@@ -403,7 +394,7 @@ const LawyerAppointments: FC = () => {
                     </div>
                   ) : (
                     <div>
-                      {cancelled.map(appointment => 
+                      {cancelled.map(appointment =>
                         <RenderAppointmentCard
                           key={appointment.id}
                           appointment={appointment}
@@ -426,7 +417,7 @@ const LawyerAppointments: FC = () => {
         {/* Agreement Modal */}
         {selectedAgreementUrl ? selectedAgreementUrl.aggrementUrl ? (
           <AgreementModal
-            appointment={selectedAgreementUrl as {appointmentId: string, aggrementUrl: string}}
+            appointment={selectedAgreementUrl as { appointmentId: string, aggrementUrl: string }}
             isOpen={isModalOpen}
             onClose={handleCloseModal}
             canApply={false}

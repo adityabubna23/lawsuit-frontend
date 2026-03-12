@@ -1,5 +1,6 @@
-import { FC } from 'react'
-import { Calendar, Clock, FileText, MessageSquare, User, Video, Upload, RefreshCw, XCircle } from 'lucide-react'
+import { FC, useState } from 'react'
+import { Calendar, Clock, FileText, MessageSquare, User, Video, Upload, RefreshCw, XCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import AppointmentDiscussionPanel from '@/components/organisms/AppointmentDiscussionPanel'
 
 interface AppointmentData {
   scheduledAt: string;
@@ -30,6 +31,10 @@ interface AppointmentData {
     amount: number;
     currency: string;
   } | null;
+  case?: {
+    id: string;
+    status: string;
+  } | null;
 }
 
 type TabType = 'attendNow' | 'upcoming' | 'missed' | 'attended' | 'cancelled'
@@ -41,7 +46,7 @@ interface RenderAppointmentCardProps {
   onAttend: (appointment: AppointmentData) => void;
   onViewAgreement: (params: { appointmentId: string; aggrementUrl: string | null }) => void;
   onUploadAgreement: (appointment: AppointmentData) => void;
-  onOpenChat: (appointment: AppointmentData) => void;
+  onOpenChat?: (appointment: AppointmentData) => void;
   onOpenCaseCreation: (appointment: AppointmentData) => void;
   onReschedule?: (appointment: AppointmentData) => void;
   onCancel?: (appointment: AppointmentData) => void;
@@ -49,18 +54,18 @@ interface RenderAppointmentCardProps {
 
 const formatDate = (dateString: string) => {
   const date = new Date(dateString)
-  return date.toLocaleDateString('en-US', { 
-    month: 'short', 
-    day: 'numeric', 
-    year: 'numeric' 
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
   })
 }
 
 const formatTime = (dateString: string) => {
   const date = new Date(dateString)
-  return date.toLocaleTimeString('en-US', { 
-    hour: '2-digit', 
-    minute: '2-digit' 
+  return date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit'
   })
 }
 
@@ -91,10 +96,11 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
   onReschedule,
   onCancel
 }) => {
+  const [discussionOpen, setDiscussionOpen] = useState(false)
   const otherParty = appointment.client
 
   return (
-    <div 
+    <div
       className="border border-gray-200 bg-white p-6 mb-4 hover:border-primary transition-colors"
     >
       <div className="flex items-start justify-between">
@@ -102,8 +108,8 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
               {otherParty?.avatarUrl ? (
-                <img 
-                  src={otherParty.avatarUrl} 
+                <img
+                  src={otherParty.avatarUrl}
                   alt={otherParty.name}
                   className="w-10 h-10 rounded-full object-cover"
                 />
@@ -144,7 +150,7 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
 
           {appointment.payment && (
             <div className="text-sm text-secondary mb-4">
-              Payment: {appointment.payment.currency} {appointment.payment.amount} - 
+              Payment: {appointment.payment.currency} {appointment.payment.amount} -
               <span className={`ml-1 ${appointment.payment.status === 'COMPLETED' ? 'text-green-600' : 'text-yellow-600'}`}>
                 {appointment.payment.status}
               </span>
@@ -183,7 +189,7 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
               Upload Agreement
             </button>
             <button
-              onClick={() => onOpenChat(appointment)}
+              onClick={() => onOpenChat?.(appointment)}
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-white transition-colors"
             >
               <MessageSquare className="w-4 h-4" />
@@ -260,14 +266,14 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
               </button>
             ) : null}
             <button
-                onClick={() => onUploadAgreement(appointment)}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-white transition-colors"
-              >
-                <Upload className="w-4 h-4" />
-                Upload Agreement
-              </button>
+              onClick={() => onUploadAgreement(appointment)}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-white transition-colors"
+            >
+              <Upload className="w-4 h-4" />
+              Upload Agreement
+            </button>
             <button
-              onClick={() => onOpenChat(appointment)}
+              onClick={() => onOpenChat?.(appointment)}
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-white transition-colors"
             >
               <MessageSquare className="w-4 h-4" />
@@ -285,6 +291,32 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
 
         {/* Cancelled Tab - No buttons */}
       </div>
+
+      {/* Discussion Thread — expandable, for confirmed/attended/attendNow */}
+      {(appointment.status === 'CONFIRMED' || appointment.status === 'PENDING' || appointment.status === 'COMPLETED') && (
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <button
+            onClick={() => setDiscussionOpen(prev => !prev)}
+            className="flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition"
+          >
+            <MessageSquare className="w-4 h-4" />
+            Discussion Thread
+            {discussionOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+          {discussionOpen && (
+            <AppointmentDiscussionPanel
+              appointmentId={appointment.id}
+              otherPartyName={otherParty?.name || 'Unknown'}
+              otherPartyRole="Client"
+              userRole="lawyer"
+              onEscalateToCase={() => onOpenCaseCreation(appointment)}
+              caseId={appointment.case?.id || null}
+              meetingLink={appointment.meetingLink}
+              appointmentStatus={appointment.status}
+            />
+          )}
+        </div>
+      )}
     </div>
   )
 }

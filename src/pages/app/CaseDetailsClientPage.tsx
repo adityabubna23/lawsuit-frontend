@@ -12,7 +12,8 @@ import {
     User,
     Mail,
     Phone,
-    Loader2
+    Loader2,
+    Lock
 } from "lucide-react";
 import CaseInfo from "@/components/atoms/CaseInfo";
 import CaseTimeline from "@/components/atoms/CaseTimeline";
@@ -20,6 +21,7 @@ import CaseHearings from "@/components/atoms/CaseHearings";
 import ChatTab from "@/components/atoms/ChatTab";
 import DocumentsTab from "@/components/atoms/DocumentsTab";
 import TasksTab from "@/components/atoms/TasksTab";
+import CaseClosureInfo from "@/components/atoms/CaseClosureInfo";
 
 interface getCaseDetailsResponse {
     data: {
@@ -33,6 +35,10 @@ interface getCaseDetailsResponse {
     isAccepted: boolean;
     startedAt: Date | null;
     closedAt: Date | null;
+    closedById: string | null;
+    closureNotes: string | null;
+    settlementAmount: number | null;
+    settlementTerms: string | null;
     createdAt: Date;
     updatedAt: Date;
     disputeResolutionMethod: "TRIAL" | "MEDIATION" | "ARBITRATION" | null;
@@ -61,7 +67,7 @@ interface getCaseDetailsResponse {
 }[]
 };
 
-type MenuItem = 'case-info' | 'timeline' | 'hearings' | 'chat' | 'documents' | 'tasks';
+type MenuItem = 'case-info' | 'timeline' | 'hearings' | 'chat' | 'documents' | 'tasks' | 'closure';
 
 export default function CaseDetailsClientPage() {
     const [activeMenu, setActiveMenu] = useState<MenuItem>('case-info');
@@ -80,6 +86,7 @@ export default function CaseDetailsClientPage() {
 
     const caseData = getCaseDetailsQuery.data?.data?.[0];
     const lawyer = caseData?.lawyer;
+    const isCaseClosed = ['CLOSED', 'WON', 'LOST', 'SETTLED'].includes(caseData?.status || '');
 
     const menuItems = [
         { id: 'case-info' as MenuItem, label: 'Case Info', icon: FileText },
@@ -88,6 +95,7 @@ export default function CaseDetailsClientPage() {
         { id: 'chat' as MenuItem, label: 'Chat', icon: MessageSquare },
         { id: 'documents' as MenuItem, label: 'Documents', icon: FolderOpen },
         { id: 'tasks' as MenuItem, label: 'Tasks', icon: CheckSquare },
+        ...(isCaseClosed ? [{ id: 'closure' as MenuItem, label: 'Case Closure', icon: Lock }] : []),
     ];
 
     if (getCaseDetailsQuery.isLoading) {
@@ -126,6 +134,16 @@ export default function CaseDetailsClientPage() {
                 return <DocumentsTab caseId={caseData.id} />;
             case 'tasks':
                 return <TasksTab caseId={caseData.id} />;
+            case 'closure':
+                return (
+                    <CaseClosureInfo
+                        status={caseData.status as 'CLOSED' | 'WON' | 'LOST' | 'SETTLED'}
+                        closedAt={caseData.closedAt as unknown as string}
+                        closureNotes={caseData.closureNotes}
+                        settlementAmount={caseData.settlementAmount}
+                        settlementTerms={caseData.settlementTerms}
+                    />
+                );
             default:
                 return <CaseInfo caseId={caseData.id} />;
         }

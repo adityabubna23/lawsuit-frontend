@@ -228,6 +228,7 @@ export const chatApi = {
     // Backend validation expects a JSON body like { text?: string, attachments?: string[] }
     api.post(`/chat/${chatId}/messages`, { text: data.text, attachments: data.attachments }),
   getParticipants: (chatId: string) => api.get(`/chat/${chatId}/participants`),
+  getOrCreateAppointmentChat: (appointmentId: string) => api.get(`/chat/appointment/${appointmentId}`),
 }
 
 export const notificationsApi = {
@@ -280,8 +281,18 @@ export const adminApi = {
   verifyLawyer: (id: string) => api.put(`/admin/${id}/verifylawyer`),
 }
 
+export const videoApi = {
+  getMeeting: (appointmentId: string) => api.get(`/video/meeting/${appointmentId}`),
+}
+
 export const storageApi = {
   getPresignedUrl: `${baseURL}/storage/presigned`,
+}
+
+export const teleLawApi = {
+  getSchemeInfo: () => api.get('/tele-law/info'),
+  checkEligibility: (data: { income?: number; caste?: string; gender?: string; state?: string; useProfile?: boolean }) =>
+    api.post('/tele-law/check-eligibility', data),
 }
 
 export const apiEndpoints = {
@@ -303,6 +314,7 @@ export const apiEndpoints = {
     addDocument: (caseid: string) => `${baseURL}/cases/${caseid}/saveDocuments`,
     getDocuments: (caseid: string) => `${baseURL}/cases/${caseid}/documents`,
     updateResolutionMethod: (caseid: string) => `${baseURL}/cases/${caseid}/resolution-method`,
+    closeCase: (caseid: string) => `${baseURL}/cases/${caseid}/close`,
   }
 }
 

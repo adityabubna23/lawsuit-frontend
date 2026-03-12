@@ -27,7 +27,8 @@ import ProfilePage from './pages/app/ProfilePage'
 import AiChatPage from './components/organisms/AiChatPage'
 import ViewCasePages from './pages/app/ViewCasePages'
 import CaseDetailsClientPage from './pages/app/CaseDetailsClientPage'
-
+import VideoConsultationPage from './pages/app/VideoConsultationPage'
+import TeleLawPage from './pages/app/TeleLawPage'
 // Admin Pages
 import AdminLayout from './layouts/AdminLayout'
 import TemplatesPage from './pages/admin/TemplatesPage'
@@ -86,8 +87,9 @@ const AppRoutes = () => {
         <Route path="case/:caseId" element={<CaseDetailsClientPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="lex-rates" element={<LexRateTable />} />
+        <Route path="tele-law" element={<TeleLawPage />} />
         <Route path="legal-eagle" element={<AiChatPage />} />
-
+        <Route path="consultation/:appointmentId" element={<VideoConsultationPage />} />
 
         <Route path="under-development" element={<UnderDevelopmentPlaceholder />} />
       </Route>
@@ -133,6 +135,7 @@ const AppRoutes = () => {
         <Route path="cases" element={<ViewCasePagesLawyer />} />
         <Route path="profile" element={<LawyerProfilePage />} />
         <Route path="agreement-templates" element={<AgreementTemplatesPage />} />
+        <Route path="consultation/:appointmentId" element={<VideoConsultationPage />} />
 
         <Route path="legal-eagle" element={<AiChatPage />} />
         <Route path="under-development" element={<UnderDevelopmentPlaceholder />} />
