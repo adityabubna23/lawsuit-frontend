@@ -1,9 +1,91 @@
-import { FC } from 'react';
+import { FC, FormEvent, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Search, Shield, Clock, Gavel, BookOpen, MessageCircle, ChevronRight, Star, MapPin, PhoneCall, Calendar, FileText, BellRing, Users } from 'lucide-react';
-import path from 'path';
+import { lawyersApi } from '@/services/api';
+
+const DEFAULT_CASE_TYPE_OPTIONS = [
+  'Family Law',
+  'Criminal Law',
+  'Corporate Law',
+  'Property Law',
+  'Civil Litigation',
+  'Tax Law',
+  'Consumer Rights',
+  'Women Rights',
+];
+
+const sortAlphabetically = (items: string[]) => [...items].sort((a, b) => a.localeCompare(b));
 
 const HomePage: FC = () => {
+  const navigate = useNavigate();
+  const [location, setLocation] = useState('');
+  const [caseType, setCaseType] = useState('');
+  const [caseTypeOptions, setCaseTypeOptions] = useState<string[]>(sortAlphabetically(DEFAULT_CASE_TYPE_OPTIONS));
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchCaseTypes = async () => {
+      try {
+        const response = await lawyersApi.getAll({ page: 1, limit: 200 });
+        const payload = response.data || {};
+        const items = Array.isArray(payload.items) ? payload.items : Array.isArray(payload.data) ? payload.data : [];
+
+        const serverOptions = new Set<string>();
+
+        const fromFilters = payload?.filters?.specializations;
+        if (Array.isArray(fromFilters)) {
+          fromFilters.forEach((item: unknown) => {
+            if (typeof item === 'string' && item.trim()) {
+              serverOptions.add(item.trim());
+            }
+          });
+        }
+
+        items.forEach((lawyer: any) => {
+          const specs = Array.isArray(lawyer?.specializations)
+            ? lawyer.specializations
+            : Array.isArray(lawyer?.specialization)
+              ? lawyer.specialization
+              : [];
+
+          specs.forEach((spec: unknown) => {
+            if (typeof spec === 'string' && spec.trim()) {
+              serverOptions.add(spec.trim());
+            }
+          });
+        });
+
+        if (isMounted && serverOptions.size > 0) {
+          setCaseTypeOptions(sortAlphabetically(Array.from(serverOptions)));
+        }
+      } catch (error) {
+        console.error('Failed to load case types for home page search', error);
+      }
+    };
+
+    fetchCaseTypes();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleFindLawyer = (e: FormEvent) => {
+    e.preventDefault();
+
+    const trimmedLocation = location.trim();
+    if (!trimmedLocation) return;
+
+    const params = new URLSearchParams({ location: trimmedLocation });
+    if (caseType) {
+      params.set('specialization', caseType);
+    }
+
+    navigate(`/app/search?${params.toString()}`);
+  };
+
   return (
     <div className="min-h-screen bg-white">
 
@@ -23,28 +105,45 @@ const HomePage: FC = () => {
 
             {/* Premium Search Bar */}
             <div className="mt-12 max-w-4xl mx-auto">
-              <div className="bg-white border border-gray-200 rounded-xl shadow-xl p-3 flex flex-col md:flex-row items-center gap-4">
+              <form
+                onSubmit={handleFindLawyer}
+                className="bg-white border border-gray-200 rounded-xl shadow-xl p-3 flex flex-col md:flex-row items-center gap-4"
+              >
                 <div className="flex items-center flex-1 w-full">
                   <MapPin className="w-6 h-6 text-primary ml-4" />
                   <input
                     type="text"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
                     placeholder="City or Area (e.g., Mumbai, Delhi High Court)"
                     className="px-4 py-4 w-full outline-none text-gray-800"
+                    required
                   />
                 </div>
                 <div className="hidden md:block w-px bg-gray-300 h-12"></div>
                 <div className="flex items-center flex-1 w-full">
                   <Gavel className="w-6 h-6 text-primary ml-4" />
-                  <input
-                    type="text"
-                    placeholder="Nature of case (Divorce, Property Dispute, Criminal, etc.)"
-                    className="px-4 py-4 w-full outline-none text-gray-800"
-                  />
+                  <select
+                    value={caseType}
+                    onChange={(e) => setCaseType(e.target.value)}
+                    className="px-4 py-4 w-full outline-none text-gray-800 bg-transparent"
+                  >
+                    <option value="">All Case Types (Optional)</option>
+                    {caseTypeOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <button className="bg-primary hover:bg-midnight text-white font-semibold px-10 py-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+                <button
+                  type="submit"
+                  className="bg-primary hover:bg-midnight text-white font-semibold px-10 py-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed"
+                  disabled={!location.trim()}
+                >
                   Find Your Lawyer
                 </button>
-              </div>
+              </form>
             </div>
 
             {/* Trust Bar */}

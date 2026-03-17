@@ -1,5 +1,5 @@
 import { FC, useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import LawyerCard from '../../components/molecules/LawyerCard'
 import Button from '../../components/atoms/Button'
 import { useLawyerStore } from '@/stores/lawyerStore'
@@ -21,8 +21,18 @@ const SORT_OPTIONS: { value: string; label: string; geoOnly?: boolean }[] = [
 
 const SearchPage: FC = () => {
   const navigate = useNavigate()
-  const [searchQuery, setSearchQuery] = useState('')
-  const [filters, setFilters] = useState<Filters>({})
+  const [searchParams] = useSearchParams()
+
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q')?.trim() ?? '')
+  const [filters, setFilters] = useState<Filters>(() => {
+    const initialLocation = searchParams.get('location')?.trim()
+    const initialSpecialization = searchParams.get('specialization')?.trim()
+
+    return {
+      ...(initialLocation ? { location: initialLocation } : {}),
+      ...(initialSpecialization ? { specialization: initialSpecialization } : {}),
+    }
+  })
   const [page, setPage] = useState(1)
 
   /* ─── Geo state ─── */

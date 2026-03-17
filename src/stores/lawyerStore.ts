@@ -4,6 +4,8 @@ import { create } from 'zustand'
 import type { Lawyer } from '@/types'
 import { lawyersApi } from '@/services/api'
 
+const sortAlphabetically = (items: string[]) => [...items].sort((a, b) => a.localeCompare(b))
+
 interface FilterOptions {
   specializations: string[]
   locations: string[]
@@ -111,7 +113,7 @@ export const useLawyerStore = create<LawyerStore>((set, get) => ({
       // Merge with master list so selecting a filter doesn't remove other options
       const currentAll = get().allFilterOptions || { specializations: [], locations: [], languages: [] }
 
-      const mergedSpecializations = Array.from(new Set([...(currentAll.specializations || []), ...(specializations || [])]))
+      const mergedSpecializations = sortAlphabetically(Array.from(new Set([...(currentAll.specializations || []), ...(specializations || [])])))
       const mergedLocations = Array.from(new Set([...(currentAll.locations || []), ...(locations || [])]))
       const mergedLanguages = Array.from(new Set([...(currentAll.languages || []), ...(languagesArr || [])]))
 

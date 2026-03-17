@@ -13,6 +13,7 @@
     "jsx": "react-jsx",
     "strict": true,
     "esModuleInterop": true,
+    "ignoreDeprecations": "6.0",
   "noUnusedLocals": false,
   "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
