@@ -10,6 +10,8 @@ import LoginPage from './pages/auth/LoginPage'
 import AdminLoginPage from './pages/auth/AdminLoginPage'
 import RegisterPage from './pages/auth/RegisterPage'
 import OtpVerifyPage from './pages/auth/OtpVerifyPage'
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage'
+import TermsOfServicePage from './pages/TermsOfServicePage'
 import UnderDevelopmentPlaceholder from './components/organisms/UnderDevelopmentPlaceholder'
 
 // App Pages
@@ -66,6 +68,8 @@ const AppRoutes = () => {
       <Route path="/auth/admin-login" element={<AdminLoginPage />} />
       <Route path="/auth/register" element={<RegisterPage />} />
       <Route path="/auth/otp-verify" element={<OtpVerifyPage />} />
+      <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+      <Route path="/terms-of-service" element={<TermsOfServicePage />} />
 
       {/* Protected App Routes */}
       <Route

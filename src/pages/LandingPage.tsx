@@ -11,7 +11,7 @@ const LandingPage: FC = () => {
           <div className="flex justify-between h-16">
             <div className="flex">
               <div className="flex-shrink-0 flex items-center">
-                <h1 className="text-2xl font-bold text-primary">Lawsuit</h1>
+                <h1 className="text-2xl font-bold text-primary">NyayaX</h1>
               </div>
             </div>
             <div className="flex items-center space-x-4">
@@ -165,6 +165,11 @@ const LandingPage: FC = () => {
                 <li>Email: support@lawsuit.com</li>
                 <li>Phone: (123) 456-7890</li>
                 <li>Address: 123 Legal St, Justice City, 12345</li>
+                <li className="pt-2">
+                  <Link to="/privacy-policy" className="hover:text-white">Privacy Policy</Link>
+                  <span className="mx-2">|</span>
+                  <Link to="/terms-of-service" className="hover:text-white">Terms of Service</Link>
+                </li>
               </ul>
             </div>
           </div>
