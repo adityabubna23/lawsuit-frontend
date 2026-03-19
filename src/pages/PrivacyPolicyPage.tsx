@@ -15,7 +15,7 @@ const PrivacyPolicyPage: FC = () => {
                         <div className="flex">
                             <div className="flex-shrink-0 flex items-center">
                                 <Link to="/">
-                                    <h1 className="text-2xl font-bold text-primary">Lawsuit</h1>
+                                    <h1 className="text-2xl font-bold text-primary">NyayaX</h1>
                                 </Link>
                             </div>
                         </div>
@@ -57,7 +57,7 @@ const PrivacyPolicyPage: FC = () => {
 
                         <section>
                             <h2 className="text-xl font-semibold text-gray-900 mb-3">5. Your Rights</h2>
-                            <p>You have the right to: access, update, or delete your personal information; opt out of marketing communications; request data portability; withdraw consent at any time. Contact us at support@lawsuit.com for any privacy-related requests.</p>
+                            <p>You have the right to: access, update, or delete your personal information; opt out of marketing communications; request data portability; withdraw consent at any time. Contact us at support@nyayax.com for any privacy-related requests.</p>
                         </section>
 
                         <section>
@@ -73,7 +73,7 @@ const PrivacyPolicyPage: FC = () => {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                         <div>
-                            <h1 className="text-2xl font-bold text-white">Lawsuit .</h1>
+                            <h1 className="text-2xl font-bold text-white">NyayaX .</h1>
                             <p className="mt-4 text-gray-300 text-sm">
                                 Connect with experienced lawyers and manage your legal needs efficiently.
                             </p>
@@ -90,7 +90,7 @@ const PrivacyPolicyPage: FC = () => {
                         <div>
                             <h3 className="text-lg font-semibold">Contact Us</h3>
                             <ul className="mt-4 space-y-2 text-gray-300 text-sm">
-                                <li>Email: support@lawsuit.com</li>
+                                <li>Email: support@nyayax.com</li>
                                 <li>Phone: (123) 456-7890</li>
                                 <li>Address: 123 Legal St, Justice City, 12345</li>
                                 <li className="pt-2">
@@ -102,7 +102,7 @@ const PrivacyPolicyPage: FC = () => {
                         </div>
                     </div>
                     <div className="mt-8 pt-8 border-t border-gray-700 text-center">
-                        <p className="text-gray-300 text-sm">&copy; {new Date().getFullYear()} Lawsuit. All rights reserved.</p>
+                        <p className="text-gray-300 text-sm">&copy; {new Date().getFullYear()} NyayaX. All rights reserved.</p>
                     </div>
                 </div>
             </footer>

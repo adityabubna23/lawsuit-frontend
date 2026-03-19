@@ -15,7 +15,7 @@ const TermsOfServicePage: FC = () => {
                         <div className="flex">
                             <div className="flex-shrink-0 flex items-center">
                                 <Link to="/">
-                                    <h1 className="text-2xl font-bold text-primary">Lawsuit</h1>
+                                    <h1 className="text-2xl font-bold text-primary">NyayaX</h1>
                                 </Link>
                             </div>
                         </div>
@@ -37,7 +37,7 @@ const TermsOfServicePage: FC = () => {
                     <div className="space-y-6 text-gray-700">
                         <section>
                             <h2 className="text-xl font-semibold text-gray-900 mb-3">1. Acceptance of Terms</h2>
-                            <p>By using LawSoft, you agree to these Terms of Service. If you do not agree, please do not use the platform. We reserve the right to modify these terms at any time, and continued use constitutes acceptance of modifications.</p>
+                            <p>By using NyayaX, you agree to these Terms of Service. If you do not agree, please do not use the platform. We reserve the right to modify these terms at any time, and continued use constitutes acceptance of modifications.</p>
                         </section>
 
                         <section>
@@ -47,7 +47,7 @@ const TermsOfServicePage: FC = () => {
 
                         <section>
                             <h2 className="text-xl font-semibold text-gray-900 mb-3">3. Legal Services Disclaimer</h2>
-                            <p>LawSoft is a platform that connects clients with lawyers. We do not provide legal advice directly. All legal advice and representation is provided by independent lawyers registered on the platform. LawSoft is not liable for the quality of legal advice provided by lawyers.</p>
+                            <p>NyayaX is a platform that connects clients with lawyers. We do not provide legal advice directly. All legal advice and representation is provided by independent lawyers registered on the platform. NyayaX is not liable for the quality of legal advice provided by lawyers.</p>
                         </section>
 
                         <section>
@@ -57,7 +57,7 @@ const TermsOfServicePage: FC = () => {
 
                         <section>
                             <h2 className="text-xl font-semibold text-gray-900 mb-3">5. Lawyer Verification</h2>
-                            <p>All lawyers on the platform undergo verification of their Bar Council registration and credentials. However, LawSoft does not guarantee the outcome of any legal matter. Clients should exercise their own judgment when selecting a lawyer.</p>
+                            <p>All lawyers on the platform undergo verification of their Bar Council registration and credentials. However, NyayaX does not guarantee the outcome of any legal matter. Clients should exercise their own judgment when selecting a lawyer.</p>
                         </section>
 
                         <section>
@@ -67,7 +67,7 @@ const TermsOfServicePage: FC = () => {
 
                         <section>
                             <h2 className="text-xl font-semibold text-gray-900 mb-3">7. Limitation of Liability</h2>
-                            <p>LawSoft shall not be liable for any indirect, incidental, or consequential damages arising from use of the platform. Our total liability is limited to the amount paid by you in the preceding 12 months.</p>
+                            <p>NyayaX shall not be liable for any indirect, incidental, or consequential damages arising from use of the platform. Our total liability is limited to the amount paid by you in the preceding 12 months.</p>
                         </section>
 
                         <section>
@@ -83,7 +83,7 @@ const TermsOfServicePage: FC = () => {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                         <div>
-                            <h1 className="text-2xl font-bold text-white">Lawsuit .</h1>
+                            <h1 className="text-2xl font-bold text-white">NyayaX .</h1>
                             <p className="mt-4 text-gray-300 text-sm">
                                 Connect with experienced lawyers and manage your legal needs efficiently.
                             </p>
@@ -100,7 +100,7 @@ const TermsOfServicePage: FC = () => {
                         <div>
                             <h3 className="text-lg font-semibold">Contact Us</h3>
                             <ul className="mt-4 space-y-2 text-gray-300 text-sm">
-                                <li>Email: support@lawsuit.com</li>
+                                <li>Email: support@nyayax.com</li>
                                 <li>Phone: (123) 456-7890</li>
                                 <li>Address: 123 Legal St, Justice City, 12345</li>
                                 <li className="pt-2">
@@ -112,7 +112,7 @@ const TermsOfServicePage: FC = () => {
                         </div>
                     </div>
                     <div className="mt-8 pt-8 border-t border-gray-700 text-center">
-                        <p className="text-gray-300 text-sm">&copy; {new Date().getFullYear()} Lawsuit. All rights reserved.</p>
+                        <p className="text-gray-300 text-sm">&copy; {new Date().getFullYear()} NyayaX. All rights reserved.</p>
                     </div>
                 </div>
             </footer>

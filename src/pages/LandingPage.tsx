@@ -125,7 +125,7 @@ const LandingPage: FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* Brand and Description */}
             <div>
-              <h1 className="text-2xl font-bold text-white">Lawsuit .</h1>
+              <h1 className="text-2xl font-bold text-white">NyayaX .</h1>
               <p className="mt-4 text-gray-300 text-sm">
                 Connect with experienced lawyers and manage your legal needs efficiently.
               </p>
@@ -162,7 +162,7 @@ const LandingPage: FC = () => {
             <div>
               <h3 className="text-lg font-semibold">Contact Us</h3>
               <ul className="mt-4 space-y-2 text-gray-300 text-sm">
-                <li>Email: support@lawsuit.com</li>
+                <li>Email: support@nyayax.com</li>
                 <li>Phone: (123) 456-7890</li>
                 <li>Address: 123 Legal St, Justice City, 12345</li>
                 <li className="pt-2">
@@ -177,7 +177,7 @@ const LandingPage: FC = () => {
           {/* Copyright */}
           <div className="mt-8 pt-8 border-t border-gray-700 text-center">
             <p className="text-gray-300 text-sm">
-              &copy; {new Date().getFullYear()} Lawsuit. All rights reserved.
+              &copy; {new Date().getFullYear()} NyayaX. All rights reserved.
             </p>
           </div>
         </div>

@@ -186,13 +186,13 @@ const RegisterPage: FC = () => {
 
           <div className="text-sm text-center text-gray-600">
             By registering, you agree to our{' '}
-            <a href="/terms" className="font-medium text-primary hover:text-primary-dark">
+            <Link to="/terms-of-service" className="font-medium text-primary hover:text-primary-dark">
               Terms of Service
-            </a>{' '}
+            </Link>{' '}
             and{' '}
-            <a href="/privacy" className="font-medium text-primary hover:text-primary-dark">
+            <Link to="/privacy-policy" className="font-medium text-primary hover:text-primary-dark">
               Privacy Policy
-            </a>
+            </Link>
           </div>
         </form>
       </div>
