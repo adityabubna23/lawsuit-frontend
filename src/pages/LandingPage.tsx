@@ -514,7 +514,11 @@ const LandingPage: FC = () => {
               <ul className="space-y-2.5">
                 {[{ to: '/app/search', label: 'Browse Lawyers' }, { to: '/auth/register', label: 'Get Started' }, { to: '#features', label: 'Features' }, { to: '#how-it-works', label: 'How It Works' }].map(l => (
                   <li key={l.label}>
-                    <Link to={l.to} className="text-gray-400 hover:text-white text-sm transition-colors">{l.label}</Link>
+                    {l.to.startsWith('#') ? (
+                      <a href={l.to} className="text-gray-400 hover:text-white text-sm transition-colors">{l.label}</a>
+                    ) : (
+                      <Link to={l.to} className="text-gray-400 hover:text-white text-sm transition-colors">{l.label}</Link>
+                    )}
                   </li>
                 ))}
               </ul>
