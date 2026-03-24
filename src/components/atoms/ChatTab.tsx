@@ -2,6 +2,8 @@ import { FC, useEffect, useState, useRef, useCallback } from 'react'
 import { chatApi, casesApi } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
 import socketService, { ChatMessage } from '@/services/socketService'
+import CallButton from './CallButton'
+import type { CallParticipant } from '@/types/video'
 
 interface Message {
   id: string
@@ -383,7 +385,7 @@ const ChatTab: FC<ChatTabProps> = ({ chatId: propChatId, onClose, caseId }) => {
 
   return (
     <div className="w-full h-full bg-white rounded-lg shadow-lg flex flex-col">
-      {/* Header with online status */}
+      {/* Header with online status and call button */}
       <div className="flex items-center justify-between px-4 py-2 border-b">
         <div className="flex items-center gap-3">
           <div className="font-semibold">Chat</div>
@@ -400,7 +402,23 @@ const ChatTab: FC<ChatTabProps> = ({ chatId: propChatId, onClose, caseId }) => {
             </div>
           )}
         </div>
-        <div>
+        <div className="flex items-center gap-2">
+          {/* Video call button */}
+          {otherUser && activeChatId && (
+            <CallButton
+              callType="chat"
+              referenceId={activeChatId}
+              callee={{
+                id: otherUser.id,
+                name: otherUser.name,
+                avatar: otherUser.avatarUrl,
+                role: authUserId ? 'LAWYER' : 'CLIENT', // The other user's role
+              } as CallParticipant}
+              size="sm"
+              variant="ghost"
+              disabled={!isOtherUserOnline}
+            />
+          )}
           {onClose && (
             <button onClick={onClose} className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded">
               Close

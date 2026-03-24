@@ -17,11 +17,11 @@ interface AppointmentResponse {
   data: AppointmentData[]
 }
 
-type TabType = 'attendNow' | 'upcoming' | 'missed' | 'attended' | 'cancelled'
+type TabType = 'pending' | 'attendNow' | 'upcoming' | 'missed' | 'attended' | 'cancelled'
 
 const LawyerAppointments: FC = () => {
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<TabType>('attendNow')
+  const [activeTab, setActiveTab] = useState<TabType>('pending')
   const [openChatId, setOpenChatId] = useState<string | null>(null)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [selectedAppointmentForCase, setSelectedAppointmentForCase] = useState<AppointmentResponse['data'][0] | null>(null)
@@ -80,7 +80,8 @@ const LawyerAppointments: FC = () => {
   const now = new Date()
 
   // Classify appointments
-  const { attendNow, upcoming, attended, missed, cancelled } = useMemo(() => {
+  const { pending, attendNow, upcoming, attended, missed, cancelled } = useMemo(() => {
+    const pending: AppointmentResponse['data'] = []
     const attendNow: AppointmentResponse['data'] = []
     const upcoming: AppointmentResponse['data'] = []
     const attended: AppointmentResponse['data'] = []
@@ -89,8 +90,11 @@ const LawyerAppointments: FC = () => {
 
     appointments.forEach((a) => {
       const status = a.status
-      // Don't render pending appointments anywhere
-      if (status === 'PENDING') return
+      // Show pending appointments in their own tab
+      if (status === 'PENDING') {
+        pending.push(a)
+        return
+      }
 
       const dt = parseISO(a.scheduledAt)
       const validDate = dt && isValid(dt)
@@ -130,12 +134,13 @@ const LawyerAppointments: FC = () => {
     })
 
     // Sort attendNow by closest time (ascending)
+    pending.sort((x, y) => parseISO(y.scheduledAt).getTime() - parseISO(x.scheduledAt).getTime())
     attendNow.sort((x, y) => parseISO(x.scheduledAt).getTime() - parseISO(y.scheduledAt).getTime())
     upcoming.sort((x, y) => parseISO(x.scheduledAt).getTime() - parseISO(y.scheduledAt).getTime())
     attended.sort((x, y) => parseISO(y.scheduledAt).getTime() - parseISO(x.scheduledAt).getTime())
     missed.sort((x, y) => parseISO(y.scheduledAt).getTime() - parseISO(x.scheduledAt).getTime())
 
-    return { attendNow, upcoming, attended, missed, cancelled }
+    return { pending, attendNow, upcoming, attended, missed, cancelled }
   }, [appointments, now])
 
   const openChatForAppointment = async (a: AppointmentResponse['data'][0]) => {
@@ -196,6 +201,29 @@ const LawyerAppointments: FC = () => {
     setSelectedAgreementUrl(null)
   }
 
+  const handleAccept = async (appointment: AppointmentResponse['data'][0]) => {
+    try {
+      await api.post(`/appointments/${appointment.id}/accept`)
+      getAppointmentsQuery.refetch()
+      alert('Appointment accepted successfully!')
+    } catch (err: any) {
+      console.error('Failed to accept appointment', err)
+      alert(err.response?.data?.error || 'Failed to accept appointment. Please try again.')
+    }
+  }
+
+  const handleReject = async (appointment: AppointmentResponse['data'][0]) => {
+    if (!confirm(`Are you sure you want to reject the appointment with ${appointment.client?.name}?`)) return
+    try {
+      await api.post(`/appointments/${appointment.id}/reject`)
+      getAppointmentsQuery.refetch()
+      alert('Appointment rejected.')
+    } catch (err: any) {
+      console.error('Failed to reject appointment', err)
+      alert(err.response?.data?.error || 'Failed to reject appointment. Please try again.')
+    }
+  }
+
   const handleAttend = async (appointment: AppointmentResponse['data'][0]) => {
     try {
       await appointmentsApi.attend(appointment.id)
@@ -231,6 +259,7 @@ const LawyerAppointments: FC = () => {
   }
 
   const tabs: { key: TabType; label: string; count: number }[] = [
+    { key: 'pending', label: 'Pending', count: pending.length },
     { key: 'attendNow', label: 'Attend Now', count: attendNow.length },
     { key: 'upcoming', label: 'Upcoming', count: upcoming.length },
     { key: 'missed', label: 'Missed', count: missed.length },
@@ -288,6 +317,59 @@ const LawyerAppointments: FC = () => {
             </div>
           ) : (
             <div>
+              {activeTab === 'pending' && (
+                <>
+                  {pending.length === 0 ? (
+                    <div className="text-center py-12">
+                      <p className="text-secondary">No pending appointment requests</p>
+                    </div>
+                  ) : (
+                    <div>
+                      {pending.map(appointment =>
+                        <div key={appointment.id} className="bg-white rounded-xl border border-amber-200 p-5 mb-4 shadow-sm">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              {appointment.client?.avatarUrl ? (
+                                <img src={appointment.client.avatarUrl} alt={appointment.client?.name} className="w-12 h-12 rounded-full object-cover" />
+                              ) : (
+                                <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold text-lg">
+                                  {appointment.client?.name?.charAt(0) || '?'}
+                                </div>
+                              )}
+                              <div>
+                                <h3 className="font-semibold text-gray-900">{appointment.client?.name || 'Client'}</h3>
+                                <p className="text-sm text-gray-500">
+                                  {new Date(appointment.scheduledAt).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+                                  {' at '}
+                                  {new Date(appointment.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  {' • '}{appointment.durationMins || 30} mins
+                                </p>
+                                {appointment.notes && <p className="text-xs text-gray-400 mt-1">Note: {appointment.notes}</p>}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="px-3 py-1 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">Pending</span>
+                              <button
+                                onClick={() => handleReject(appointment)}
+                                className="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 border border-red-200 rounded-lg transition"
+                              >
+                                Reject
+                              </button>
+                              <button
+                                onClick={() => handleAccept(appointment)}
+                                className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition"
+                              >
+                                Accept
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+
               {activeTab === 'attendNow' && (
                 <>
                   {attendNow.length === 0 ? (

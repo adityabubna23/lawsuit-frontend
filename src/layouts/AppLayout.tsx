@@ -1,6 +1,7 @@
 import { FC, useState, useEffect } from 'react'
 import NotificationModal from '../components/molecules/NotificationModal'
 import NotificationToast from '../components/atoms/NotificationToast'
+import VideoCallProvider from '../components/organisms/VideoCallProvider'
 import { useNotificationStore } from '../stores/notificationStore'
 import { useNotificationSocket } from '../hooks/useNotificationSocket'
 import useWalletStore from '../stores/walletStore'
@@ -42,6 +43,7 @@ const AppLayout: FC = () => {
     { name: 'Search Lawyers', path: '/app/search' },
     { name: 'Appointments', path: '/app/appointments' },
     { name: 'Cases', path: '/app/cases' },
+    { name: 'Call History', path: '/app/call-history' },
     { name: 'Lex Rates', path: '/app/lex-rates' },
     { name: 'Tele Law', path: '/app/tele-law' },
     { name: 'Legal Eagle', path: '/app/legal-eagle' },
@@ -247,6 +249,10 @@ const AppLayout: FC = () => {
       </main>
       <NotificationModal open={showNotifications} onClose={() => setShowNotifications(false)} />
       <NotificationToast />
+      <VideoCallProvider>
+        {/* VideoCallProvider renders its children but also provides video call modals */}
+        <></>
+      </VideoCallProvider>
     </div>
   )
 }

@@ -30,6 +30,7 @@ import AiChatPage from './components/organisms/AiChatPage'
 import ViewCasePages from './pages/app/ViewCasePages'
 import CaseDetailsClientPage from './pages/app/CaseDetailsClientPage'
 import VideoConsultationPage from './pages/app/VideoConsultationPage'
+import CallHistoryPage from './pages/app/CallHistoryPage'
 import TeleLawPage from './pages/app/TeleLawPage'
 // Admin Pages
 import AdminLayout from './layouts/AdminLayout'
@@ -84,7 +85,9 @@ const AppRoutes = () => {
         <Route path="search" element={<SearchPage />} />
         <Route path="lawyers/:id" element={<LawyerDetailPage />} />
         <Route path="book/:lawyerId" element={<BookingPage />} />
-        <Route path="appointments" element={<AppointmentsPage />} />
+        <Route path="appointments" element={
+          user?.role === 'LAWYER' ? <Navigate to="/lawyer/appointments" replace /> : <AppointmentsPage />
+        } />
         <Route path="wallet" element={<WalletPage />} />
         <Route path="withdraw" element={<WithdrawPage />} />
         <Route path="cases" element={<ViewCasePages />} />
@@ -94,6 +97,7 @@ const AppRoutes = () => {
         <Route path="tele-law" element={<TeleLawPage />} />
         <Route path="legal-eagle" element={<AiChatPage />} />
         <Route path="consultation/:appointmentId" element={<VideoConsultationPage />} />
+        <Route path="call-history" element={<CallHistoryPage />} />
 
         <Route path="under-development" element={<UnderDevelopmentPlaceholder />} />
       </Route>
@@ -140,6 +144,7 @@ const AppRoutes = () => {
         <Route path="profile" element={<LawyerProfilePage />} />
         <Route path="agreement-templates" element={<AgreementTemplatesPage />} />
         <Route path="consultation/:appointmentId" element={<VideoConsultationPage />} />
+        <Route path="call-history" element={<CallHistoryPage />} />
 
         <Route path="legal-eagle" element={<AiChatPage />} />
         <Route path="under-development" element={<UnderDevelopmentPlaceholder />} />

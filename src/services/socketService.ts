@@ -1,6 +1,15 @@
 import { io, Socket } from 'socket.io-client'
 import { useAuthStore } from '@/stores/authStore'
 import type { Notification as AppNotification } from '@/types'
+import type {
+  CallIncomingEvent,
+  CallAcceptedEvent,
+  CallDeclinedEvent,
+  CallEndEvent,
+  CallErrorEvent,
+  CallInitiateEvent,
+  CallParticipant,
+} from '@/types/video'
 
 // Compute socket URL from VITE_API_URL (same host, different path)
 const _envUrl = (import.meta.env.VITE_API_URL as string) || ''
@@ -25,6 +34,14 @@ type OnlineStatusHandler = (data: { usersOnline: string[] }) => void
 type UserStatusHandler = (data: { userId: string; online: boolean }) => void
 type NotificationHandler = (notification: AppNotification) => void
 type UnreadCountHandler = (data: { unreadCount: number }) => void
+
+// Video call event handlers
+type CallIncomingHandler = (data: CallIncomingEvent) => void
+type CallAcceptedHandler = (data: CallAcceptedEvent) => void
+type CallDeclinedHandler = (data: CallDeclinedEvent) => void
+type CallEndedHandler = (data: CallEndEvent) => void
+type CallErrorHandler = (data: CallErrorEvent) => void
+type CallCancelledHandler = (data: { callId: string }) => void
 
 export interface ChatMessage {
   id: string
@@ -51,6 +68,14 @@ class SocketService {
   private notificationHandlers: NotificationHandler[] = []
   private unreadCountHandlers: UnreadCountHandler[] = []
   private onlineUsers: Set<string> = new Set()
+  
+  // Video call handlers
+  private callIncomingHandlers: CallIncomingHandler[] = []
+  private callAcceptedHandlers: CallAcceptedHandler[] = []
+  private callDeclinedHandlers: CallDeclinedHandler[] = []
+  private callEndedHandlers: CallEndedHandler[] = []
+  private callErrorHandlers: CallErrorHandler[] = []
+  private callCancelledHandlers: CallCancelledHandler[] = []
 
   private constructor() {}
 
@@ -137,6 +162,46 @@ class SocketService {
     // Listen for unread count updates
     this.socket.on('notification:unread-count', (data: { unreadCount: number }) => {
       this.unreadCountHandlers.forEach((handler) => handler(data))
+    })
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Video Call Events
+    // ─────────────────────────────────────────────────────────────────────
+    
+    // Incoming call notification
+    this.socket.on('call:incoming', (data: CallIncomingEvent) => {
+      console.log('Incoming call:', data)
+      this.callIncomingHandlers.forEach((handler) => handler(data))
+    })
+
+    // Call was accepted by the callee
+    this.socket.on('call:accepted', (data: CallAcceptedEvent) => {
+      console.log('Call accepted:', data)
+      this.callAcceptedHandlers.forEach((handler) => handler(data))
+    })
+
+    // Call was declined by the callee
+    this.socket.on('call:declined', (data: CallDeclinedEvent) => {
+      console.log('Call declined:', data)
+      this.callDeclinedHandlers.forEach((handler) => handler(data))
+    })
+
+    // Call ended
+    this.socket.on('call:ended', (data: CallEndEvent) => {
+      console.log('Call ended:', data)
+      this.callEndedHandlers.forEach((handler) => handler(data))
+    })
+
+    // Call error
+    this.socket.on('call:error', (data: CallErrorEvent) => {
+      console.error('Call error:', data)
+      this.callErrorHandlers.forEach((handler) => handler(data))
+    })
+
+    // Call cancelled by caller
+    this.socket.on('call:cancelled', (data: { callId: string }) => {
+      console.log('Call cancelled:', data)
+      this.callCancelledHandlers.forEach((handler) => handler(data))
     })
 
     return this.socket
@@ -248,6 +313,88 @@ class SocketService {
     this.unreadCountHandlers.push(handler)
     return () => {
       this.unreadCountHandlers = this.unreadCountHandlers.filter((h) => h !== handler)
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Video Call Methods
+  // ─────────────────────────────────────────────────────────────────────
+
+  // Initiate a call
+  initiateCall(calleeId: string, callType: 'chat' | 'appointment', referenceId: string) {
+    if (this.socket?.connected) {
+      this.socket.emit('call:initiate', { calleeId, callType, referenceId })
+    }
+  }
+
+  // Accept an incoming call
+  acceptCall(callId: string) {
+    if (this.socket?.connected) {
+      this.socket.emit('call:accept', { callId })
+    }
+  }
+
+  // Decline an incoming call
+  declineCall(callId: string) {
+    if (this.socket?.connected) {
+      this.socket.emit('call:decline', { callId })
+    }
+  }
+
+  // Cancel an outgoing call (before it's answered)
+  cancelCall(callId: string) {
+    if (this.socket?.connected) {
+      this.socket.emit('call:cancel', { callId })
+    }
+  }
+
+  // End an ongoing call
+  endCall(callId: string) {
+    if (this.socket?.connected) {
+      this.socket.emit('call:end', { callId })
+    }
+  }
+
+  // Video call event handlers
+  onCallIncoming(handler: CallIncomingHandler) {
+    this.callIncomingHandlers.push(handler)
+    return () => {
+      this.callIncomingHandlers = this.callIncomingHandlers.filter((h) => h !== handler)
+    }
+  }
+
+  onCallAccepted(handler: CallAcceptedHandler) {
+    this.callAcceptedHandlers.push(handler)
+    return () => {
+      this.callAcceptedHandlers = this.callAcceptedHandlers.filter((h) => h !== handler)
+    }
+  }
+
+  onCallDeclined(handler: CallDeclinedHandler) {
+    this.callDeclinedHandlers.push(handler)
+    return () => {
+      this.callDeclinedHandlers = this.callDeclinedHandlers.filter((h) => h !== handler)
+    }
+  }
+
+  onCallEnded(handler: CallEndedHandler) {
+    this.callEndedHandlers.push(handler)
+    return () => {
+      this.callEndedHandlers = this.callEndedHandlers.filter((h) => h !== handler)
+    }
+  }
+
+  onCallError(handler: CallErrorHandler) {
+    this.callErrorHandlers.push(handler)
+    return () => {
+      this.callErrorHandlers = this.callErrorHandlers.filter((h) => h !== handler)
+    }
+  }
+
+  onCallCancelled(handler: CallCancelledHandler) {
+    this.callCancelledHandlers.push(handler)
+    return () => {
+      this.callCancelledHandlers = this.callCancelledHandlers.filter((h) => h !== handler)
     }
   }
 

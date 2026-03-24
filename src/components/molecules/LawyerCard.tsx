@@ -101,71 +101,87 @@ const LawyerCard: FC<LawyerCardProps> = ({
         return
       }
 
-      // Razorpay flow — book then open checkout
+      // Razorpay flow — backend only creates a payment order (no appointment yet)
       const res = await appointmentsApi.book({ lawyerId: id, scheduledAt, durationMins: 30, meetingType: 'VIDEO_CALL' })
       const payload = res.data || res
-      const appointment = payload.appointment ?? payload
-      const payment = payload.payment ?? payload
-      const order = payload.payment.order ?? payload
-      // Try to open Razorpay checkout if provider returned an order id
-      const providerOrderId = (payment && (payment.order.id || payment.provider_order_id)) as string | undefined
-      const paymentRecord = payment && payment.payment ? payment.payment : payment
 
-      // If we have a real Razorpay order id and the checkout script is available, open checkout
-      const rzpKey = (import.meta.env.VITE_RAZORPAY_KEY as string) || ''
-      if ((window as any).Razorpay) {
-        const options: any = {
-          key: rzpKey,
-          amount: (paymentRecord?.amount ?? Math.round(fee * 100)),
-          currency: paymentRecord?.currency ?? 'INR',
-          name: 'LawSuit',
-          description: `Consultation with ${name}`,
-          order_id: order?.id,
-          handler: async (resp: any) => {
-            try {
-              // resp contains razorpay_payment_id, razorpay_order_id, razorpay_signature
-              await appointmentsApi.confirmPayment(appointment.id, {
-                appointmentId: appointment.id,
-                razorpay_order_id: resp.razorpay_order_id,
-                razorpay_payment_id: resp.razorpay_payment_id,
-                razorpay_signature: resp.razorpay_signature,
-              })
-              // success: reset UI
-              setIsExpanded(false)
-              setSelectedDate(null)
-              setSelectedSlot(null)
-
-              navigate('/app/appointments', { replace: true })
-            } catch (err) {
-              console.error('Confirm payment failed', err)
-              setErrorMsg('Payment succeeded but confirming failed. Please contact support.')
-            } finally {
-              setIsProcessing(false)
-            }
-          },
-          prefill: {
-            name: authUser?.name,
-            email: (authUser as any)?.email,
-            contact: (authUser as any)?.phone,
-          },
-          notes: { appointmentId: appointment.id },
-          theme: { color: '#0B4D64' },
-        }
-
-        const rzp = new (window as any).Razorpay(options)
-        rzp.open()
-        // do not clear processing yet — wait for handler
-        return
+      if (payload.error) {
+        throw new Error(payload.error)
       }
 
-      // Fallback
-      setIsExpanded(false)
-      setSelectedDate(null)
-      setSelectedSlot(null)
-      setIsProcessing(false)
+      const payment = payload.payment
+      if (!payment?.id) {
+        console.error('Unexpected booking response:', payload)
+        throw new Error('Failed to create payment order. Please try again.')
+      }
+
+      const providerOrderId = payment.providerOrderId
+      if (!providerOrderId) {
+        throw new Error('Payment order could not be created. Please try again later.')
+      }
+
+      const rzpKey = (import.meta.env.VITE_RAZORPAY_KEY as string) || ''
+      if (!(window as any).Razorpay) {
+        throw new Error('Payment gateway not loaded. Please refresh the page.')
+      }
+
+      const options: any = {
+        key: rzpKey,
+        amount: payment.amount * 100, // payment.amount is in rupees, Razorpay expects paise
+        currency: payment.currency ?? 'INR',
+        name: 'NyayaX',
+        description: `Consultation with ${name}`,
+        order_id: providerOrderId,
+        handler: async (resp: any) => {
+          try {
+            // confirmPayment creates the appointment on the backend
+            await appointmentsApi.confirmPayment(payment.id, {
+              appointmentId: payment.id,
+              razorpay_order_id: resp.razorpay_order_id,
+              razorpay_payment_id: resp.razorpay_payment_id,
+              razorpay_signature: resp.razorpay_signature,
+            })
+            setIsExpanded(false)
+            setSelectedDate(null)
+            setSelectedSlot(null)
+            navigate('/app/appointments', { replace: true })
+          } catch (err) {
+            console.error('Confirm payment failed', err)
+            setErrorMsg('Payment succeeded but booking confirmation failed. Please contact support.')
+          } finally {
+            setIsProcessing(false)
+          }
+        },
+        prefill: {
+          name: authUser?.name,
+          email: (authUser as any)?.email,
+          contact: (authUser as any)?.phone,
+        },
+        notes: { paymentId: payment.id },
+        theme: { color: '#0B4D64' },
+        modal: {
+          ondismiss: () => {
+            setIsProcessing(false)
+          }
+        }
+      }
+
+      const rzp = new (window as any).Razorpay(options)
+      rzp.on('payment.failed', () => {
+        setIsProcessing(false)
+        setErrorMsg('Payment failed. The slot has NOT been booked — you can try again.')
+      })
+      rzp.open()
+      return
     } catch (err: any) {
       console.error('Booking error', err)
-      setErrorMsg(err?.response?.data?.error || err?.message || 'Booking failed')
+      const msg = err?.response?.data?.error || err?.message || 'Booking failed'
+      if (msg.toLowerCase().includes('slot not available')) {
+        setErrorMsg('This slot has already been booked. Please select a different time.')
+        setSelectedSlot(null)
+      } else {
+        setErrorMsg(msg)
+      }
       setIsProcessing(false)
     }
   }

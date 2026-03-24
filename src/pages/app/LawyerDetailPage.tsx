@@ -42,6 +42,7 @@ const LawyerDetailPage: FC = () => {
   const [paymentSuccess, setPaymentSuccess] = useState(false)
   const [toastVisible, setToastVisible] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'wallet'>('razorpay')
+  const [bookingError, setBookingError] = useState<string | null>(null)
   const navigate = useNavigate()
 
   const walletBalance = useWalletStore((s) => s.balance)
@@ -60,9 +61,10 @@ const LawyerDetailPage: FC = () => {
       try {
         const res = await lawyersApi.getById(id)
         const raw = (res as any).data?.lawyer ?? (res as any).data?.data ?? (res as any).data ?? res
+        console.log('[LawyerDetailPage] raw lawyer API response:', raw)
 
         const mapped = {
-          id: raw.id ?? raw.user?.id,
+          id: raw.id ?? raw.user?.id ?? id, // fallback to URL param
           name: raw.user?.name ?? raw.name ?? raw.fullName ?? 'Unknown',
           specialization: Array.isArray(raw.specializations) ? raw.specializations : (Array.isArray(raw.specialization) ? raw.specialization : []),
           experienceYears: raw.experienceYears ?? raw.experience ?? 0,
@@ -90,6 +92,7 @@ const LawyerDetailPage: FC = () => {
     if (!lawyer) return
     setIsModalOpen(true)
     setPaymentSuccess(false)
+    setBookingError(null)
     setPaymentMethod('razorpay')
   }
 
@@ -106,6 +109,7 @@ const LawyerDetailPage: FC = () => {
   }
 
   const handlePayNow = async () => {
+    console.log('[handlePayNow] lawyer:', lawyer, 'date:', selectedDate, 'slot:', selectedSlot, 'method:', paymentMethod)
     if (!lawyer || !selectedDate || !selectedSlot) return
 
     if (paymentMethod === 'wallet') {
@@ -135,14 +139,20 @@ const LawyerDetailPage: FC = () => {
         }, 900)
       } catch (err: any) {
         const msg = err?.response?.data?.error || err?.message || 'Wallet payment failed'
-        alert(msg)
+        if (msg.toLowerCase().includes('slot not available')) {
+          setBookingError('This slot has already been booked. Please go back and select a different time.')
+        } else {
+          setBookingError(msg)
+        }
       } finally {
         setPaymentLoading(false)
       }
     } else {
-      // Razorpay payment — book then open checkout
+      // Razorpay payment — backend only creates a payment order, no appointment yet.
+      // Appointment is created on confirmPayment after successful Razorpay payment.
       try {
         setPaymentLoading(true)
+        setBookingError(null)
         const datetimeIso = parseSlotToISO(selectedDate, selectedSlot)
         const res = await appointmentsApi.book({
           lawyerId: lawyer.id,
@@ -150,70 +160,93 @@ const LawyerDetailPage: FC = () => {
           durationMins: 30,
           meetingType: 'VIDEO_CALL',
         })
+
         const payload = res.data || res
-        const appointment = payload.appointment ?? payload
-        const payment = payload.payment ?? payload
+        console.log('[handlePayNow] booking response payload:', JSON.stringify(payload, null, 2))
 
-        const providerOrderId = payment?.providerOrderId || payment?.order?.id
-
-        if ((window as any).Razorpay && providerOrderId) {
-          const rzpKey = (import.meta.env.VITE_RAZORPAY_KEY as string) || ''
-          const options: any = {
-            key: rzpKey,
-            amount: (payment?.amount ?? Math.round((lawyer.fee || 0) * 100)),
-            currency: payment?.currency ?? 'INR',
-            name: 'LawSuit',
-            description: `Consultation with ${lawyer.name}`,
-            order_id: providerOrderId,
-            handler: async (resp: any) => {
-              try {
-                await appointmentsApi.confirmPayment(appointment.id, {
-                  appointmentId: appointment.id,
-                  razorpay_order_id: resp.razorpay_order_id,
-                  razorpay_payment_id: resp.razorpay_payment_id,
-                  razorpay_signature: resp.razorpay_signature,
-                })
-                setPaymentSuccess(true)
-                try { await useNotificationStore.getState().fetchNotifications() } catch { }
-                try { await useAppointmentStore.getState().fetchAppointments() } catch { }
-
-                setToastVisible(true)
-                setTimeout(() => {
-                  setIsModalOpen(false)
-                  setToastVisible(false)
-                  navigate('/app/appointments')
-                }, 900)
-              } catch {
-                alert('Payment succeeded but confirming failed. Please contact support.')
-              } finally {
-                setPaymentLoading(false)
-              }
-            },
-            prefill: {
-              name: authUser?.name,
-              email: (authUser as any)?.email,
-              contact: (authUser as any)?.phone,
-            },
-            notes: { appointmentId: appointment.id },
-            theme: { color: '#0B4D64' },
-          }
-          const rzp = new (window as any).Razorpay(options)
-          rzp.on('payment.failed', () => setPaymentLoading(false))
-          rzp.open()
-          return
+        if (payload.error) {
+          throw new Error(payload.error)
         }
 
-        // Fallback: no Razorpay SDK or no order id
-        setPaymentSuccess(true)
-        setToastVisible(true)
-        setTimeout(() => {
-          setIsModalOpen(false)
-          setToastVisible(false)
-          navigate('/app/appointments')
-        }, 900)
+        const payment = payload?.payment
+        if (!payment?.id) {
+          console.error('Unexpected booking response:', payload)
+          throw new Error('Failed to create payment order. Please try again.')
+        }
+
+        const providerOrderId = payment.providerOrderId
+
+        if (!(window as any).Razorpay) {
+          throw new Error('Payment gateway not loaded. Please refresh the page and try again.')
+        }
+
+        if (!providerOrderId) {
+          throw new Error('Payment order could not be created. Please try again later.')
+        }
+
+        const rzpKey = (import.meta.env.VITE_RAZORPAY_KEY as string) || ''
+        const options: any = {
+          key: rzpKey,
+          amount: payment.amount * 100, // payment.amount is in rupees, Razorpay expects paise
+          currency: payment.currency ?? 'INR',
+          name: 'NyayaX',
+          description: `Consultation with ${lawyer.name}`,
+          order_id: providerOrderId,
+          handler: async (resp: any) => {
+            try {
+              // confirmPayment now creates the appointment on the backend
+              await appointmentsApi.confirmPayment(payment.id, {
+                appointmentId: payment.id,
+                razorpay_order_id: resp.razorpay_order_id,
+                razorpay_payment_id: resp.razorpay_payment_id,
+                razorpay_signature: resp.razorpay_signature,
+              })
+              setPaymentSuccess(true)
+              try { await useNotificationStore.getState().fetchNotifications() } catch { }
+              try { await useAppointmentStore.getState().fetchAppointments() } catch { }
+
+              setToastVisible(true)
+              setTimeout(() => {
+                setIsModalOpen(false)
+                setToastVisible(false)
+                navigate('/app/appointments')
+              }, 900)
+            } catch (confirmErr: any) {
+              console.error('Confirm payment error:', confirmErr)
+              setBookingError('Payment succeeded but booking failed. Please contact support.')
+              setPaymentLoading(false)
+            }
+          },
+          prefill: {
+            name: authUser?.name,
+            email: (authUser as any)?.email,
+            contact: (authUser as any)?.phone,
+          },
+          notes: { paymentId: payment.id },
+          theme: { color: '#0B4D64' },
+          modal: {
+            ondismiss: () => {
+              setPaymentLoading(false)
+            }
+          }
+        }
+        const rzp = new (window as any).Razorpay(options)
+        rzp.on('payment.failed', () => {
+          setPaymentLoading(false)
+          setBookingError('Payment failed. The slot has NOT been booked — you can try again.')
+        })
+        rzp.open()
+        return
       } catch (err: any) {
         console.error('Booking error', err)
-        alert(err?.response?.data?.error || err?.message || 'Booking failed')
+        // No appointment was created, so no orphan cleanup needed
+        const msg = err?.response?.data?.error || err?.message || 'Booking failed'
+        if (msg.toLowerCase().includes('slot not available')) {
+          setBookingError('This slot has already been booked. Please close this dialog and select a different time.')
+          setSelectedSlot(null)
+        } else {
+          setBookingError(msg)
+        }
       } finally {
         setPaymentLoading(false)
       }
@@ -395,7 +428,13 @@ const LawyerDetailPage: FC = () => {
                 )}
               </div>
 
-              {paymentSuccess && <div className="text-sm text-green-600">Payment successful ✅</div>}
+              {paymentSuccess && <div className="text-sm text-green-600 bg-green-50 border border-green-200 rounded-lg px-4 py-3">Payment successful ✅</div>}
+              {bookingError && (
+                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+                  <div className="font-medium mb-1">⚠️ Booking Failed</div>
+                  <div>{bookingError}</div>
+                </div>
+              )}
             </div>
 
             <div className="p-5 border-t flex items-center gap-3">

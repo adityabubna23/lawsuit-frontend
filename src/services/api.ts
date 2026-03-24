@@ -286,6 +286,9 @@ export const videoApi = {
   getMeeting: (appointmentId: string) => api.get(`/video/meeting/${appointmentId}`),
   createChatSession: (chatId: string) => api.post(`/video/chat/${chatId}/session`),
   getChatSession: (chatId: string) => api.get(`/video/chat/${chatId}/session`),
+  endChatSession: (chatId: string) => api.post(`/video/chat/${chatId}/session/end`),
+  getCallHistory: (params?: { page?: number; limit?: number }) =>
+    api.get('/video/call-history', { params }),
 }
 
 export const storageApi = {

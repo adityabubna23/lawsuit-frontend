@@ -1,6 +1,7 @@
 import { FC, useState, useEffect } from 'react'
 import NotificationModal from '../components/molecules/NotificationModal'
 import NotificationToast from '../components/atoms/NotificationToast'
+import VideoCallProvider from '../components/organisms/VideoCallProvider'
 import { useNotificationStore } from '../stores/notificationStore'
 import { useNotificationSocket } from '../hooks/useNotificationSocket'
 import useWalletStore from '../stores/walletStore'
@@ -34,6 +35,7 @@ const LawyerLayout: FC = () => {
     { name: 'Dashboard', path: '/lawyer/dashboard' },
     { name: 'Appointments', path: '/lawyer/appointments' },
     { name: 'Cases', path: '/lawyer/cases' },
+    { name: 'Call History', path: '/lawyer/call-history' },
     { name: 'Agreement Templates', path: '/lawyer/agreement-templates' },
     { name: 'Calander', path: '/lawyer/under-development' },
     { name: 'Legal Eagle', path: '/lawyer/legal-eagle' },
@@ -228,6 +230,9 @@ const LawyerLayout: FC = () => {
       </main>
       <NotificationModal open={showNotifications} onClose={() => setShowNotifications(false)} />
       <NotificationToast />
+      <VideoCallProvider>
+        <></>
+      </VideoCallProvider>
     </div>
   )
 }

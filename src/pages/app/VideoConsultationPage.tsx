@@ -1,4 +1,4 @@
-import { FC, useEffect, useRef, useState, useCallback } from 'react'
+import { FC, useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { videoApi } from '@/services/api'
 import DailyIframe, { DailyCall } from '@daily-co/daily-js'
@@ -14,67 +14,98 @@ const VideoConsultationPage: FC = () => {
     const { appointmentId } = useParams<{ appointmentId: string }>()
     const navigate = useNavigate()
     const videoContainerRef = useRef<HTMLDivElement>(null)
-    const [callObject, setCallObject] = useState<DailyCall | null>(null)
+    const callRef = useRef<DailyCall | null>(null)
+    const joinedRef = useRef(false)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
-    const joinMeeting = useCallback(async () => {
-        if (!appointmentId) return
-
-        try {
-            setLoading(true)
-            // 1. Fetch meeting link and token from our backend
-            const res = await videoApi.getMeeting(appointmentId)
-            const { meetingLink, token } = res.data as MeetingResponse
-
-            if (!meetingLink || !videoContainerRef.current) {
-                throw new Error('Failed to retrieve meeting details')
-            }
-
-            // 2. Create the Daily iframe container
-            const newCallObject = DailyIframe.createFrame(videoContainerRef.current, {
-                iframeStyle: {
-                    width: '100%',
-                    height: '100%',
-                    border: '0',
-                    borderRadius: '8px',
-                },
-                showLeaveButton: true,
-            })
-
-            // 3. Listen to events like leaving the call
-            newCallObject.on('left-meeting', () => {
-                // Redirect back to appointments when the call ends
-                navigate(-1)
-            })
-
-            newCallObject.on('error', (e) => {
-                console.error('Daily error:', e)
-                setError('An error occurred with the video call.')
-            })
-
-            // 4. Join the call
-            await newCallObject.join({ url: meetingLink, token })
-            setCallObject(newCallObject)
-            setLoading(false)
-
-        } catch (err: any) {
-            console.error('Video consultation error:', err)
-            setError(err.response?.data?.error || err.message || 'Failed to join the meeting')
-            setLoading(false)
-        }
-    }, [appointmentId, navigate])
-
     useEffect(() => {
+        if (!appointmentId || joinedRef.current) return
+
+        let cancelled = false
+
+        const joinMeeting = async () => {
+            try {
+                setLoading(true)
+
+                // 1. Fetch meeting link and token from our backend
+                const res = await videoApi.getMeeting(appointmentId)
+                const { meetingLink, token } = res.data as MeetingResponse
+
+                if (cancelled) return
+
+                if (!meetingLink || !videoContainerRef.current) {
+                    throw new Error('Failed to retrieve meeting details')
+                }
+
+                // 2. Destroy any existing frame first (safety net)
+                if (callRef.current) {
+                    try {
+                        await callRef.current.leave()
+                        callRef.current.destroy()
+                    } catch {
+                        // ignore cleanup errors
+                    }
+                    callRef.current = null
+                }
+
+                // 3. Create the Daily iframe container
+                const newCallObject = DailyIframe.createFrame(videoContainerRef.current, {
+                    iframeStyle: {
+                        width: '100%',
+                        height: '100%',
+                        border: '0',
+                        borderRadius: '8px',
+                    },
+                    showLeaveButton: true,
+                })
+
+                callRef.current = newCallObject
+                joinedRef.current = true
+
+                // 4. Listen to events like leaving the call
+                newCallObject.on('left-meeting', () => {
+                    navigate(-1)
+                })
+
+                newCallObject.on('error', (e) => {
+                    console.error('Daily error:', e)
+                    setError('An error occurred with the video call.')
+                })
+
+                // 5. Join the call
+                await newCallObject.join({ url: meetingLink, token })
+
+                if (cancelled) {
+                    newCallObject.leave().then(() => newCallObject.destroy())
+                    callRef.current = null
+                    return
+                }
+
+                setLoading(false)
+            } catch (err: any) {
+                if (cancelled) return
+                console.error('Video consultation error:', err)
+                setError(err.response?.data?.error || err.message || 'Failed to join the meeting')
+                setLoading(false)
+            }
+        }
+
         joinMeeting()
 
         return () => {
+            cancelled = true
             // Cleanup the call object when the component unmounts
-            if (callObject) {
-                callObject.leave().then(() => callObject.destroy())
+            const call = callRef.current
+            if (call) {
+                call.leave().catch(() => { }).then(() => {
+                    try { call.destroy() } catch { /* ignore */ }
+                })
+                callRef.current = null
             }
+            joinedRef.current = false
         }
-    }, [joinMeeting])
+    }, [appointmentId, navigate])
 
     if (error) {
         return (
