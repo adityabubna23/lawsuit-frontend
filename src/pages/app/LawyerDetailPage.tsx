@@ -362,14 +362,28 @@ const LawyerDetailPage: FC = () => {
                 onSlotChange={(s) => setSelectedSlot(s)}
                 lawyerId={lawyer.id}
               />
+
+              {/* Fee display */}
+              {headerStats.fee > 0 ? (
+                <div className="mt-4 p-3 bg-gray-50 rounded-lg flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Consultation Fee</span>
+                  <span className="text-lg font-semibold text-gray-900">
+                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(headerStats.fee)}
+                  </span>
+                </div>
+              ) : (
+                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+                  This lawyer has not set their consultation fee yet. Booking is unavailable.
+                </div>
+              )}
             </div>
 
             <Button
               onClick={handleBook}
-              disabled={!selectedDate || !selectedSlot}
+              disabled={!selectedDate || !selectedSlot || headerStats.fee <= 0}
               className="w-full"
             >
-              Book Consultation
+              {headerStats.fee <= 0 ? 'Fee Not Set' : 'Book Consultation'}
             </Button>
           </div>
         </div>

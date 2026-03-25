@@ -1,16 +1,16 @@
 import React, { useEffect, useState } from 'react'
 import { usersApi } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
-import { 
-  Briefcase, 
-  GraduationCap, 
-  Languages, 
-  MapPin, 
-  FileText, 
-  Plus, 
-  Trash2, 
-  Edit3, 
-  X, 
+import {
+  Briefcase,
+  GraduationCap,
+  Languages,
+  MapPin,
+  FileText,
+  Plus,
+  Trash2,
+  Edit3,
+  X,
   Save,
   Loader2,
   ExternalLink
@@ -46,6 +46,7 @@ interface LawyerInfoShape {
   state?: string
   pincode?: string
   address?: string
+  feePerConsultation?: number  // stored in paise, displayed in rupees
 }
 
 const parseArrayInput = (value?: string) => {
@@ -73,8 +74,8 @@ const normalizeResponse = (data: any): LawyerInfoShape => {
       : rawEducation
         ? (typeof rawEducation === 'string' ? [{ course: rawEducation }] : [rawEducation])
         : [],
-    languages: Array.isArray(payload.languages) 
-      ? payload.languages 
+    languages: Array.isArray(payload.languages)
+      ? payload.languages
       : (payload.languages ? payload.languages.split(',').map((s: string) => s.trim()).filter(Boolean) : []),
   }
 }
@@ -213,12 +214,12 @@ const LawyerInfo: React.FC = () => {
       }
 
       await usersApi.postLawyerInformation(payload)
-      
+
       // Re-fetch to get updated data
       const res = await usersApi.getLawyerInformation()
       const data = (res as any).data ?? res
       const normalized = normalizeResponse(data)
-      
+
       setInitial(normalized)
       setForm(normalized)
       setEditing(false)
@@ -251,8 +252,8 @@ const LawyerInfo: React.FC = () => {
   }
 
   const inputClasses = `w-full px-4 py-2.5 border-2 rounded-lg transition-colors
-    ${editing 
-      ? 'border-gray-200 bg-white focus:border-primary focus:outline-none' 
+    ${editing
+      ? 'border-gray-200 bg-white focus:border-primary focus:outline-none'
       : 'border-transparent bg-gray-50 text-gray-700 cursor-default'
     }`
 
@@ -266,15 +267,15 @@ const LawyerInfo: React.FC = () => {
         <div className="flex items-center gap-2">
           {editing ? (
             <>
-              <button 
+              <button
                 type="button"
-                onClick={handleCancel} 
+                onClick={handleCancel}
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
               >
                 <X className="w-4 h-4" />
                 Cancel
               </button>
-              <button 
+              <button
                 type="button"
                 onClick={onSubmit}
                 disabled={submitting}
@@ -285,8 +286,8 @@ const LawyerInfo: React.FC = () => {
               </button>
             </>
           ) : (
-            <button 
-              onClick={() => setEditing(true)} 
+            <button
+              onClick={() => setEditing(true)}
               className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-primary border-2 border-primary rounded-lg hover:bg-primary hover:text-white transition-colors"
             >
               <Edit3 className="w-4 h-4" />
@@ -306,10 +307,10 @@ const LawyerInfo: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
               <label className={labelClasses}>License Number</label>
-              <input 
-                disabled={!editing} 
-                value={form.licenseNumber || ''} 
-                onChange={(e) => onChange('licenseNumber', e.target.value)} 
+              <input
+                disabled={!editing}
+                value={form.licenseNumber || ''}
+                onChange={(e) => onChange('licenseNumber', e.target.value)}
                 className={inputClasses}
                 placeholder="Enter license number"
               />
@@ -317,20 +318,20 @@ const LawyerInfo: React.FC = () => {
             <div>
               <label className={labelClasses}>License Proof</label>
               {form.licenseProofUrl && !editing ? (
-                <a 
-                  href={form.licenseProofUrl} 
-                  target="_blank" 
-                  rel="noreferrer" 
+                <a
+                  href={form.licenseProofUrl}
+                  target="_blank"
+                  rel="noreferrer"
                   className="inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium text-primary bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors"
                 >
                   <ExternalLink className="w-4 h-4" />
                   View Document
                 </a>
               ) : editing ? (
-                <input 
-                  type="file" 
-                  accept="image/*,application/pdf" 
-                  onChange={(e) => setLicenseFile(e.target.files?.[0] ?? null)} 
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={(e) => setLicenseFile(e.target.files?.[0] ?? null)}
                   className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
                 />
               ) : (
@@ -339,10 +340,10 @@ const LawyerInfo: React.FC = () => {
             </div>
             <div>
               <label className={labelClasses}>Bar Council ID</label>
-              <input 
-                disabled={!editing} 
-                value={form.barCouncilId || ''} 
-                onChange={(e) => onChange('barCouncilId', e.target.value)} 
+              <input
+                disabled={!editing}
+                value={form.barCouncilId || ''}
+                onChange={(e) => onChange('barCouncilId', e.target.value)}
                 className={inputClasses}
                 placeholder="Enter bar council ID"
               />
@@ -350,20 +351,20 @@ const LawyerInfo: React.FC = () => {
             <div>
               <label className={labelClasses}>Bar Council Proof</label>
               {form.barCouncilProofUrl && !editing ? (
-                <a 
-                  href={form.barCouncilProofUrl} 
-                  target="_blank" 
-                  rel="noreferrer" 
+                <a
+                  href={form.barCouncilProofUrl}
+                  target="_blank"
+                  rel="noreferrer"
                   className="inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium text-primary bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors"
                 >
                   <ExternalLink className="w-4 h-4" />
                   View Document
                 </a>
               ) : editing ? (
-                <input 
-                  type="file" 
-                  accept="image/*,application/pdf" 
-                  onChange={(e) => setBarCouncilFile(e.target.files?.[0] ?? null)} 
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={(e) => setBarCouncilFile(e.target.files?.[0] ?? null)}
                   className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
                 />
               ) : (
@@ -372,24 +373,46 @@ const LawyerInfo: React.FC = () => {
             </div>
             <div>
               <label className={labelClasses}>Bar Council Name</label>
-              <input 
-                disabled={!editing} 
-                value={form.barCouncil || ''} 
-                onChange={(e) => onChange('barCouncil', e.target.value)} 
+              <input
+                disabled={!editing}
+                value={form.barCouncil || ''}
+                onChange={(e) => onChange('barCouncil', e.target.value)}
                 className={inputClasses}
                 placeholder="Enter bar council name"
               />
             </div>
             <div>
               <label className={labelClasses}>Years of Experience</label>
-              <input 
-                disabled={!editing} 
-                type="number" 
-                value={form.experienceYears ?? ''} 
-                onChange={(e) => onChange('experienceYears', e.target.value ? Number(e.target.value) : undefined)} 
+              <input
+                disabled={!editing}
+                type="number"
+                value={form.experienceYears ?? ''}
+                onChange={(e) => onChange('experienceYears', e.target.value ? Number(e.target.value) : undefined)}
                 className={inputClasses}
                 placeholder="e.g. 5"
               />
+            </div>
+            <div>
+              <label className={labelClasses}>Consultation Fee (₹)</label>
+              <div className="relative">
+                <span className={`absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium ${editing ? '' : 'text-gray-400'}`}>₹</span>
+                <input
+                  disabled={!editing}
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.feePerConsultation != null ? Math.round(form.feePerConsultation / 100) : ''}
+                  onChange={(e) => {
+                    const rupees = e.target.value ? Number(e.target.value) : undefined
+                    onChange('feePerConsultation', rupees != null ? rupees * 100 : undefined)
+                  }}
+                  className={`${inputClasses} pl-9`}
+                  placeholder="e.g. 500"
+                />
+              </div>
+              {editing && (
+                <p className="mt-1 text-xs text-gray-500">Enter your consultation fee in rupees. Clients will see this amount when booking.</p>
+              )}
             </div>
           </div>
         </section>
@@ -402,9 +425,9 @@ const LawyerInfo: React.FC = () => {
               <h4 className="text-base font-semibold text-midnight">Work Experience</h4>
             </div>
             {editing && (
-              <button 
-                type="button" 
-                onClick={addExperience} 
+              <button
+                type="button"
+                onClick={addExperience}
                 className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-primary border border-primary rounded-lg hover:bg-primary hover:text-white transition-colors"
               >
                 <Plus className="w-4 h-4" />
@@ -418,9 +441,9 @@ const LawyerInfo: React.FC = () => {
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-sm font-medium text-midnight">Experience #{idx + 1}</span>
                   {editing && (
-                    <button 
-                      type="button" 
-                      onClick={() => removeExperience(idx)} 
+                    <button
+                      type="button"
+                      onClick={() => removeExperience(idx)}
                       className="inline-flex items-center gap-1 text-sm text-red-600 hover:text-red-700"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -431,41 +454,41 @@ const LawyerInfo: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className={labelClasses}>Title / Role</label>
-                    <input 
-                      disabled={!editing} 
-                      value={exp?.title || ''} 
-                      onChange={(e) => updateExperience(idx, { title: e.target.value })} 
+                    <input
+                      disabled={!editing}
+                      value={exp?.title || ''}
+                      onChange={(e) => updateExperience(idx, { title: e.target.value })}
                       className={inputClasses}
                       placeholder="e.g. Senior Associate"
                     />
                   </div>
                   <div>
                     <label className={labelClasses}>Organisation</label>
-                    <input 
-                      disabled={!editing} 
-                      value={exp?.organisation || ''} 
-                      onChange={(e) => updateExperience(idx, { organisation: e.target.value })} 
+                    <input
+                      disabled={!editing}
+                      value={exp?.organisation || ''}
+                      onChange={(e) => updateExperience(idx, { organisation: e.target.value })}
                       className={inputClasses}
                       placeholder="e.g. XYZ Law Firm"
                     />
                   </div>
                   <div>
                     <label className={labelClasses}>From</label>
-                    <input 
-                      disabled={!editing} 
-                      type="month" 
-                      value={exp?.from || ''} 
-                      onChange={(e) => updateExperience(idx, { from: e.target.value })} 
+                    <input
+                      disabled={!editing}
+                      type="month"
+                      value={exp?.from || ''}
+                      onChange={(e) => updateExperience(idx, { from: e.target.value })}
                       className={inputClasses}
                     />
                   </div>
                   <div>
                     <label className={labelClasses}>To</label>
-                    <input 
-                      disabled={!editing} 
-                      type="month" 
-                      value={exp?.to || ''} 
-                      onChange={(e) => updateExperience(idx, { to: e.target.value })} 
+                    <input
+                      disabled={!editing}
+                      type="month"
+                      value={exp?.to || ''}
+                      onChange={(e) => updateExperience(idx, { to: e.target.value })}
                       className={inputClasses}
                     />
                   </div>
@@ -488,9 +511,9 @@ const LawyerInfo: React.FC = () => {
               <h4 className="text-base font-semibold text-midnight">Education</h4>
             </div>
             {editing && (
-              <button 
-                type="button" 
-                onClick={addEducation} 
+              <button
+                type="button"
+                onClick={addEducation}
                 className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-primary border border-primary rounded-lg hover:bg-primary hover:text-white transition-colors"
               >
                 <Plus className="w-4 h-4" />
@@ -504,9 +527,9 @@ const LawyerInfo: React.FC = () => {
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-sm font-medium text-midnight">Education #{idx + 1}</span>
                   {editing && (
-                    <button 
-                      type="button" 
-                      onClick={() => removeEducation(idx)} 
+                    <button
+                      type="button"
+                      onClick={() => removeEducation(idx)}
                       className="inline-flex items-center gap-1 text-sm text-red-600 hover:text-red-700"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -517,42 +540,42 @@ const LawyerInfo: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className={labelClasses}>University</label>
-                    <input 
-                      disabled={!editing} 
-                      value={ed?.university || ''} 
-                      onChange={(e) => updateEducation(idx, { university: e.target.value })} 
+                    <input
+                      disabled={!editing}
+                      value={ed?.university || ''}
+                      onChange={(e) => updateEducation(idx, { university: e.target.value })}
                       className={inputClasses}
                       placeholder="e.g. National Law University"
                     />
                   </div>
                   <div>
                     <label className={labelClasses}>Course / Degree</label>
-                    <input 
-                      disabled={!editing} 
-                      value={ed?.course || ''} 
-                      onChange={(e) => updateEducation(idx, { course: e.target.value })} 
+                    <input
+                      disabled={!editing}
+                      value={ed?.course || ''}
+                      onChange={(e) => updateEducation(idx, { course: e.target.value })}
                       className={inputClasses}
                       placeholder="e.g. LLB"
                     />
                   </div>
                   <div>
                     <label className={labelClasses}>Start Year</label>
-                    <input 
-                      disabled={!editing} 
-                      type="number" 
-                      value={ed?.startYear || ''} 
-                      onChange={(e) => updateEducation(idx, { startYear: e.target.value })} 
+                    <input
+                      disabled={!editing}
+                      type="number"
+                      value={ed?.startYear || ''}
+                      onChange={(e) => updateEducation(idx, { startYear: e.target.value })}
                       className={inputClasses}
                       placeholder="e.g. 2015"
                     />
                   </div>
                   <div>
                     <label className={labelClasses}>Completion Year</label>
-                    <input 
-                      disabled={!editing} 
-                      type="number" 
-                      value={ed?.completionYear || ''} 
-                      onChange={(e) => updateEducation(idx, { completionYear: e.target.value })} 
+                    <input
+                      disabled={!editing}
+                      type="number"
+                      value={ed?.completionYear || ''}
+                      onChange={(e) => updateEducation(idx, { completionYear: e.target.value })}
                       className={inputClasses}
                       placeholder="e.g. 2018"
                     />
@@ -560,19 +583,19 @@ const LawyerInfo: React.FC = () => {
                   <div className="md:col-span-2">
                     <label className={labelClasses}>Certificate</label>
                     {ed?.certificateUrl && !editing ? (
-                      <a 
-                        href={ed.certificateUrl} 
-                        target="_blank" 
-                        rel="noreferrer" 
+                      <a
+                        href={ed.certificateUrl}
+                        target="_blank"
+                        rel="noreferrer"
                         className="inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium text-primary bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors"
                       >
                         <ExternalLink className="w-4 h-4" />
                         View Certificate
                       </a>
                     ) : editing ? (
-                      <input 
-                        type="file" 
-                        accept="image/*,application/pdf" 
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf"
                         onChange={(e) => {
                           const f = e.target.files?.[0] ?? null
                           setEducationFiles((prev) => {
@@ -580,7 +603,7 @@ const LawyerInfo: React.FC = () => {
                             copy[idx] = f
                             return copy
                           })
-                        }} 
+                        }}
                         className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
                       />
                     ) : (
@@ -608,20 +631,20 @@ const LawyerInfo: React.FC = () => {
             <div>
               <label className={labelClasses}>Languages</label>
               <div className={`w-full px-3 py-2 border-2 rounded-lg transition-colors min-h-[48px] flex flex-wrap items-center gap-2
-                ${editing 
-                  ? 'border-gray-200 bg-white focus-within:border-primary' 
+                ${editing
+                  ? 'border-gray-200 bg-white focus-within:border-primary'
                   : 'border-transparent bg-gray-50'
                 }`}
               >
                 {(form.languages || []).map((lang, idx) => (
-                  <span 
-                    key={idx} 
+                  <span
+                    key={idx}
                     className="inline-flex items-center gap-1 px-3 py-1 bg-primary/10 text-primary text-sm font-medium rounded-full"
                   >
                     {lang}
                     {editing && (
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         onClick={() => removeLanguage(idx)}
                         className="ml-1 hover:text-red-600 transition-colors"
                       >
@@ -651,10 +674,10 @@ const LawyerInfo: React.FC = () => {
             </div>
             <div>
               <label className={labelClasses}>Bio</label>
-              <textarea 
-                disabled={!editing} 
-                value={form.bio || ''} 
-                onChange={(e) => onChange('bio', e.target.value)} 
+              <textarea
+                disabled={!editing}
+                value={form.bio || ''}
+                onChange={(e) => onChange('bio', e.target.value)}
                 className={`${inputClasses} min-h-[120px] resize-none`}
                 placeholder="Write a brief description about yourself and your practice..."
               />
@@ -671,40 +694,40 @@ const LawyerInfo: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
               <label className={labelClasses}>City</label>
-              <input 
-                disabled={!editing} 
-                value={form.city || ''} 
-                onChange={(e) => onChange('city', e.target.value)} 
+              <input
+                disabled={!editing}
+                value={form.city || ''}
+                onChange={(e) => onChange('city', e.target.value)}
                 className={inputClasses}
                 placeholder="e.g. Mumbai"
               />
             </div>
             <div>
               <label className={labelClasses}>State</label>
-              <input 
-                disabled={!editing} 
-                value={form.state || ''} 
-                onChange={(e) => onChange('state', e.target.value)} 
+              <input
+                disabled={!editing}
+                value={form.state || ''}
+                onChange={(e) => onChange('state', e.target.value)}
                 className={inputClasses}
                 placeholder="e.g. Maharashtra"
               />
             </div>
             <div>
               <label className={labelClasses}>Pincode</label>
-              <input 
-                disabled={!editing} 
-                value={form.pincode || ''} 
-                onChange={(e) => onChange('pincode', e.target.value)} 
+              <input
+                disabled={!editing}
+                value={form.pincode || ''}
+                onChange={(e) => onChange('pincode', e.target.value)}
                 className={inputClasses}
                 placeholder="e.g. 400001"
               />
             </div>
             <div>
               <label className={labelClasses}>Address</label>
-              <input 
-                disabled={!editing} 
-                value={form.address || ''} 
-                onChange={(e) => onChange('address', e.target.value)} 
+              <input
+                disabled={!editing}
+                value={form.address || ''}
+                onChange={(e) => onChange('address', e.target.value)}
                 className={inputClasses}
                 placeholder="Enter your office address"
               />
