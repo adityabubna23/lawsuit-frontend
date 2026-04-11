@@ -1,165 +1,202 @@
 import { useEffect, useCallback } from 'react'
 import { useVideoCallStore } from '@/stores/videoCallStore'
-import { useAuthStore } from '@/stores/authStore'
 import socketService from '@/services/socketService'
-import { videoApi } from '@/services/api'
-import type { CallType, CallParticipant, CallEndReason } from '@/types/video'
 import { soundManager } from '@/utils/soundManager'
+import type { CallType, CallParticipant, CallEndReason } from '@/types/video'
 
-export const useVideoCall = () => {
-  const store = useVideoCallStore()
-  const user = useAuthStore((s) => s.user)
+/**
+ * Maps call:error codes returned by the backend into CallEndReason.
+ */
+function errorCodeToEndReason(code: string | undefined): CallEndReason {
+  switch (code) {
+    case 'USER_OFFLINE':
+      return 'missed'
+    case 'USER_BUSY':
+    case 'CALLER_BUSY':
+      return 'busy'
+    default:
+      return 'failed'
+  }
+}
 
-  // Set up socket event listeners
+// Reset delay after a call ends — gives the UI time to show the final state.
+const END_RESET_DELAY_MS = 1500
+
+/**
+ * Subscribe to socket lifecycle events. This runs ONCE per hook instance;
+ * it reads live state via `useVideoCallStore.getState()` so the listeners
+ * stay stable for the whole session.
+ */
+function useCallEventSubscription() {
   useEffect(() => {
-    // Connect socket if not connected
     socketService.connect()
+    let resetTimer: ReturnType<typeof setTimeout> | null = null
 
-    // Handle incoming call
+    const scheduleReset = () => {
+      if (resetTimer) clearTimeout(resetTimer)
+      resetTimer = setTimeout(() => {
+        useVideoCallStore.getState().reset()
+        resetTimer = null
+      }, END_RESET_DELAY_MS)
+    }
+
+    // Caller: backend ack — the call is ringing the callee
+    const unsubInitiated = socketService.onCallInitiated((data) => {
+      useVideoCallStore.getState().callInitiated(data)
+    })
+
+    // Callee: incoming call
     const unsubIncoming = socketService.onCallIncoming((data) => {
-      // Don't show incoming call if already in a call
-      if (store.status !== 'idle') {
+      const store = useVideoCallStore.getState()
+      // If we're already in a call, auto-decline so we don't ring twice
+      if (store.status !== 'idle' && store.status !== 'ended') {
         socketService.declineCall(data.callId)
         return
       }
       store.receiveIncomingCall(data)
     })
 
-    // Handle call accepted (for caller)
+    // Caller: callee accepted
     const unsubAccepted = socketService.onCallAccepted((data) => {
-      store.callAccepted(data.roomUrl, data.token)
+      useVideoCallStore.getState().callAccepted(data.callee)
     })
 
-    // Handle call declined (for caller)
+    // Caller: callee declined
     const unsubDeclined = socketService.onCallDeclined((data) => {
       soundManager.stopLoop()
       soundManager.playOnce('ended')
-      store.endCall(data.reason === 'busy' ? 'busy' : 'declined')
+      const reason: CallEndReason = data.reason === 'busy' ? 'busy' : 'declined'
+      useVideoCallStore.getState().endCall(reason)
+      scheduleReset()
     })
 
-    // Handle call ended
-    const unsubEnded = socketService.onCallEnded((data) => {
-      store.endCall(data.reason)
-    })
-
-    // Handle call error
-    const unsubError = socketService.onCallError((data) => {
-      console.error('Call error:', data.error)
-      soundManager.stopLoop()
-      soundManager.playOnce('error')
-      store.endCall('failed')
-    })
-
-    // Handle call cancelled (for callee)
+    // Callee: caller cancelled before we answered
     const unsubCancelled = socketService.onCallCancelled(() => {
       soundManager.stopLoop()
-      store.endCall('cancelled')
+      useVideoCallStore.getState().endCall('cancelled')
+      scheduleReset()
+    })
+
+    // Either side: the other party ended the call
+    const unsubEnded = socketService.onCallEnded(() => {
+      useVideoCallStore.getState().endCall('completed')
+      scheduleReset()
+    })
+
+    // Errors from the backend
+    const unsubError = socketService.onCallError((data) => {
+      soundManager.stopLoop()
+      soundManager.playOnce('error')
+      useVideoCallStore.getState().endCall(errorCodeToEndReason(data.code))
+      scheduleReset()
     })
 
     return () => {
+      unsubInitiated()
       unsubIncoming()
       unsubAccepted()
       unsubDeclined()
+      unsubCancelled()
       unsubEnded()
       unsubError()
-      unsubCancelled()
+      if (resetTimer) clearTimeout(resetTimer)
     }
-  }, [store.status])
+  }, [])
+}
 
-  // Initiate a call
+/**
+ * Main video-call hook. Uses per-field selectors so components only re-render
+ * when the specific fields they read change.
+ */
+export const useVideoCall = () => {
+  useCallEventSubscription()
+
+  // Selectors — each re-renders independently
+  const status = useVideoCallStore((s) => s.status)
+  const callId = useVideoCallStore((s) => s.callId)
+  const callType = useVideoCallStore((s) => s.callType)
+  const referenceId = useVideoCallStore((s) => s.referenceId)
+  const caller = useVideoCallStore((s) => s.caller)
+  const callee = useVideoCallStore((s) => s.callee)
+  const roomUrl = useVideoCallStore((s) => s.roomUrl)
+  const token = useVideoCallStore((s) => s.token)
+  const startedAt = useVideoCallStore((s) => s.startedAt)
+  const endedAt = useVideoCallStore((s) => s.endedAt)
+  const endReason = useVideoCallStore((s) => s.endReason)
+  const isMinimized = useVideoCallStore((s) => s.isMinimized)
+  const isMuted = useVideoCallStore((s) => s.isMuted)
+  const isCameraOff = useVideoCallStore((s) => s.isCameraOff)
+
+  // Stable actions — selector returns identity-stable fn refs from the store
+  const toggleMinimize = useVideoCallStore((s) => s.toggleMinimize)
+  const toggleMute = useVideoCallStore((s) => s.toggleMute)
+  const toggleCamera = useVideoCallStore((s) => s.toggleCamera)
+  const resetCall = useVideoCallStore((s) => s.reset)
+
   const initiateCall = useCallback(
-    async (callType: CallType, referenceId: string, callee: CallParticipant) => {
-      if (!user) {
-        console.error('User not authenticated')
-        return
-      }
-
-      // Update store state
-      store.initiateCall(callType, referenceId, callee)
-
-      // Emit socket event
-      socketService.initiateCall(callee.id, callType, referenceId)
+    (type: CallType, refId: string, target: CallParticipant) => {
+      useVideoCallStore.getState().initiateCall(type, refId, target)
+      socketService.initiateCall(target.id, type, refId)
     },
-    [user, store]
+    []
   )
 
-  // Accept incoming call
   const acceptCall = useCallback(() => {
-    if (!store.callId) return
+    const id = useVideoCallStore.getState().callId
+    if (!id) return
+    useVideoCallStore.getState().acceptCall()
+    socketService.acceptCall(id)
+  }, [])
 
-    store.acceptCall()
-    socketService.acceptCall(store.callId)
-  }, [store])
-
-  // Decline incoming call
   const declineCall = useCallback(() => {
-    if (!store.callId) return
+    const id = useVideoCallStore.getState().callId
+    if (id) socketService.declineCall(id)
+    useVideoCallStore.getState().endCall('declined')
+    setTimeout(() => useVideoCallStore.getState().reset(), END_RESET_DELAY_MS)
+  }, [])
 
-    socketService.declineCall(store.callId)
-    store.declineCall()
-  }, [store])
-
-  // Cancel outgoing call
   const cancelCall = useCallback(() => {
-    if (!store.callId && store.status === 'initiating') {
-      // Call hasn't been assigned an ID yet, just reset
-      store.cancelCall()
-      return
-    }
+    const id = useVideoCallStore.getState().callId
+    if (id) socketService.cancelCall(id)
+    useVideoCallStore.getState().endCall('cancelled')
+    setTimeout(() => useVideoCallStore.getState().reset(), END_RESET_DELAY_MS)
+  }, [])
 
-    if (store.callId) {
-      socketService.cancelCall(store.callId)
-    }
-    store.cancelCall()
-  }, [store])
+  const endCall = useCallback((reason: CallEndReason = 'completed') => {
+    const id = useVideoCallStore.getState().callId
+    if (id) socketService.endCall(id)
+    useVideoCallStore.getState().endCall(reason)
+    setTimeout(() => useVideoCallStore.getState().reset(), END_RESET_DELAY_MS)
+  }, [])
 
-  // End ongoing call
-  const endCall = useCallback(
-    (reason: CallEndReason = 'completed') => {
-      if (store.callId) {
-        socketService.endCall(store.callId)
-      }
-      store.endCall(reason)
-    },
-    [store]
-  )
+  // Mark the Daily iframe as fully joined (called from DailyVideoPlayer)
+  const markConnected = useCallback(() => {
+    useVideoCallStore.getState().callConnected()
+  }, [])
 
-  // Join video room (after call is connected)
-  const joinRoom = useCallback(async () => {
-    if (!store.roomUrl || !store.token) {
-      console.error('No room URL or token available')
-      return null
-    }
-
-    store.callConnected()
-    return {
-      roomUrl: store.roomUrl,
-      token: store.token,
-    }
-  }, [store])
-
-  // Get current call duration
+  // Compute call duration from startedAt (no state — purely derived)
   const getCallDuration = useCallback(() => {
-    if (!store.startedAt) return 0
-    const endTime = store.endedAt || new Date()
-    return Math.floor((endTime.getTime() - store.startedAt.getTime()) / 1000)
-  }, [store.startedAt, store.endedAt])
+    if (!startedAt) return 0
+    const endTime = endedAt || new Date()
+    return Math.floor((endTime.getTime() - startedAt.getTime()) / 1000)
+  }, [startedAt, endedAt])
 
   return {
     // State
-    status: store.status,
-    callId: store.callId,
-    callType: store.callType,
-    referenceId: store.referenceId,
-    caller: store.caller,
-    callee: store.callee,
-    roomUrl: store.roomUrl,
-    token: store.token,
-    isMinimized: store.isMinimized,
-    isMuted: store.isMuted,
-    isCameraOff: store.isCameraOff,
-    startedAt: store.startedAt,
-    endReason: store.endReason,
+    status,
+    callId,
+    callType,
+    referenceId,
+    caller,
+    callee,
+    roomUrl,
+    token,
+    startedAt,
+    endedAt,
+    endReason,
+    isMinimized,
+    isMuted,
+    isCameraOff,
 
     // Actions
     initiateCall,
@@ -167,19 +204,23 @@ export const useVideoCall = () => {
     declineCall,
     cancelCall,
     endCall,
-    joinRoom,
-    toggleMinimize: store.toggleMinimize,
-    toggleMute: store.toggleMute,
-    toggleCamera: store.toggleCamera,
-    reset: store.reset,
+    markConnected,
+    toggleMinimize,
+    toggleMute,
+    toggleCamera,
+    reset: resetCall,
 
-    // Computed
+    // Derived
     getCallDuration,
-    isInCall: ['ringing', 'connecting', 'connected', 'initiating'].includes(store.status),
-    isRinging: store.status === 'ringing',
-    isConnected: store.status === 'connected',
-    isConnecting: store.status === 'connecting',
-    isInitiating: store.status === 'initiating',
+    isInCall:
+      status === 'initiating' ||
+      status === 'ringing' ||
+      status === 'connecting' ||
+      status === 'connected',
+    isRinging: status === 'ringing',
+    isConnected: status === 'connected',
+    isConnecting: status === 'connecting',
+    isInitiating: status === 'initiating',
   }
 }
 

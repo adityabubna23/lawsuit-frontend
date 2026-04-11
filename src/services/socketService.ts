@@ -2,13 +2,14 @@ import { io, Socket } from 'socket.io-client'
 import { useAuthStore } from '@/stores/authStore'
 import type { Notification as AppNotification } from '@/types'
 import type {
+  CallType,
   CallIncomingEvent,
+  CallInitiatedEvent,
   CallAcceptedEvent,
   CallDeclinedEvent,
-  CallEndEvent,
+  CallCancelledEvent,
+  CallEndedEvent,
   CallErrorEvent,
-  CallInitiateEvent,
-  CallParticipant,
 } from '@/types/video'
 
 // Compute socket URL from VITE_API_URL (same host, different path)
@@ -36,12 +37,13 @@ type NotificationHandler = (notification: AppNotification) => void
 type UnreadCountHandler = (data: { unreadCount: number }) => void
 
 // Video call event handlers
+type CallInitiatedHandler = (data: CallInitiatedEvent) => void
 type CallIncomingHandler = (data: CallIncomingEvent) => void
 type CallAcceptedHandler = (data: CallAcceptedEvent) => void
 type CallDeclinedHandler = (data: CallDeclinedEvent) => void
-type CallEndedHandler = (data: CallEndEvent) => void
+type CallEndedHandler = (data: CallEndedEvent) => void
+type CallCancelledHandler = (data: CallCancelledEvent) => void
 type CallErrorHandler = (data: CallErrorEvent) => void
-type CallCancelledHandler = (data: { callId: string }) => void
 
 export interface ChatMessage {
   id: string
@@ -70,12 +72,13 @@ class SocketService {
   private onlineUsers: Set<string> = new Set()
   
   // Video call handlers
+  private callInitiatedHandlers: CallInitiatedHandler[] = []
   private callIncomingHandlers: CallIncomingHandler[] = []
   private callAcceptedHandlers: CallAcceptedHandler[] = []
   private callDeclinedHandlers: CallDeclinedHandler[] = []
   private callEndedHandlers: CallEndedHandler[] = []
-  private callErrorHandlers: CallErrorHandler[] = []
   private callCancelledHandlers: CallCancelledHandler[] = []
+  private callErrorHandlers: CallErrorHandler[] = []
 
   private constructor() {}
 
@@ -167,28 +170,34 @@ class SocketService {
     // ─────────────────────────────────────────────────────────────────────
     // Video Call Events
     // ─────────────────────────────────────────────────────────────────────
-    
-    // Incoming call notification
+
+    // Ack for the caller — confirms the call is ringing and carries room+token
+    this.socket.on('call:initiated', (data: CallInitiatedEvent) => {
+      this.callInitiatedHandlers.forEach((handler) => handler(data))
+    })
+
+    // Incoming call notification (callee side)
     this.socket.on('call:incoming', (data: CallIncomingEvent) => {
-      console.log('Incoming call:', data)
       this.callIncomingHandlers.forEach((handler) => handler(data))
     })
 
-    // Call was accepted by the callee
+    // Call was accepted by the callee (caller side)
     this.socket.on('call:accepted', (data: CallAcceptedEvent) => {
-      console.log('Call accepted:', data)
       this.callAcceptedHandlers.forEach((handler) => handler(data))
     })
 
-    // Call was declined by the callee
+    // Call was declined by the callee (caller side)
     this.socket.on('call:declined', (data: CallDeclinedEvent) => {
-      console.log('Call declined:', data)
       this.callDeclinedHandlers.forEach((handler) => handler(data))
     })
 
-    // Call ended
-    this.socket.on('call:ended', (data: CallEndEvent) => {
-      console.log('Call ended:', data)
+    // Call cancelled by the caller (callee side)
+    this.socket.on('call:cancelled', (data: CallCancelledEvent) => {
+      this.callCancelledHandlers.forEach((handler) => handler(data))
+    })
+
+    // Call ended (either side)
+    this.socket.on('call:ended', (data: CallEndedEvent) => {
       this.callEndedHandlers.forEach((handler) => handler(data))
     })
 
@@ -196,12 +205,6 @@ class SocketService {
     this.socket.on('call:error', (data: CallErrorEvent) => {
       console.error('Call error:', data)
       this.callErrorHandlers.forEach((handler) => handler(data))
-    })
-
-    // Call cancelled by caller
-    this.socket.on('call:cancelled', (data: { callId: string }) => {
-      console.log('Call cancelled:', data)
-      this.callCancelledHandlers.forEach((handler) => handler(data))
     })
 
     return this.socket
@@ -320,42 +323,49 @@ class SocketService {
   // Video Call Methods
   // ─────────────────────────────────────────────────────────────────────
 
-  // Initiate a call
-  initiateCall(calleeId: string, callType: 'chat' | 'appointment', referenceId: string) {
+  /** Initiate an outgoing call. Backend will ack with `call:initiated`. */
+  initiateCall(to: string, callType: CallType, referenceId: string) {
     if (this.socket?.connected) {
-      this.socket.emit('call:initiate', { calleeId, callType, referenceId })
+      this.socket.emit('call:initiate', { to, callType, referenceId })
     }
   }
 
-  // Accept an incoming call
+  /** Accept an incoming call (callee only). */
   acceptCall(callId: string) {
     if (this.socket?.connected) {
       this.socket.emit('call:accept', { callId })
     }
   }
 
-  // Decline an incoming call
+  /** Decline an incoming call (callee only). */
   declineCall(callId: string) {
     if (this.socket?.connected) {
       this.socket.emit('call:decline', { callId })
     }
   }
 
-  // Cancel an outgoing call (before it's answered)
+  /** Cancel an outgoing call before it is answered (caller only). */
   cancelCall(callId: string) {
     if (this.socket?.connected) {
       this.socket.emit('call:cancel', { callId })
     }
   }
 
-  // End an ongoing call
+  /** End an ongoing call (either party). */
   endCall(callId: string) {
     if (this.socket?.connected) {
       this.socket.emit('call:end', { callId })
     }
   }
 
-  // Video call event handlers
+  // Video call event subscribers. Each returns an unsubscribe fn.
+  onCallInitiated(handler: CallInitiatedHandler) {
+    this.callInitiatedHandlers.push(handler)
+    return () => {
+      this.callInitiatedHandlers = this.callInitiatedHandlers.filter((h) => h !== handler)
+    }
+  }
+
   onCallIncoming(handler: CallIncomingHandler) {
     this.callIncomingHandlers.push(handler)
     return () => {
@@ -377,6 +387,13 @@ class SocketService {
     }
   }
 
+  onCallCancelled(handler: CallCancelledHandler) {
+    this.callCancelledHandlers.push(handler)
+    return () => {
+      this.callCancelledHandlers = this.callCancelledHandlers.filter((h) => h !== handler)
+    }
+  }
+
   onCallEnded(handler: CallEndedHandler) {
     this.callEndedHandlers.push(handler)
     return () => {
@@ -388,13 +405,6 @@ class SocketService {
     this.callErrorHandlers.push(handler)
     return () => {
       this.callErrorHandlers = this.callErrorHandlers.filter((h) => h !== handler)
-    }
-  }
-
-  onCallCancelled(handler: CallCancelledHandler) {
-    this.callCancelledHandlers.push(handler)
-    return () => {
-      this.callCancelledHandlers = this.callCancelledHandlers.filter((h) => h !== handler)
     }
   }
 

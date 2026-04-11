@@ -1,20 +1,35 @@
 // Video Call Types and Interfaces
+//
+// Contract (mirrors backend `src/sockets/index.ts`):
+//
+//   frontend -> backend: call:initiate { to, callType, referenceId }
+//                        call:accept   { callId }
+//                        call:decline  { callId }
+//                        call:cancel   { callId }
+//                        call:end      { callId }
+//
+//   backend  -> caller:  call:initiated { callId, callType, referenceId, callee, roomUrl, token }
+//                        call:accepted  { callId, callee }
+//                        call:declined  { callId, reason }
+//                        call:ended     { callId, duration }
+//                        call:error     { callId?, code, message }
+//
+//   backend  -> callee:  call:incoming  { callId, callType, referenceId, caller, roomUrl, token }
+//                        call:cancelled { callId }
+//                        call:ended     { callId, duration }
+//                        call:error     { callId?, code, message }
 
-export type CallStatus = 
+export type CallStatus =
   | 'idle'
-  | 'initiating'
-  | 'ringing'
-  | 'connecting'
-  | 'connected'
+  | 'initiating' // caller: waiting for callee to accept
+  | 'ringing'    // callee: incoming call modal open
+  | 'connecting' // both: joining Daily room
+  | 'connected'  // both: in the call
   | 'ended'
-  | 'failed'
-  | 'missed'
-  | 'declined'
-  | 'busy'
 
 export type CallType = 'chat' | 'appointment'
 
-export type CallEndReason = 
+export type CallEndReason =
   | 'completed'
   | 'declined'
   | 'missed'
@@ -47,7 +62,33 @@ export interface VideoCallState {
   isCameraOff: boolean
 }
 
-export interface IncomingCallData {
+// ───────────────────────────────────────────────────────────
+// Socket event payloads
+// ───────────────────────────────────────────────────────────
+
+// Frontend → backend
+export interface CallInitiatePayload {
+  to: string
+  callType: CallType
+  referenceId: string
+}
+
+export interface CallIdPayload {
+  callId: string
+}
+
+// Backend → caller (ack)
+export interface CallInitiatedEvent {
+  callId: string
+  callType: CallType
+  referenceId: string
+  callee: CallParticipant
+  roomUrl: string
+  token: string
+}
+
+// Backend → callee
+export interface CallIncomingEvent {
   callId: string
   callType: CallType
   referenceId: string
@@ -56,23 +97,37 @@ export interface IncomingCallData {
   token: string
 }
 
-export interface OutgoingCallData {
-  callType: CallType
-  referenceId: string
+// Backend → caller
+export interface CallAcceptedEvent {
+  callId: string
   callee: CallParticipant
 }
 
-export interface CallAcceptedData {
+export interface CallDeclinedEvent {
   callId: string
-  roomUrl: string
-  token: string
+  reason: 'declined' | 'busy'
 }
 
-export interface CallEndedData {
+// Backend → callee
+export interface CallCancelledEvent {
   callId: string
-  reason: CallEndReason
-  duration?: number // in seconds
 }
+
+// Backend → either
+export interface CallEndedEvent {
+  callId: string
+  duration?: number
+}
+
+export interface CallErrorEvent {
+  callId?: string
+  code: string
+  message: string
+}
+
+// ───────────────────────────────────────────────────────────
+// Call history (HTTP)
+// ───────────────────────────────────────────────────────────
 
 export interface CallHistory {
   id: string
@@ -84,8 +139,8 @@ export interface CallHistory {
   calleeId: string
   calleeName: string
   calleeAvatar?: string
-  status: 'completed' | 'missed' | 'declined' | 'failed'
-  duration: number // in seconds
+  status: 'completed' | 'missed' | 'declined' | 'failed' | 'cancelled'
+  duration: number
   startedAt: string
   endedAt: string
   createdAt: string
@@ -96,56 +151,4 @@ export interface CallHistoryResponse {
   total: number
   page: number
   limit: number
-}
-
-// Socket event types
-export interface CallInitiateEvent {
-  callType: CallType
-  referenceId: string // chatId or appointmentId
-  calleeId: string
-}
-
-export interface CallIncomingEvent {
-  callId: string
-  callType: CallType
-  referenceId: string
-  caller: CallParticipant
-  roomUrl: string
-  token: string
-}
-
-export interface CallAcceptEvent {
-  callId: string
-}
-
-export interface CallDeclineEvent {
-  callId: string
-}
-
-export interface CallCancelEvent {
-  callId: string
-}
-
-export interface CallAcceptedEvent {
-  callId: string
-  callee: CallParticipant
-  roomUrl: string
-  token: string
-}
-
-export interface CallDeclinedEvent {
-  callId: string
-  reason: 'declined' | 'busy'
-}
-
-export interface CallEndEvent {
-  callId: string
-  reason: CallEndReason
-  duration?: number
-}
-
-export interface CallErrorEvent {
-  callId?: string
-  error: string
-  code?: string
 }

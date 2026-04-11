@@ -5,31 +5,26 @@ import type {
   CallType,
   CallParticipant,
   CallEndReason,
-  IncomingCallData,
-  CallHistory,
+  CallInitiatedEvent,
+  CallIncomingEvent,
 } from '@/types/video'
 import { soundManager } from '@/utils/soundManager'
 
 interface VideoCallStore extends VideoCallState {
-  // Actions
-  setStatus: (status: CallStatus) => void
-  initiateCall: (
-    callType: CallType,
-    referenceId: string,
-    callee: CallParticipant
-  ) => void
-  receiveIncomingCall: (data: IncomingCallData) => void
+  // Lifecycle
+  initiateCall: (callType: CallType, referenceId: string, callee: CallParticipant) => void
+  callInitiated: (data: CallInitiatedEvent) => void
+  receiveIncomingCall: (data: CallIncomingEvent) => void
   acceptCall: () => void
-  declineCall: () => void
-  cancelCall: () => void
-  callAccepted: (roomUrl: string, token: string) => void
+  callAccepted: (callee?: CallParticipant | null) => void
   callConnected: () => void
   endCall: (reason: CallEndReason) => void
-  setCallDetails: (roomUrl: string, token: string) => void
+  reset: () => void
+
+  // UI controls
   toggleMinimize: () => void
   toggleMute: () => void
   toggleCamera: () => void
-  reset: () => void
 }
 
 const initialState: VideoCallState = {
@@ -49,83 +44,64 @@ const initialState: VideoCallState = {
   isCameraOff: false,
 }
 
-export const useVideoCallStore = create<VideoCallStore>((set, get) => ({
+export const useVideoCallStore = create<VideoCallStore>((set) => ({
   ...initialState,
 
-  setStatus: (status) => set({ status }),
-
+  // Caller: local optimistic state while we wait for the backend ack
   initiateCall: (callType, referenceId, callee) => {
     soundManager.startLoop('outgoing')
     set({
+      ...initialState,
       status: 'initiating',
       callType,
       referenceId,
       callee,
-      caller: null, // Will be set from user context
-      callId: null,
-      roomUrl: null,
-      token: null,
-      startedAt: null,
-      endedAt: null,
-      endReason: null,
-      isMinimized: false,
     })
   },
 
+  // Caller: backend ack — now we have a callId + roomUrl + token
+  callInitiated: (data) => {
+    set({
+      callId: data.callId,
+      callType: data.callType,
+      referenceId: data.referenceId,
+      callee: data.callee,
+      roomUrl: data.roomUrl,
+      token: data.token,
+    })
+  },
+
+  // Callee: incoming call received
   receiveIncomingCall: (data) => {
     soundManager.startLoop('incoming')
     set({
+      ...initialState,
       status: 'ringing',
       callId: data.callId,
       callType: data.callType,
       referenceId: data.referenceId,
       caller: data.caller,
-      callee: null,
       roomUrl: data.roomUrl,
       token: data.token,
-      startedAt: null,
-      endedAt: null,
-      endReason: null,
-      isMinimized: false,
     })
   },
 
+  // Callee: locally accept (socket emit handled by the hook)
   acceptCall: () => {
     soundManager.stopLoop()
     set({ status: 'connecting' })
   },
 
-  declineCall: () => {
+  // Caller: callee accepted on the other side
+  callAccepted: (callee) => {
     soundManager.stopLoop()
-    soundManager.playOnce('ended')
-    const currentState = get()
-    set({
-      ...initialState,
-      endReason: 'declined',
-      endedAt: new Date(),
-      // Keep some info for potential logging
-    })
-  },
-
-  cancelCall: () => {
-    soundManager.stopLoop()
-    soundManager.playOnce('ended')
-    set({
-      ...initialState,
-      endReason: 'cancelled',
-      endedAt: new Date(),
-    })
-  },
-
-  callAccepted: (roomUrl, token) => {
-    soundManager.stopLoop()
-    set({
+    set((state) => ({
       status: 'connecting',
-      roomUrl,
-      token,
-    })
+      callee: callee ?? state.callee,
+    }))
   },
 
+  // Either side: Daily iframe successfully joined
   callConnected: () => {
     soundManager.playOnce('connected')
     set({
@@ -142,53 +118,27 @@ export const useVideoCallStore = create<VideoCallStore>((set, get) => ({
       endedAt: new Date(),
       endReason: reason,
     })
-    // Reset after a short delay
-    setTimeout(() => {
-      set(initialState)
-    }, 2000)
-  },
-
-  setCallDetails: (roomUrl, token) => {
-    set({ roomUrl, token })
-  },
-
-  toggleMinimize: () => {
-    set((state) => ({ isMinimized: !state.isMinimized }))
-  },
-
-  toggleMute: () => {
-    set((state) => ({ isMuted: !state.isMuted }))
-  },
-
-  toggleCamera: () => {
-    set((state) => ({ isCameraOff: !state.isCameraOff }))
   },
 
   reset: () => {
     soundManager.stopLoop()
     set(initialState)
   },
+
+  toggleMinimize: () => set((state) => ({ isMinimized: !state.isMinimized })),
+  toggleMute: () => set((state) => ({ isMuted: !state.isMuted })),
+  toggleCamera: () => set((state) => ({ isCameraOff: !state.isCameraOff })),
 }))
 
-// Selector hooks for better performance
+// Selector hooks — use these in components to avoid subscribing to the whole store
 export const useCallStatus = () => useVideoCallStore((state) => state.status)
+
 export const useIsInCall = () =>
   useVideoCallStore((state) =>
-    ['ringing', 'connecting', 'connected', 'initiating'].includes(state.status)
+    state.status === 'initiating' ||
+    state.status === 'ringing' ||
+    state.status === 'connecting' ||
+    state.status === 'connected'
   )
-export const useCallParticipants = () =>
-  useVideoCallStore((state) => ({
-    caller: state.caller,
-    callee: state.callee,
-  }))
-export const useCallControls = () =>
-  useVideoCallStore((state) => ({
-    isMuted: state.isMuted,
-    isCameraOff: state.isCameraOff,
-    isMinimized: state.isMinimized,
-    toggleMute: state.toggleMute,
-    toggleCamera: state.toggleCamera,
-    toggleMinimize: state.toggleMinimize,
-  }))
 
 export default useVideoCallStore
