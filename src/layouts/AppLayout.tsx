@@ -43,6 +43,7 @@ const AppLayout: FC = () => {
     { name: 'Search Lawyers', path: '/app/search' },
     { name: 'Appointments', path: '/app/appointments' },
     { name: 'Cases', path: '/app/cases' },
+    { name: 'Mediations', path: '/app/mediations' },
     { name: 'Call History', path: '/app/call-history' },
     { name: 'Lex Rates', path: '/app/lex-rates' },
     { name: 'Tele Law', path: '/app/tele-law' },

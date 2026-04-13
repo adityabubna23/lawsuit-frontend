@@ -321,6 +321,41 @@ export const apiEndpoints = {
   }
 }
 
+export const mediationApi = {
+  // Invites
+  createInvite: (data: {
+    respondentEmail: string
+    respondentName?: string
+    respondentPhone?: string
+    disputeTitle: string
+    disputeDescription: string
+    initiatorLawyerId?: string
+  }) => api.post('/mediations/invites', data),
+  getInviteByToken: (token: string) => api.get(`/mediations/invites/public/${token}`),
+  acceptInvite: (token: string) => api.post(`/mediations/invites/${token}/accept`),
+  declineInvite: (token: string) => api.post(`/mediations/invites/${token}/decline`),
+
+  // Mediator directory / profile
+  listMediators: () => api.get('/mediations/mediators'),
+  updateMediatorProfile: (data: {
+    isMediator: boolean
+    mediatorBio?: string
+    mediationFee?: number
+    mediationSpecializations?: string[]
+  }) => api.put('/mediations/me/mediator-profile', data),
+
+  // Mediation lifecycle
+  list: () => api.get('/mediations'),
+  getById: (id: string) => api.get(`/mediations/${id}`),
+  attachRespondentLawyer: (id: string, lawyerId: string) =>
+    api.post(`/mediations/${id}/respondent-lawyer`, { lawyerId }),
+  pickMediator: (id: string, mediatorId: string) =>
+    api.post(`/mediations/${id}/mediator-pick`, { mediatorId }),
+  getRoom: (id: string) => api.get(`/mediations/${id}/room`),
+  conclude: (id: string, data: { outcome: 'RESOLVED' | 'ESCALATED_TO_CASE'; settlementTerms?: string; closureNotes?: string }) =>
+    api.post(`/mediations/${id}/conclude`, data),
+}
+
 export const courtAdminApi = {
   login: (email: string, password: string) => api.post('/court-admin/login', { email, password }),
   getCourtsByPincode: (pincode: string) => api.get(`/court-admin/public/courts/by-pincode/${pincode}`),

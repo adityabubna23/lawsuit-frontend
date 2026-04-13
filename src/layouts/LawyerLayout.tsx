@@ -35,6 +35,7 @@ const LawyerLayout: FC = () => {
     { name: 'Dashboard', path: '/lawyer/dashboard' },
     { name: 'Appointments', path: '/lawyer/appointments' },
     { name: 'Cases', path: '/lawyer/cases' },
+    { name: 'Mediations', path: '/lawyer/mediations' },
     { name: 'Call History', path: '/lawyer/call-history' },
     { name: 'Agreement Templates', path: '/lawyer/agreement-templates' },
     { name: 'Calander', path: '/lawyer/under-development' },

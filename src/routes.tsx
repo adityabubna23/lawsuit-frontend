@@ -47,7 +47,15 @@ import LawyerProfilePage from './pages/lawyer/LawyerProfilePage'
 import LexRateTable from './components/organisms/LexRatesTable'
 import ViewCasePagesLawyer from './pages/lawyer/ViewCasePagesLawyer'
 import CaseDetailsLawyerPage from './pages/lawyer/CaseDetailsLawyerPage'
-import AgreementTemplatesPage from './pages/lawyer/AgreementTemplatesPage'// Court Admin Pages
+import AgreementTemplatesPage from './pages/lawyer/AgreementTemplatesPage'
+import LawyerMediatorSettingsPage from './pages/lawyer/LawyerMediatorSettingsPage'
+// Mediation Pages
+import MediationsPage from './pages/app/MediationsPage'
+import MediationDetailPage from './pages/app/MediationDetailPage'
+import NewMediationInvitePage from './pages/app/NewMediationInvitePage'
+import MediationRoomPage from './pages/app/MediationRoomPage'
+import MediationInviteAcceptPage from './pages/mediation/MediationInviteAcceptPage'
+// Court Admin Pages
 import CourtAdminLayout from './layouts/CourtAdminLayout'
 import CourtAdminLoginPage from './pages/auth/CourtAdminLoginPage'
 import CourtAdminDashboardPage from './pages/courtAdmin/CourtAdminDashboardPage'
@@ -82,6 +90,9 @@ const AppRoutes = () => {
       <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
       <Route path="/terms-of-service" element={<TermsOfServicePage />} />
 
+      {/* Mediation invite link (public; acts based on auth) */}
+      <Route path="/mediation/invite/:token" element={<MediationInviteAcceptPage />} />
+
       {/* Protected App Routes */}
       <Route
         path="/app"
@@ -114,6 +125,12 @@ const AppRoutes = () => {
         <Route path="legal-eagle" element={<AiChatPage />} />
         <Route path="consultation/:appointmentId" element={<VideoConsultationPage />} />
         <Route path="call-history" element={<CallHistoryPage />} />
+
+        {/* Mediation (client) */}
+        <Route path="mediations" element={<MediationsPage />} />
+        <Route path="mediation/new" element={<NewMediationInvitePage />} />
+        <Route path="mediation/:id" element={<MediationDetailPage />} />
+        <Route path="mediation/:id/room" element={<MediationRoomPage />} />
 
         <Route path="under-development" element={<UnderDevelopmentPlaceholder />} />
       </Route>
@@ -160,6 +177,10 @@ const AppRoutes = () => {
         <Route path="cases" element={<ViewCasePagesLawyer />} />
         <Route path="profile" element={<LawyerProfilePage />} />
         <Route path="agreement-templates" element={<AgreementTemplatesPage />} />
+        <Route path="mediator-settings" element={<LawyerMediatorSettingsPage />} />
+        <Route path="mediations" element={<MediationsPage />} />
+        <Route path="mediation/:id" element={<MediationDetailPage />} />
+        <Route path="mediation/:id/room" element={<MediationRoomPage />} />
         <Route path="consultation/:appointmentId" element={<VideoConsultationPage />} />
         <Route path="call-history" element={<CallHistoryPage />} />
 
