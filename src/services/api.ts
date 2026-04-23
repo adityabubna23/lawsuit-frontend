@@ -316,9 +316,21 @@ export const apiEndpoints = {
     getHearings: (caseid: string) => `${baseURL}/cases/hearings/${caseid}`,
     addDocument: (caseid: string) => `${baseURL}/cases/${caseid}/saveDocuments`,
     getDocuments: (caseid: string) => `${baseURL}/cases/${caseid}/documents`,
+    extractDocument: (caseid: string, documentId: string) => `${baseURL}/cases/${caseid}/documents/${documentId}/extract`,
+    summarizeDocument: (caseid: string, documentId: string) => `${baseURL}/cases/${caseid}/documents/${documentId}/summarize`,
+    askDocument: (caseid: string, documentId: string) => `${baseURL}/cases/${caseid}/documents/${documentId}/ask`,
     updateResolutionMethod: (caseid: string) => `${baseURL}/cases/${caseid}/resolution-method`,
     closeCase: (caseid: string) => `${baseURL}/cases/${caseid}/close`,
   }
+}
+
+export const documentAiApi = {
+  extract: (caseId: string, documentId: string) =>
+    api.post(`/cases/${caseId}/documents/${documentId}/extract`),
+  summarize: (caseId: string, documentId: string) =>
+    api.post(`/cases/${caseId}/documents/${documentId}/summarize`),
+  ask: (caseId: string, documentId: string, question: string) =>
+    api.post(`/cases/${caseId}/documents/${documentId}/ask`, { question }),
 }
 
 export const mediationApi = {
