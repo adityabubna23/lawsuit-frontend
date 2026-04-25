@@ -52,13 +52,18 @@ const MediationDetailPage: FC = () => {
     onSuccess: () => {
       setShowMediators(false)
       qc.invalidateQueries({ queryKey: ['mediation', id] })
+      qc.invalidateQueries({ queryKey: ['mediations'] })
     },
     onError: (e: any) => setError(e?.response?.data?.error || 'Failed to pick mediator'),
   })
 
   const attachLawyer = useMutation({
     mutationFn: (lawyerId: string) => mediationApi.attachRespondentLawyer(id, lawyerId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['mediation', id] }),
+    onSuccess: (_data, lawyerId) => {
+      qc.invalidateQueries({ queryKey: ['mediation', id] })
+      qc.invalidateQueries({ queryKey: ['mediations'] })
+      navigate(`/app/lawyers/${lawyerId}?mediationId=${id}`)
+    },
     onError: (e: any) => setError(e?.response?.data?.error || 'Failed to attach lawyer'),
   })
 
@@ -67,6 +72,7 @@ const MediationDetailPage: FC = () => {
     onSuccess: () => {
       setShowConclude(false)
       qc.invalidateQueries({ queryKey: ['mediation', id] })
+      qc.invalidateQueries({ queryKey: ['mediations'] })
     },
     onError: (e: any) => setError(e?.response?.data?.error || 'Failed to conclude'),
   })

@@ -35,9 +35,9 @@ const NotificationModal: FC<{ open: boolean; onClose: () => void }> = ({ open, o
 
   // Navigate based on notification type/data
   const handleNotificationClick = (n: Notification) => {
-    const { data, type } = n
-    if (type === 'NEW_MESSAGE' && data.chatId) {
-      navigate(`/app/chat/${data.chatId}`)
+    const { data } = n
+    if (data.link) {
+      navigate(data.link)
     } else if (data.appointmentId) {
       navigate(`/app/appointments`)
     } else if (data.caseId) {

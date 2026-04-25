@@ -1,5 +1,5 @@
 import { FC, useState, useEffect, useMemo } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { Lawyer } from '@/types'
 import Button from '@/components/atoms/Button'
@@ -44,6 +44,8 @@ const LawyerDetailPage: FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'wallet'>('razorpay')
   const [bookingError, setBookingError] = useState<string | null>(null)
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const mediationId = searchParams.get('mediationId') || undefined
 
   const walletBalance = useWalletStore((s) => s.balance)
   const fetchBalance = useWalletStore((s) => s.fetchBalance)
@@ -123,6 +125,7 @@ const LawyerDetailPage: FC = () => {
           durationMins: 30,
           meetingType: 'VIDEO_CALL',
           paymentMethod: 'wallet',
+          ...(mediationId ? { mediationId } : {}),
         })
         setPaymentSuccess(true)
 
@@ -159,6 +162,7 @@ const LawyerDetailPage: FC = () => {
           scheduledAt: datetimeIso,
           durationMins: 30,
           meetingType: 'VIDEO_CALL',
+          ...(mediationId ? { mediationId } : {}),
         })
 
         const payload = res.data || res

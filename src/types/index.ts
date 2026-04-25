@@ -124,6 +124,7 @@ export interface NotificationData {
   chatId?: string
   caseId?: string
   referenceId?: string
+  link?: string
 }
 
 export interface Notification {

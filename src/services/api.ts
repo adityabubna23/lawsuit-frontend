@@ -170,8 +170,8 @@ export const lawyersApi = {
 export const appointmentsApi = {
   create: (data: { lawyerId: string; datetime: string; paymentId?: string }) =>
     api.post('/appointments', data),
-  // Book endpoint: backend expects { lawyerId, scheduledAt, durationMins?, meetingType?, paymentMethod?, notes? }
-  book: (payload: { lawyerId: string; scheduledAt: string; durationMins?: number; meetingType?: string; paymentMethod?: string; notes?: string }) =>
+  // Book endpoint: backend expects { lawyerId, scheduledAt, durationMins?, meetingType?, paymentMethod?, notes?, mediationId? }
+  book: (payload: { lawyerId: string; scheduledAt: string; durationMins?: number; meetingType?: string; paymentMethod?: string; notes?: string; mediationId?: string }) =>
     api.post('/appointments/book', payload),
   // Confirm payment for an appointment
   confirmPayment: (appointmentId: string, body: { appointmentId: string; razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) =>

@@ -1,5 +1,6 @@
 import { io, Socket } from 'socket.io-client'
 import { useAuthStore } from '@/stores/authStore'
+import { queryClient } from '@/lib/queryClient'
 import type { Notification as AppNotification } from '@/types'
 import type {
   CallType,
@@ -165,6 +166,13 @@ class SocketService {
     // Listen for unread count updates
     this.socket.on('notification:unread-count', (data: { unreadCount: number }) => {
       this.unreadCountHandlers.forEach((handler) => handler(data))
+    })
+
+    // Listen for mediation lifecycle updates (invite-accepted, lawyer-attached,
+    // mediator-picked, in-session, concluded, etc.). One event covers all transitions.
+    this.socket.on('mediation:updated', (payload: { mediationId: string; status: string; matched?: boolean; escalatedCaseId?: string | null }) => {
+      queryClient.invalidateQueries({ queryKey: ['mediations'] })
+      queryClient.invalidateQueries({ queryKey: ['mediation', payload.mediationId] })
     })
 
     // ─────────────────────────────────────────────────────────────────────
