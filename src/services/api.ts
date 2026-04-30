@@ -170,8 +170,8 @@ export const lawyersApi = {
 export const appointmentsApi = {
   create: (data: { lawyerId: string; datetime: string; paymentId?: string }) =>
     api.post('/appointments', data),
-  // Book endpoint: backend expects { lawyerId, scheduledAt, durationMins?, meetingType?, paymentMethod?, notes? }
-  book: (payload: { lawyerId: string; scheduledAt: string; durationMins?: number; meetingType?: string; paymentMethod?: string; notes?: string }) =>
+  // Book endpoint: backend expects { lawyerId, scheduledAt, durationMins?, meetingType?, paymentMethod?, notes?, mediationId? }
+  book: (payload: { lawyerId: string; scheduledAt: string; durationMins?: number; meetingType?: string; paymentMethod?: string; notes?: string; mediationId?: string }) =>
     api.post('/appointments/book', payload),
   // Confirm payment for an appointment
   confirmPayment: (appointmentId: string, body: { appointmentId: string; razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) =>
@@ -316,9 +316,21 @@ export const apiEndpoints = {
     getHearings: (caseid: string) => `${baseURL}/cases/hearings/${caseid}`,
     addDocument: (caseid: string) => `${baseURL}/cases/${caseid}/saveDocuments`,
     getDocuments: (caseid: string) => `${baseURL}/cases/${caseid}/documents`,
+    extractDocument: (caseid: string, documentId: string) => `${baseURL}/cases/${caseid}/documents/${documentId}/extract`,
+    summarizeDocument: (caseid: string, documentId: string) => `${baseURL}/cases/${caseid}/documents/${documentId}/summarize`,
+    askDocument: (caseid: string, documentId: string) => `${baseURL}/cases/${caseid}/documents/${documentId}/ask`,
     updateResolutionMethod: (caseid: string) => `${baseURL}/cases/${caseid}/resolution-method`,
     closeCase: (caseid: string) => `${baseURL}/cases/${caseid}/close`,
   }
+}
+
+export const documentAiApi = {
+  extract: (caseId: string, documentId: string) =>
+    api.post(`/cases/${caseId}/documents/${documentId}/extract`),
+  summarize: (caseId: string, documentId: string) =>
+    api.post(`/cases/${caseId}/documents/${documentId}/summarize`),
+  ask: (caseId: string, documentId: string, question: string) =>
+    api.post(`/cases/${caseId}/documents/${documentId}/ask`, { question }),
 }
 
 export const mediationApi = {

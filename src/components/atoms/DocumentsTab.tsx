@@ -2,9 +2,10 @@ import { useState } from "react"
 import { AddDocumentSchema } from "@/schema/case.schema"
 import api, { apiEndpoints } from "@/services/api"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Plus, FileText, Image, File, Film, Music, X, Download, ExternalLink } from "lucide-react"
+import { Plus, FileText, Image, File, Film, Music, X, Download, ExternalLink, ShieldCheck, Sparkles, Lock } from "lucide-react"
 import UploadInput from "./UploadButton"
 import Modal from "./Modal"
+import DocumentAIPanel from "@/components/molecules/DocumentAIPanel"
 
 interface Document {
   id: string;
@@ -16,6 +17,10 @@ interface Document {
   url: string;
   version: number;
   uploadedAt: Date;
+  extractedText?: string | null;
+  extractionStatus?: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED" | null;
+  extractedAt?: Date | null;
+  summary?: string | null;
 }
 
 interface DocumentsQueryResponse {
@@ -129,8 +134,14 @@ const DocumentsTab = ({ caseId } : { caseId: string }) => {
   return (
     <div className="p-4">
       {/* Header with Upload Button */}
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-lg font-semibold text-gray-800">Documents</h3>
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-800">Documents</h3>
+          <p className="flex items-center gap-1.5 text-xs text-gray-500 mt-0.5">
+            <Lock className="w-3 h-3" />
+            Encrypted storage — protected under attorney–client privilege
+          </p>
+        </div>
         <button
           onClick={() => setIsUploadModalOpen(true)}
           className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
@@ -179,6 +190,23 @@ const DocumentsTab = ({ caseId } : { caseId: string }) => {
               <p className="text-xs text-gray-500 mt-1">
                 {formatFileSize(doc.size)}
               </p>
+              {/* Extraction badge */}
+              {doc.extractionStatus === "COMPLETED" && (
+                <span className="mt-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-green-50 text-green-700 border border-green-200">
+                  <Sparkles className="w-2.5 h-2.5" />
+                  AI ready
+                </span>
+              )}
+              {doc.extractionStatus === "PROCESSING" && (
+                <span className="mt-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                  Processing…
+                </span>
+              )}
+              {doc.extractionStatus === "FAILED" && (
+                <span className="mt-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-red-50 text-red-700 border border-red-200">
+                  Extract failed
+                </span>
+              )}
             </div>
           ))}
         </div>
@@ -203,9 +231,21 @@ const DocumentsTab = ({ caseId } : { caseId: string }) => {
           </div>
           
           {/* Modal Content */}
-          <div className="p-4">
-            <UploadInput 
-              imageUrl={imageUrl} 
+          <div className="p-4 space-y-4">
+            {/* Confidentiality notice */}
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
+              <ShieldCheck className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+              <div className="text-xs text-gray-700 leading-relaxed">
+                <p className="font-semibold text-gray-800 mb-0.5">Your documents are confidential</p>
+                <p>
+                  Files are transmitted over HTTPS, stored encrypted, and shared only with your assigned lawyer
+                  and authorised case members. Supported formats: PDF, DOCX, and common image types (JPG, PNG).
+                </p>
+              </div>
+            </div>
+
+            <UploadInput
+              imageUrl={imageUrl}
               setImageUrl={(url) => {
                 if (typeof url === 'function') {
                   setImageUrl(url);
@@ -217,9 +257,14 @@ const DocumentsTab = ({ caseId } : { caseId: string }) => {
                     setFileName(urlFileName);
                   }
                 }
-              }} 
-              width="full" 
+              }}
+              width="full"
             />
+
+            <p className="flex items-center gap-1.5 text-[11px] text-gray-500">
+              <Sparkles className="w-3 h-3 text-primary" />
+              After upload, you can extract text, generate a summary, or ask questions about the document.
+            </p>
           </div>
           
           {/* Modal Footer */}
@@ -288,53 +333,63 @@ const DocumentsTab = ({ caseId } : { caseId: string }) => {
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-auto p-4 bg-gray-50">
-              {getFilePreviewType(selectedDocument.mimeType) === 'image' && (
-                <div className="flex items-center justify-center min-h-[400px]">
-                  <img 
-                    src={selectedDocument.url} 
-                    alt={selectedDocument.filename} 
-                    className="max-w-full h-auto"
-                  />
-                </div>
-              )}
+            <div className="flex-1 overflow-auto bg-gray-50">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
+                {/* Preview */}
+                <div className="lg:col-span-2">
+                  {getFilePreviewType(selectedDocument.mimeType) === 'image' && (
+                    <div className="flex items-center justify-center min-h-[400px] bg-white rounded-lg border border-gray-200">
+                      <img
+                        src={selectedDocument.url}
+                        alt={selectedDocument.filename}
+                        className="max-w-full h-auto"
+                      />
+                    </div>
+                  )}
 
-              {getFilePreviewType(selectedDocument.mimeType) === 'pdf' && (
-                <iframe
-                  src={selectedDocument.url}
-                  className="w-full h-full min-h-[600px] bg-white"
-                  title={selectedDocument.filename}
-                />
-              )}
+                  {getFilePreviewType(selectedDocument.mimeType) === 'pdf' && (
+                    <iframe
+                      src={selectedDocument.url}
+                      className="w-full h-full min-h-[600px] bg-white rounded-lg border border-gray-200"
+                      title={selectedDocument.filename}
+                    />
+                  )}
 
-              {getFilePreviewType(selectedDocument.mimeType) === 'video' && (
-                <div className="flex items-center justify-center min-h-[400px]">
-                  <video 
-                    src={selectedDocument.url} 
-                    controls 
-                    className="max-w-full max-h-[70vh]"
-                  />
-                </div>
-              )}
+                  {getFilePreviewType(selectedDocument.mimeType) === 'video' && (
+                    <div className="flex items-center justify-center min-h-[400px] bg-white rounded-lg border border-gray-200">
+                      <video
+                        src={selectedDocument.url}
+                        controls
+                        className="max-w-full max-h-[70vh]"
+                      />
+                    </div>
+                  )}
 
-              {getFilePreviewType(selectedDocument.mimeType) === 'other' && (
-                <div className="bg-white p-8 border border-gray-200 rounded-lg">
-                  <div className="text-center py-12">
-                    {getFileIcon(selectedDocument.mimeType)}
-                    <p className="text-gray-500 mt-4 mb-4">
-                      This file type cannot be previewed directly.
-                    </p>
-                    <a
-                      href={selectedDocument.url}
-                      download={selectedDocument.filename}
-                      className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-                    >
-                      <Download className="w-4 h-4" />
-                      Download Document
-                    </a>
-                  </div>
+                  {getFilePreviewType(selectedDocument.mimeType) === 'other' && (
+                    <div className="bg-white p-8 border border-gray-200 rounded-lg">
+                      <div className="text-center py-12">
+                        {getFileIcon(selectedDocument.mimeType)}
+                        <p className="text-gray-500 mt-4 mb-4">
+                          This file type cannot be previewed directly.
+                        </p>
+                        <a
+                          href={selectedDocument.url}
+                          download={selectedDocument.filename}
+                          className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                        >
+                          <Download className="w-4 h-4" />
+                          Download Document
+                        </a>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+
+                {/* AI side panel */}
+                <div className="lg:col-span-1">
+                  <DocumentAIPanel caseId={caseId} document={selectedDocument} />
+                </div>
+              </div>
             </div>
 
             {/* Footer with file info */}
