@@ -38,10 +38,13 @@ const LoginPage: FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      await login(formData.email, formData.password)
-      // read user from store and route based on role
-      const user = useAuthStore.getState().user
-      const role = user?.role?.toString?.().toUpperCase?.()
+      // Use the user returned from login() — reading useAuthStore.getState().user
+      // here is racy: other stores (userStore.getUser via HomePage's mount,
+      // courtAdminStore init from shared storage) can call setState({ user })
+      // synchronously between the await and the navigate, dropping the role.
+      // The returned value is the canonical post-login user.
+      const loggedInUser = await login(formData.email, formData.password)
+      const role = loggedInUser?.role?.toString?.().toUpperCase?.()
       if (role === 'LAWYER') {
         navigate('/lawyer/dashboard', { replace: true })
       } else if (role === 'ADMIN') {

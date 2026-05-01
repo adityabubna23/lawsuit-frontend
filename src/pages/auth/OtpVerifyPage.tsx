@@ -69,14 +69,16 @@ const OtpVerifyPage: FC = () => {
     try {
       // if identifier isn't set (rare) let user continue if they filled an input
       const idToVerify = identifier
-      await verifyOtp(idToVerify, otpString)
-      const user = useAuthStore.getState().user?.role?.toString?.().toUpperCase?.()
-      if (user === 'LAWYER') {
+      const verifiedUser = await verifyOtp(idToVerify, otpString)
+      const role = verifiedUser?.role?.toString?.().toUpperCase?.()
+      if (role === 'LAWYER') {
         navigate('/lawyer/appointments', { replace: true })
-      } else if (user === 'ADMIN') {
+      } else if (role === 'ADMIN') {
         navigate('/admin/dashboard', { replace: true })
-      } else if (user === 'COURT_ADMIN') {
+      } else if (role === 'COURT_ADMIN') {
         navigate('/court-admin/dashboard', { replace: true })
+      } else if (role === 'ORGANIZATION') {
+        navigate('/organization/dashboard', { replace: true })
       } else {
         // default to client home
         navigate('/app/home', { replace: true })

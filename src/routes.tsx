@@ -78,6 +78,18 @@ import MyFirmRequestsPage from './pages/app/firms/MyFirmRequestsPage'
 
 
 
+// Resolve the user's role with a localStorage fallback. Other stores
+// (userStore, courtAdminStore) write to authStore.user via setState, so the
+// in-memory value can flip briefly during a render. Storage is the canonical
+// post-login source of truth until the next login/logout.
+import storage from '@/utils/storage'
+function useEffectiveRole(): string | undefined {
+  const stateUser = useAuthStore((s) => s.user) as any
+  if (stateUser?.role) return String(stateUser.role).toUpperCase()
+  const stored = storage.getUserData<any>()
+  return stored?.role ? String(stored.role).toUpperCase() : undefined
+}
+
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuthStore()
@@ -90,7 +102,10 @@ const CourtAdminProtectedRoute = ({ children }: { children: React.ReactNode }) =
 }
 
 const AppRoutes = () => {
-  const { user } = useAuthStore()
+  // Effective role with localStorage fallback. Use this for ALL role-based
+  // route guards/redirects so a transient null/wrong user state doesn't bounce
+  // an org user back to /app/home.
+  const role = useEffectiveRole()
 
   return (
     <Routes>
@@ -112,11 +127,11 @@ const AppRoutes = () => {
         path="/app"
         element={
           <ProtectedRoute>
-            {user?.role === 'LAWYER' ? (
+            {role === 'LAWYER' ? (
               <Navigate to="/lawyer/dashboard" replace />
-            ) : user?.role === 'ADMIN' ? (
+            ) : role === 'ADMIN' ? (
               <Navigate to="/admin/dashboard" replace />
-            ) : user?.role === 'ORGANIZATION' ? (
+            ) : role === 'ORGANIZATION' ? (
               <Navigate to="/organization/dashboard" replace />
             ) : (
               <AppLayout />
@@ -129,7 +144,7 @@ const AppRoutes = () => {
         <Route path="lawyers/:id" element={<LawyerDetailPage />} />
         <Route path="book/:lawyerId" element={<BookingPage />} />
         <Route path="appointments" element={
-          user?.role === 'LAWYER' ? <Navigate to="/lawyer/appointments" replace /> : <AppointmentsPage />
+          role === 'LAWYER' ? <Navigate to="/lawyer/appointments" replace /> : <AppointmentsPage />
         } />
         <Route path="wallet" element={<WalletPage />} />
         <Route path="withdraw" element={<WithdrawPage />} />
@@ -161,7 +176,7 @@ const AppRoutes = () => {
         path="/organization"
         element={
           <ProtectedRoute>
-            {user?.role === 'ORGANIZATION' ? (
+            {role === 'ORGANIZATION' ? (
               <OrganizationLayout />
             ) : (
               <Navigate to="/app/home" replace />
@@ -182,7 +197,7 @@ const AppRoutes = () => {
         path="/admin"
         element={
           <ProtectedRoute>
-            {user?.role === 'ADMIN' ? (
+            {role === 'ADMIN' ? (
               <AdminLayout />
             ) : (
               <Navigate to="/app/home" replace />
@@ -203,7 +218,7 @@ const AppRoutes = () => {
         path="/lawyer"
         element={
           <ProtectedRoute>
-            {user?.role === 'LAWYER' ? (
+            {role === 'LAWYER' ? (
               <LawyerLayout />
             ) : (
               <Navigate to="/app/home" replace />
