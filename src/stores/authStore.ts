@@ -41,9 +41,9 @@ interface AuthState {
   isLoading: boolean
   isAuthenticated: boolean
   error: string | null
-  login: (email: string, password: string) => Promise<void>
-  register: (data: { name: string; email: string; password: string; role: string; phone?: number | string; registrationNumber?: string; pincode?: string; courtDetails?: any }) => Promise<void>
-  verifyOtp: (identifier: string, code: string) => Promise<void>
+  login: (email: string, password: string) => Promise<User>
+  register: (data: { name: string; email: string; password: string; role: string; phone?: number | string; registrationNumber?: string; pincode?: string; courtDetails?: any }) => Promise<User>
+  verifyOtp: (identifier: string, code: string) => Promise<User>
   requestOtp: (identifier: string) => Promise<any>
   logout: () => void
   clearError: () => void
@@ -68,6 +68,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       if (accessToken) storage.setAuthToken(accessToken)
       if (refreshToken) storage.setRefreshToken(refreshToken)
       set({ user: enrichedUser, token: accessToken ?? null, isAuthenticated: !!accessToken })
+      return enrichedUser as User
     } catch (error: any) {
       set({ error: error.response?.data?.message || 'Login failed' })
       throw error
@@ -93,6 +94,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       if (accessToken) storage.setAuthToken(accessToken)
       if (refreshToken) storage.setRefreshToken(refreshToken)
       set({ user: enrichedUser, token: accessToken ?? null, isAuthenticated: !!accessToken })
+      return enrichedUser as User
     } catch (error: any) {
       set({ error: error.response?.data?.message || 'Registration failed' })
       throw error
@@ -112,6 +114,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       if (accessToken) storage.setAuthToken(accessToken)
       if (refreshToken) storage.setRefreshToken(refreshToken)
       set({ user: enrichedUser, token: accessToken ?? null, isAuthenticated: !!accessToken })
+      return enrichedUser as User
     } catch (error: any) {
       set({ error: error.response?.data?.message || 'OTP verification failed' })
       throw error
