@@ -10,7 +10,7 @@ import type { OrgAppointmentRequest } from '@/types'
  *
  * Backend contract:
  *  - When the org assigned the lawyer, the response was
- *      { request, payment: { id, providerOrderId, amount /* rupees */, currency }, paidVia: 'razorpay' }
+ *      { request, payment: { id, providerOrderId, amount (rupees), currency }, paidVia: 'razorpay' }
  *  - We open Razorpay checkout against payment.providerOrderId.
  *  - On success, we POST /appointments/confirm-payment WITHOUT an appointmentId — the backend
  *    resolves it via providerOrderId and creates the Appointment from the request's metadata.
