@@ -19,6 +19,11 @@ const typeIcons: Record<NotificationType, string> = {
   DOCUMENT_UPLOADED: '📄',
   VIDEO_CALL: '📹',
   TASK_ASSIGNED: '📌',
+  ORGANIZATION_VERIFIED: '🏛️',
+  ORGANIZATION_REJECTED: '⚠️',
+  ORG_APPOINTMENT_REQUEST_RECEIVED: '📥',
+  ORG_APPOINTMENT_REQUEST_ASSIGNED: '👤',
+  ORG_APPOINTMENT_REQUEST_REJECTED: '🚫',
 }
 
 function timeAgo(dateStr: string): string {
