@@ -1,6 +1,7 @@
 import { FC, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useCourtAdminStore } from '../stores/courtAdminStore';
+import ErrorBoundary from '../components/organisms/ErrorBoundary';
 
 const CourtAdminLayout: FC = () => {
     const [collapsed, setCollapsed] = useState(false);
@@ -28,6 +29,15 @@ const CourtAdminLayout: FC = () => {
             icon: (
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M3 21V8l9-5 9 5v13H3zm6-2h6v-7H9v7z" fill="currentColor" />
+                </svg>
+            )
+        },
+        {
+            to: '/court-admin/salary',
+            label: 'Salary',
+            icon: (
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M7 14l5-5 5 5H7z" fill="currentColor" transform="rotate(180 12 12)" />
                 </svg>
             )
         },
@@ -115,7 +125,9 @@ const CourtAdminLayout: FC = () => {
                 </header>
 
                 <main className="flex-1 overflow-auto bg-gray-50 p-6">
-                    <Outlet />
+                    <ErrorBoundary scope="court-admin page">
+                        <Outlet />
+                    </ErrorBoundary>
                 </main>
             </div>
         </div>

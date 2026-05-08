@@ -2,8 +2,10 @@ import { FC, useState, useEffect } from 'react'
 import NotificationModal from '../components/molecules/NotificationModal'
 import NotificationToast from '../components/atoms/NotificationToast'
 import VideoCallProvider from '../components/organisms/VideoCallProvider'
+import ErrorBoundary from '../components/organisms/ErrorBoundary'
 import { useNotificationStore } from '../stores/notificationStore'
 import { useNotificationSocket } from '../hooks/useNotificationSocket'
+import useFcmRegistration from '../hooks/useFcmRegistration'
 import useWalletStore from '../stores/walletStore'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
@@ -21,6 +23,7 @@ const AppLayout: FC = () => {
 
   // Boot socket connection + notification listeners
   useNotificationSocket()
+  useFcmRegistration()
 
   useEffect(() => {
     fetchBalance().catch(() => { })
@@ -49,6 +52,7 @@ const AppLayout: FC = () => {
     { name: 'Call History', path: '/app/call-history' },
     { name: 'Lex Rates', path: '/app/lex-rates' },
     { name: 'Tele Law', path: '/app/tele-law' },
+    { name: 'Legal Updates', path: '/app/legal-updates' },
     { name: 'Legal Eagle', path: '/app/legal-eagle' },
   ]
 
@@ -248,7 +252,9 @@ const AppLayout: FC = () => {
       </nav>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Outlet />
+        <ErrorBoundary scope="client page">
+          <Outlet />
+        </ErrorBoundary>
       </main>
       <NotificationModal open={showNotifications} onClose={() => setShowNotifications(false)} />
       <NotificationToast />

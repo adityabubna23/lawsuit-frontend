@@ -64,13 +64,24 @@ const UserMenu: FC<UserMenuProps> = ({ user, onLogout }) => {
               <div className="mt-6 border-t pt-4">
                 {user?.role === 'LAWYER' ? (
                   <>
-                    <Link to="/lawyer/profile" className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Your Profile</Link>
-                    <Link to="/lawyer/under-development" className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Settings</Link>
+                    <Link to="/lawyer/profile" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Your Profile</Link>
+                    <Link to="/lawyer/salary" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Salary Slip</Link>
+                    <Link to="/lawyer/subscription" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Pro Subscription</Link>
+                    <Link to="/lawyer/referral" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Refer & Earn</Link>
+                    <Link to="/lawyer/bank-accounts" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Bank Accounts</Link>
+                    <Link to="/lawyer/payments" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Payment History</Link>
+                    <Link to="/lawyer/legal-updates" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Legal Updates</Link>
+                    <Link to="/lawyer/report-issue" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Report an Issue</Link>
                   </>
                 ) : (
                   <>
-                    <Link to="/app/profile" className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Your Profile</Link>
-                    <Link to="/app/under-development" className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Settings</Link>
+                    <Link to="/app/profile" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Your Profile</Link>
+                    <Link to="/app/referral" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Refer & Earn</Link>
+                    <Link to="/app/bank-accounts" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Bank Accounts</Link>
+                    <Link to="/app/subscription" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Subscription</Link>
+                    <Link to="/app/payments" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Payment History</Link>
+                    <Link to="/app/legal-updates" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Legal Updates</Link>
+                    <Link to="/app/report-issue" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Report an Issue</Link>
                   </>
                 )}
               </div>

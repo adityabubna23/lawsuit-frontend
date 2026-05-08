@@ -1,7 +1,18 @@
 import { FC, useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import useWalletStore from '@/stores/walletStore'
-import { ArrowLeft, Building2, AlertCircle, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Building2, AlertCircle, CheckCircle, Smartphone, Plus } from 'lucide-react'
+import { bankAccountApi } from '@/services/api'
+
+interface BankAccount {
+  id: string
+  type: 'BANK' | 'UPI'
+  bankName?: string | null
+  accountNumber?: string | null
+  upiId?: string | null
+  label?: string | null
+  isDefault: boolean
+}
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
@@ -11,10 +22,27 @@ const WithdrawPage: FC = () => {
   const { balance, loading, fetchBalance, withdraw } = useWalletStore()
   const [amount, setAmount] = useState('')
   const [bankAccountId, setBankAccountId] = useState('')
+  const [accounts, setAccounts] = useState<BankAccount[]>([])
+  const [accountsLoading, setAccountsLoading] = useState(true)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
   useEffect(() => {
     fetchBalance()
+    const loadAccounts = async () => {
+      try {
+        const res = await bankAccountApi.list()
+        const data = (res.data?.data ?? res.data ?? []) as BankAccount[]
+        const list = Array.isArray(data) ? data : []
+        setAccounts(list)
+        const def = list.find((a) => a.isDefault)
+        if (def) setBankAccountId(def.id)
+      } catch {
+        /* ignore */
+      } finally {
+        setAccountsLoading(false)
+      }
+    }
+    loadAccounts()
   }, [])
 
   const showToast = (msg: string, type: 'success' | 'error') => {
@@ -106,17 +134,55 @@ const WithdrawPage: FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Bank Account ID <span className="text-gray-400">(optional)</span>
-            </label>
-            <input
-              type="text"
-              value={bankAccountId}
-              onChange={(e) => setBankAccountId(e.target.value)}
-              placeholder="Enter bank account ID"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-            />
-            <p className="mt-1.5 text-xs text-gray-400">If not provided, funds will be sent to your default bank account.</p>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-sm font-medium text-gray-700">Withdraw to</label>
+              <Link to="/app/bank-accounts" className="text-xs text-primary hover:underline inline-flex items-center gap-1">
+                <Plus className="w-3 h-3" /> Manage accounts
+              </Link>
+            </div>
+            {accountsLoading ? (
+              <div className="text-xs text-gray-400">Loading accounts…</div>
+            ) : accounts.length === 0 ? (
+              <Link
+                to="/app/bank-accounts"
+                className="block w-full px-4 py-3 border border-dashed border-gray-300 rounded-xl text-sm text-gray-500 hover:border-primary hover:text-primary text-center transition-colors"
+              >
+                No accounts yet — add one to withdraw
+              </Link>
+            ) : (
+              <div className="space-y-2">
+                {accounts.map((acc) => (
+                  <button
+                    key={acc.id}
+                    type="button"
+                    onClick={() => setBankAccountId(acc.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors ${bankAccountId === acc.id
+                      ? 'border-primary bg-primary/5'
+                      : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                  >
+                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                      {acc.type === 'BANK' ? <Building2 className="w-4 h-4" /> : <Smartphone className="w-4 h-4" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-gray-900 truncate">
+                        {acc.label || (acc.type === 'BANK' ? acc.bankName : 'UPI')}
+                      </div>
+                      <div className="text-xs text-gray-500 truncate">
+                        {acc.type === 'BANK'
+                          ? `••••${(acc.accountNumber || '').slice(-4)}`
+                          : acc.upiId}
+                      </div>
+                    </div>
+                    {acc.isDefault && (
+                      <span className="text-[10px] uppercase tracking-wider text-green-700 bg-green-50 px-1.5 py-0.5 rounded">
+                        Default
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

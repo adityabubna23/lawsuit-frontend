@@ -8,6 +8,7 @@ import { useUserStore } from '@/stores/userStore'
 import { usersApi } from '@/services/api'
 import Button from '@/components/atoms/Button'
 import LawyerInfo from '@/components/molecules/LawyerInfo'
+import DangerZone from '@/components/molecules/DangerZone'
 import LawyerVerificationSection from '@/components/organisms/LawyerVerificationSection'
 
 const LawyerProfilePage: FC = () => {
@@ -276,6 +277,10 @@ const LawyerProfilePage: FC = () => {
 
             <div className="mt-12">
               <LawyerVerificationSection />
+            </div>
+
+            <div className="mt-12">
+              <DangerZone />
             </div>
           </div>
         </div>

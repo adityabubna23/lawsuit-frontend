@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { usersApi } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
+import AddressPicker from '@/components/molecules/AddressPicker'
 import {
   Briefcase,
   GraduationCap,
@@ -691,48 +692,55 @@ const LawyerInfo: React.FC = () => {
             <MapPin className="w-5 h-5 text-primary" />
             <h4 className="text-base font-semibold text-midnight">Location</h4>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <label className={labelClasses}>City</label>
-              <input
-                disabled={!editing}
-                value={form.city || ''}
-                onChange={(e) => onChange('city', e.target.value)}
-                className={inputClasses}
-                placeholder="e.g. Mumbai"
+          {editing ? (
+            <div className="space-y-4">
+              <AddressPicker
+                value={{
+                  state: form.state,
+                  district: (form as any).district,
+                  city: form.city,
+                  pincode: form.pincode,
+                }}
+                onChange={(next) => {
+                  setForm((s) => ({
+                    ...s,
+                    state: next.state,
+                    city: next.city,
+                    pincode: next.pincode,
+                    ...(next.district !== undefined ? { district: next.district } : {}),
+                  } as any))
+                }}
               />
+              <div>
+                <label className={labelClasses}>Address</label>
+                <input
+                  value={form.address || ''}
+                  onChange={(e) => onChange('address', e.target.value)}
+                  className={inputClasses}
+                  placeholder="Enter your office address"
+                />
+              </div>
             </div>
-            <div>
-              <label className={labelClasses}>State</label>
-              <input
-                disabled={!editing}
-                value={form.state || ''}
-                onChange={(e) => onChange('state', e.target.value)}
-                className={inputClasses}
-                placeholder="e.g. Maharashtra"
-              />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div>
+                <label className={labelClasses}>City</label>
+                <input disabled value={form.city || ''} className={inputClasses} />
+              </div>
+              <div>
+                <label className={labelClasses}>State</label>
+                <input disabled value={form.state || ''} className={inputClasses} />
+              </div>
+              <div>
+                <label className={labelClasses}>Pincode</label>
+                <input disabled value={form.pincode || ''} className={inputClasses} />
+              </div>
+              <div>
+                <label className={labelClasses}>Address</label>
+                <input disabled value={form.address || ''} className={inputClasses} />
+              </div>
             </div>
-            <div>
-              <label className={labelClasses}>Pincode</label>
-              <input
-                disabled={!editing}
-                value={form.pincode || ''}
-                onChange={(e) => onChange('pincode', e.target.value)}
-                className={inputClasses}
-                placeholder="e.g. 400001"
-              />
-            </div>
-            <div>
-              <label className={labelClasses}>Address</label>
-              <input
-                disabled={!editing}
-                value={form.address || ''}
-                onChange={(e) => onChange('address', e.target.value)}
-                className={inputClasses}
-                placeholder="Enter your office address"
-              />
-            </div>
-          </div>
+          )}
         </section>
       </form>
     </div>

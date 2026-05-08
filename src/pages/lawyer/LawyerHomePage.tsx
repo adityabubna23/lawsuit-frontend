@@ -9,6 +9,7 @@ import {
 import { appointmentsApi, casesApi, walletApi } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
 import { useUserStore } from '@/stores/userStore'
+import AppointmentDashboardStats from '@/components/molecules/AppointmentDashboardStats'
 import { format, isToday, parseISO } from 'date-fns'
 
 // ── helpers ─────────────────────────────────────────────────────────────────
@@ -165,6 +166,8 @@ const LawyerHomePage: FC = () => {
 
       {/* ── Main Content ── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+        {/* Server-driven performance overview (lawyer dashboard endpoint). */}
+        <AppointmentDashboardStats role="lawyer" />
 
         {/* Error banner */}
         {error && (

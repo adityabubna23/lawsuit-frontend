@@ -2,20 +2,13 @@ import axios from 'axios'
 import { useAuthStore } from '@/stores/authStore'
 import storage from '@/utils/storage'
 import { UpdateAgreementUrlInput } from '@/schema/appointment.schema'
+import { normalizeApiBase } from '@/utils/apiUrl'
 
-// Create axios instance with default config
-// Compute base URL from VITE_API_URL. If the env value is a host (e.g. http://localhost:3000)
-// append `/api/v1`. If the env already contains `/api` or `/api/v1` we use it as-is.
-const _envUrl = (import.meta.env.VITE_API_URL as string) || ''
-let baseURL = '/api/v1'
-if (_envUrl && _envUrl.length > 0) {
-  const normalized = _envUrl.replace(/\/+$/g, '') // remove trailing slash(es)
-  if (/\/api(\/v1)?$/.test(normalized)) {
-    baseURL = normalized
-  } else {
-    baseURL = `${normalized}/api/v1`
-  }
-}
+// Compute base URL from VITE_API_URL. Accepts naked hosts (`api.nyayax.com`)
+// as well as full URLs (`http://localhost:4000/api/v1`) — see normalizeApiBase
+// for the full normalisation rules. Falls back to a same-origin `/api/v1`
+// when the env var is empty.
+const baseURL = normalizeApiBase(import.meta.env.VITE_API_URL as string) || '/api/v1'
 
 const api = axios.create({
   baseURL,
@@ -165,6 +158,21 @@ export const lawyersApi = {
   }) => api.get('/lawyers', { params }),
   getById: (id: string) => api.get(`/lawyers/${id}`),
   getProfile: (id: string) => api.get(`/lawyers/${id}/profile`),
+  /**
+   * Returns Cloudinary signed-upload params (timestamp, signature, cloudName,
+   * apiKey, folder='lawyer-applications') for direct client → Cloudinary upload
+   * of license / bar council proof during onboarding.
+   */
+  apply: (payload?: {
+    userId?: string
+    name?: string
+    email?: string
+    phone?: string
+    licenseNumber?: string
+    fileName?: string
+    fileType?: string
+  }) => api.post('/lawyers/apply', payload || {}),
+  update: (id: string, payload: any) => api.put(`/lawyers/${id}`, payload),
 }
 
 export const appointmentsApi = {
@@ -210,6 +218,7 @@ export const casesApi = {
 export const usersApi = {
   getMe: () => api.get('/users/me'),
   updateMe: (payload: { name?: string; phone?: string; avatarUrl?: string }) => api.put('/users/me', payload),
+  deleteMe: () => api.delete('/users/me'),
   getPresignedUrl: (userId: string, params?: { fileName?: string; mimeType?: string; size?: number }) =>
     api.get(`/cases/${userId}/getpresignedUrl`, { params }),
   // Cloudinary signed upload: returns { timestamp, signature, cloudName, apiKey, folder }
@@ -276,10 +285,250 @@ export const agreementTemplatesApi = {
 }
 
 export const adminApi = {
+  // Existing
   getNotVerifiedClients: () => api.get('/admin/not-verified-client'),
   getNotVerifiedLawyers: () => api.get('/admin/not-verified-lawyers'),
   verifyClient: (id: string) => api.put(`/admin/${id}/verifyclient`),
   verifyLawyer: (id: string) => api.put(`/admin/${id}/verifylawyer`),
+
+  // Dashboard
+  getDashboard: () => api.get('/admin/dashboard'),
+
+  // User browsing (USERS permission)
+  getAllUsers: (params?: { role?: string; q?: string; page?: number; limit?: number }) =>
+    api.get('/admin/users', { params }),
+  getUserById: (id: string) => api.get(`/admin/users/${id}`),
+  toggleUserVerification: (id: string, payload: { isVerified: boolean; reason?: string }) =>
+    api.put(`/admin/users/${id}/verification`, payload),
+
+  // Admin team management (SUPER_ADMIN)
+  listAdmins: (params?: { page?: number; limit?: number; q?: string }) =>
+    api.get('/admin/admins', { params }),
+  createAdmin: (payload: { name: string; email: string; phone: string; password: string; level?: 'SUPER_ADMIN' | 'ADMIN'; permissions?: string[] }) =>
+    api.post('/admin/admins', payload),
+  getAdmin: (id: string) => api.get(`/admin/admins/${id}`),
+  updateAdmin: (id: string, payload: any) => api.put(`/admin/admins/${id}`, payload),
+  deleteAdmin: (id: string) => api.delete(`/admin/admins/${id}`),
+
+  // Payouts (SUPER_ADMIN)
+  listPayouts: (params?: { status?: string; page?: number; limit?: number }) =>
+    api.get('/admin/payouts', { params }),
+  getPayoutSummary: () => api.get('/admin/payouts/summary'),
+  getEscrowLedger: (params?: { page?: number; limit?: number }) =>
+    api.get('/admin/payouts/escrow-ledger', { params }),
+  listPayoutHistory: (params?: { page?: number; limit?: number }) =>
+    api.get('/admin/payouts/history', { params }),
+  reconcileLedger: () => api.get('/admin/payouts/reconcile'),
+  disbursePayout: (id: string) => api.post(`/admin/payouts/${id}/disburse`),
+  refundPayout: (id: string, reason?: string) => api.post(`/admin/payouts/${id}/refund`, { reason }),
+  openDispute: (id: string, reason?: string) => api.post(`/admin/payouts/${id}/dispute`, { reason }),
+  resolveDispute: (id: string, payload: { resolution: 'REFUND' | 'RELEASE'; notes?: string }) =>
+    api.post(`/admin/payouts/${id}/dispute/resolve`, payload),
+
+  // Court admin authorization (SUPER_ADMIN)
+  listPendingCourtAdmins: () => api.get('/admin/court-admins/pending'),
+  getCourtAdminDetail: (id: string) => api.get(`/admin/court-admins/${id}`),
+  approveCourtAdmin: (id: string, remarks?: string) =>
+    api.post(`/admin/court-admins/${id}/approve`, { remarks }),
+  rejectCourtAdmin: (id: string, reason: string) =>
+    api.post(`/admin/court-admins/${id}/reject`, { reason }),
+
+  // KYC override (SUPER_ADMIN)
+  overrideLawyerKyc: (id: string, payload: { isVerified: boolean; reason: string }) =>
+    api.post(`/admin/lawyers/${id}/kyc-override`, payload),
+  overrideOrgKyc: (id: string, payload: { isVerified: boolean; reason: string }) =>
+    api.post(`/admin/organizations/${id}/kyc-override`, payload),
+
+  // User control (SUPER_ADMIN)
+  banUser: (role: string, id: string, reason: string) =>
+    api.post(`/admin/users/${role}/${id}/ban`, { reason }),
+  unbanUser: (role: string, id: string) =>
+    api.post(`/admin/users/${role}/${id}/unban`),
+  softDeleteUser: (role: string, id: string, reason?: string) =>
+    api.post(`/admin/users/${role}/${id}/soft-delete`, { reason }),
+  forcePasswordReset: (role: string, id: string) =>
+    api.post(`/admin/users/${role}/${id}/force-password-reset`),
+
+  // Platform config (SUPER_ADMIN)
+  listConfig: () => api.get('/admin/config'),
+  upsertConfig: (key: string, value: any) => api.put(`/admin/config/${key}`, { value }),
+
+  // Audit log (SUPER_ADMIN)
+  getAuditLog: (params?: { page?: number; limit?: number; actorId?: string; action?: string }) =>
+    api.get('/admin/audit-log', { params }),
+
+  // Reports moderation (REPORTS permission)
+  listReports: (params?: { status?: string; q?: string; page?: number; limit?: number }) =>
+    api.get('/admin/reports', { params }),
+  updateReportStatus: (id: string, status: 'OPEN' | 'IN_REVIEW' | 'RESOLVED') =>
+    api.patch(`/admin/reports/${id}`, { status }),
+
+  // Legal updates publishing (LEGAL_UPDATES permission)
+  createLegalUpdate: (payload: { title: string; content: string; category: string; publishedAt?: string }) =>
+    api.post('/admin/legal-updates', payload),
+  updateLegalUpdate: (id: string, payload: any) =>
+    api.put(`/admin/legal-updates/${id}`, payload),
+  deleteLegalUpdate: (id: string) => api.delete(`/admin/legal-updates/${id}`),
+
+  // Announcements (SUPER_ADMIN)
+  broadcast: (payload: { title: string; message: string; roles?: string[] }) =>
+    api.post('/admin/announcements', payload),
+
+  // Legacy financial monitoring
+  getAllPayments: (params?: { page?: number; limit?: number }) =>
+    api.get('/admin/payments', { params }),
+  getAllWallets: (params?: { page?: number; limit?: number }) =>
+    api.get('/admin/wallets', { params }),
+  getWithdrawals: (params?: { page?: number; limit?: number }) =>
+    api.get('/admin/wallets/withdrawals', { params }),
+  reverseWithdrawal: (id: string) =>
+    api.put(`/admin/wallets/withdrawals/${id}/reverse`),
+}
+
+// ── Admin Court Admin salary (separate routes from entity salary) ──────
+export const adminCourtAdminSalaryApi = {
+  // Cycle queues
+  listPayable: () => api.get('/admin/salary-cycles/current'),
+  // History across all court admins
+  cyclesHistory: (params?: { page?: number; limit?: number }) =>
+    api.get('/admin/salary-cycles/history', { params }),
+  // Per-court-admin
+  getConfig: (id: string) => api.get(`/admin/court-admins/${id}/salary`),
+  setBaseSalary: (id: string, payload: { baseSalary?: number; notes?: string }) =>
+    api.put(`/admin/court-admins/${id}/salary`, payload),
+  hold: (id: string, reason: string) =>
+    api.post(`/admin/court-admins/${id}/salary/hold`, { reason }),
+  release: (id: string, notes?: string) =>
+    api.post(`/admin/court-admins/${id}/salary/release`, { notes }),
+  pay: (id: string, payload?: { notes?: string }) =>
+    api.post(`/admin/court-admins/${id}/salary/pay`, payload || {}),
+  history: (id: string) => api.get(`/admin/court-admins/${id}/salary/history`),
+  performance: (id: string) => api.get(`/admin/court-admins/${id}/performance`),
+}
+
+// ── Admin entity salary management (LAWYER + ORGANIZATION) ────────────
+// Server mounts the same handlers under /admin/lawyers/:id/salary/*
+// and /admin/organizations/:id/salary/* via mountEntitySalaryRoutes().
+type SalarySubject = 'lawyers' | 'organizations'
+
+export const adminSalaryApi = {
+  // Cycle-level queues (no :id)
+  listPayableLawyers: () => api.get('/admin/lawyer-salary-cycles/current'),
+  listPayableOrganizations: () => api.get('/admin/org-salary-cycles/current'),
+
+  // Per-entity config + lifecycle
+  getConfig: (subject: SalarySubject, id: string) =>
+    api.get(`/admin/${subject}/${id}/salary`),
+  setConfig: (subject: SalarySubject, id: string, payload: { baseSalary?: number; bonusPct?: number; notes?: string }) =>
+    api.put(`/admin/${subject}/${id}/salary`, payload),
+  hold: (subject: SalarySubject, id: string, reason: string) =>
+    api.post(`/admin/${subject}/${id}/salary/hold`, { reason }),
+  release: (subject: SalarySubject, id: string, notes?: string) =>
+    api.post(`/admin/${subject}/${id}/salary/release`, { notes }),
+  preview: (subject: SalarySubject, id: string) =>
+    api.get(`/admin/${subject}/${id}/salary/preview`),
+  pay: (subject: SalarySubject, id: string, payload?: { notes?: string }) =>
+    api.post(`/admin/${subject}/${id}/salary/pay`, payload || {}),
+  adjustmentHistory: (subject: SalarySubject, id: string) =>
+    api.get(`/admin/${subject}/${id}/salary/history`),
+  payoutHistory: (subject: SalarySubject, id: string) =>
+    api.get(`/admin/${subject}/${id}/salary/payouts`),
+  getBankAccounts: (subject: SalarySubject, id: string) =>
+    api.get(`/admin/${subject}/${id}/bank-accounts`),
+}
+
+// ── Admin court CRUD + court-admin team mgmt (mounted under /court-admin) ──
+export const adminCourtApi = {
+  // Court CRUD
+  createCourt: (payload: any) => api.post('/court-admin/courts', payload),
+  listCourts: (params?: { page?: number; limit?: number; q?: string }) =>
+    api.get('/court-admin/courts', { params }),
+  getCourt: (id: string) => api.get(`/court-admin/courts/${id}`),
+  updateCourt: (id: string, payload: any) => api.put(`/court-admin/courts/${id}`, payload),
+  deleteCourt: (id: string) => api.delete(`/court-admin/courts/${id}`),
+
+  // Court Admin team
+  createCourtAdmin: (payload: any) => api.post('/court-admin/admins', payload),
+  listCourtAdmins: (params?: { page?: number; limit?: number; q?: string }) =>
+    api.get('/court-admin/admins', { params }),
+  getCourtAdmin: (id: string) => api.get(`/court-admin/admins/${id}`),
+  toggleCourtAdminStatus: (id: string, status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED') =>
+    api.put(`/court-admin/admins/${id}/status`, { status }),
+}
+
+// ── Lawyer salary (LAWYER self) ────────────────────────────────────────
+export const lawyerSalaryApi = {
+  getMine: () => api.get('/lawyers/me/salary'),
+  apply: (payload: any) => api.post('/lawyers/apply', payload),
+  update: (id: string, payload: any) => api.put(`/lawyers/${id}`, payload),
+}
+
+// ── Court Admin extensions ─────────────────────────────────────────────
+export const courtAdminExtApi = {
+  selfRegister: (payload: any) => api.post('/court-admin/register', payload),
+  getMyAuthorization: () => api.get('/court-admin/me/authorization'),
+  reapply: (payload?: { remarks?: string }) =>
+    api.post('/court-admin/me/reapply', payload || {}),
+  getMySalary: () => api.get('/court-admin/me/salary'),
+}
+
+// ── Document AI (case-scoped) ──────────────────────────────────────────
+// `documentAiApi` already exists above with extract/summarize/ask.
+
+// ── Address ────────────────────────────────────────────────────────────
+export const addressApi = {
+  getStates: () => api.get('/address/states'),
+  getDistricts: (state: string) => api.get(`/address/districts/${encodeURIComponent(state)}`),
+  getPincode: (pincode: string) => api.get(`/address/pincode/${pincode}`),
+}
+
+// ── FCM Tokens (push notifications) ────────────────────────────────────
+export const fcmApi = {
+  register: (token: string, deviceId?: string) =>
+    api.post('/users/fcm-token', { token, deviceId }),
+  remove: (token: string) =>
+    api.delete('/users/fcm-token', { data: { token } }),
+}
+
+// ── Payments — refund ──────────────────────────────────────────────────
+export const paymentsApi = {
+  list: (params?: { page?: number; limit?: number }) =>
+    api.get('/payments', { params }),
+  getById: (id: string) => api.get(`/payments/${id}`),
+  requestRefund: (id: string, reason?: string) =>
+    api.post(`/payments/${id}/refund`, { reason }),
+}
+
+// ── Appointments — lifecycle actions, dashboards ───────────────────────
+export const appointmentsExtApi = {
+  accept: (id: string) => api.post(`/appointments/${id}/accept`),
+  reject: (id: string, reason?: string) =>
+    api.post(`/appointments/${id}/reject`, { reason }),
+  complete: (id: string) => api.post(`/appointments/${id}/complete`),
+  lawyerDashboard: () => api.get('/appointments/dashboard/lawyer'),
+  clientDashboard: () => api.get('/appointments/dashboard/client'),
+  getById: (id: string) => api.get(`/appointments/${id}`),
+}
+
+// ── Cases — tasks, hearings, timeline ──────────────────────────────────
+export const casesExtApi = {
+  // Tasks
+  listTasks: (caseId: string) => api.get(`/cases/${caseId}/tasks`),
+  createTask: (caseId: string, payload: { title: string; description?: string; assigneeRole?: 'CLIENT' | 'LAWYER'; dueDate?: string }) =>
+    api.post(`/cases/${caseId}/tasks`, payload),
+  updateTask: (taskId: string, payload: { status?: string; title?: string; description?: string; dueDate?: string }) =>
+    api.put(`/cases/tasks/${taskId}`, payload),
+  // Timeline
+  addTimeline: (caseId: string, payload: { event: string; description?: string; timestamp?: string }) =>
+    api.post(`/cases/${caseId}/timeline`, payload),
+  // Hearings
+  addHearing: (caseId: string, payload: { date: string; court?: string; judge?: string; purpose?: string; outcome?: string; notes?: string }) =>
+    api.post(`/cases/${caseId}/hearings`, payload),
+  // Resolution & closure
+  updateResolutionMethod: (caseId: string, method: 'TRIAL' | 'MEDIATION' | 'ARBITRATION') =>
+    api.put(`/cases/${caseId}/resolution-method`, { resolutionMethod: method }),
+  closeCase: (caseId: string, payload: { settlementAmount?: number; settlementTerms?: string; closureNotes?: string; status?: string }) =>
+    api.post(`/cases/${caseId}/close`, payload),
 }
 
 export const videoApi = {
@@ -296,6 +545,75 @@ export const teleLawApi = {
   getSchemeInfo: () => api.get('/tele-law/info'),
   checkEligibility: (data: { income?: number; caste?: string; gender?: string; state?: string; useProfile?: boolean }) =>
     api.post('/tele-law/check-eligibility', data),
+}
+
+// ── Referral ───────────────────────────────────────────────────────────
+export const referralApi = {
+  getCode: () => api.get('/referral/code'),
+  apply: (code: string) => api.post('/referral/apply', { code }),
+  getInfo: () => api.get('/referral/info'),
+}
+
+// ── Subscription ───────────────────────────────────────────────────────
+export const subscriptionApi = {
+  get: () => api.get('/subscription'),
+  subscribe: () => api.post('/subscription/subscribe'),
+  confirm: (payload: {
+    paymentId: string
+    razorpay_order_id: string
+    razorpay_payment_id: string
+    razorpay_signature: string
+  }) => api.post('/subscription/confirm', payload),
+  subscribeFromWallet: () => api.post('/subscription/subscribe-wallet'),
+  cancel: () => api.post('/subscription/cancel'),
+}
+
+// ── Bank Accounts ──────────────────────────────────────────────────────
+export interface BankAccountPayload {
+  type: 'BANK' | 'UPI'
+  accountHolderName?: string
+  accountNumber?: string
+  ifscCode?: string
+  bankName?: string
+  upiId?: string
+  label?: string
+  isDefault?: boolean
+}
+
+export const bankAccountApi = {
+  list: () => api.get('/bank-accounts'),
+  getById: (id: string) => api.get(`/bank-accounts/${id}`),
+  create: (data: BankAccountPayload) => api.post('/bank-accounts', data),
+  update: (id: string, data: Partial<BankAccountPayload>) =>
+    api.put(`/bank-accounts/${id}`, data),
+  delete: (id: string) => api.delete(`/bank-accounts/${id}`),
+  verifyUpi: (upiId: string) => api.post('/bank-accounts/verify-upi', { upiId }),
+  ifscLookup: (code: string) => api.get(`/bank-accounts/ifsc/${code}`),
+}
+
+// ── Reports / Issue Tracking ───────────────────────────────────────────
+export const reportApi = {
+  create: (payload: { title: string; description: string; screenshotUrl?: string }) =>
+    api.post('/report', payload),
+  list: () => api.get('/report'),
+}
+
+// ── Legal Updates ──────────────────────────────────────────────────────
+export const legalUpdatesApi = {
+  list: (params?: { category?: string; search?: string }) =>
+    api.get('/legal-updates', { params }),
+}
+
+// ── Reviews ────────────────────────────────────────────────────────────
+export const reviewsApi = {
+  list: (lawyerId: string, params?: { page?: number; limit?: number }) =>
+    api.get(`/lawyers/${lawyerId}/reviews`, { params }),
+  create: (lawyerId: string, payload: { rating: number; comment?: string; appointmentId?: string }) =>
+    api.post(`/lawyers/${lawyerId}/reviews`, payload),
+  getEligibility: (lawyerId: string, appointmentId?: string) =>
+    api.get(`/lawyers/${lawyerId}/review-eligibility`, {
+      params: appointmentId ? { appointmentId } : undefined,
+    }),
 }
 
 export const apiEndpoints = {

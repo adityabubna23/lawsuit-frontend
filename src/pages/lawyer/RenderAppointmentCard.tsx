@@ -1,6 +1,7 @@
 import { FC, useState } from 'react'
-import { Calendar, Clock, FileText, MessageSquare, User, Video, Upload, RefreshCw, XCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { Calendar, Clock, FileText, MessageSquare, User, Video, Upload, RefreshCw, XCircle, ChevronDown, ChevronUp, Check, X, CheckCircle2 } from 'lucide-react'
 import AppointmentDiscussionPanel from '@/components/organisms/AppointmentDiscussionPanel'
+import { appointmentsExtApi } from '@/services/api'
 
 interface AppointmentData {
   scheduledAt: string;
@@ -50,6 +51,8 @@ interface RenderAppointmentCardProps {
   onOpenCaseCreation: (appointment: AppointmentData) => void;
   onReschedule?: (appointment: AppointmentData) => void;
   onCancel?: (appointment: AppointmentData) => void;
+  /** Called after a lifecycle change so parent can refresh. */
+  onChanged?: () => void;
 }
 
 const formatDate = (dateString: string) => {
@@ -94,10 +97,56 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
   onOpenChat,
   onOpenCaseCreation,
   onReschedule,
-  onCancel
+  onCancel,
+  onChanged,
 }) => {
   const [discussionOpen, setDiscussionOpen] = useState(false)
+  const [busyAction, setBusyAction] = useState<null | 'accept' | 'reject' | 'complete'>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const otherParty = appointment.client
+
+  const handleAccept = async () => {
+    if (!confirm('Accept this consultation?')) return
+    setBusyAction('accept')
+    setActionError(null)
+    try {
+      await appointmentsExtApi.accept(appointment.id)
+      onChanged?.()
+    } catch (err: any) {
+      setActionError(err?.response?.data?.error || 'Failed to accept')
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const handleReject = async () => {
+    const reason = prompt('Reason for rejecting? (optional)') || undefined
+    if (reason === undefined && !confirm('Reject this consultation?')) return
+    setBusyAction('reject')
+    setActionError(null)
+    try {
+      await appointmentsExtApi.reject(appointment.id, reason)
+      onChanged?.()
+    } catch (err: any) {
+      setActionError(err?.response?.data?.error || 'Failed to reject')
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const handleComplete = async () => {
+    if (!confirm('Mark this consultation as completed? Escrow will be released to your wallet.')) return
+    setBusyAction('complete')
+    setActionError(null)
+    try {
+      await appointmentsExtApi.complete(appointment.id)
+      onChanged?.()
+    } catch (err: any) {
+      setActionError(err?.response?.data?.error || 'Failed to complete')
+    } finally {
+      setBusyAction(null)
+    }
+  }
 
   return (
     <div
@@ -158,6 +207,43 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
           )}
         </div>
       </div>
+
+      {/* Lifecycle actions — independent of tab grouping. */}
+      {(appointment.status === 'PENDING' || appointment.status === 'CONFIRMED') && (
+        <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-100">
+          {appointment.status === 'PENDING' && (
+            <>
+              <button
+                onClick={handleAccept}
+                disabled={busyAction !== null}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 transition-colors rounded"
+              >
+                <Check className="w-4 h-4" />
+                {busyAction === 'accept' ? 'Accepting…' : 'Accept'}
+              </button>
+              <button
+                onClick={handleReject}
+                disabled={busyAction !== null}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border border-red-600 text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors rounded"
+              >
+                <X className="w-4 h-4" />
+                {busyAction === 'reject' ? 'Rejecting…' : 'Reject'}
+              </button>
+            </>
+          )}
+          {appointment.status === 'CONFIRMED' && (
+            <button
+              onClick={handleComplete}
+              disabled={busyAction !== null}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors rounded"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              {busyAction === 'complete' ? 'Completing…' : 'Mark complete'}
+            </button>
+          )}
+          {actionError && <span className="text-xs text-red-600 self-center">{actionError}</span>}
+        </div>
+      )}
 
       <div className="flex gap-3 mt-4 pt-4 border-t border-gray-100">
         {/* Attend Now Tab Buttons */}

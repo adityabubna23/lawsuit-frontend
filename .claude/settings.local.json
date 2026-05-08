@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls \"C:/Users/chand/OneDrive/Desktop/NexusWS/NyayaX/\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\chand\\\\OneDrive\\\\Desktop\\\\NexusWS\\\\NyayaX\\\\lawsuit-server\\\\src\\\\routes\\\\\" -Filter \"*.ts\" | Select-Object Name)",
+      "Bash(npx tsc *)",
+      "Bash(echo \"EXIT=$?\")"
+    ]
+  }
+}

@@ -4,6 +4,8 @@ import NotificationToast from '../components/atoms/NotificationToast'
 import VideoCallProvider from '../components/organisms/VideoCallProvider'
 import { useNotificationStore } from '../stores/notificationStore'
 import { useNotificationSocket } from '../hooks/useNotificationSocket'
+import useFcmRegistration from '../hooks/useFcmRegistration'
+import ErrorBoundary from '../components/organisms/ErrorBoundary'
 import useWalletStore from '../stores/walletStore'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
@@ -21,6 +23,7 @@ const LawyerLayout: FC = () => {
 
   // Boot socket connection + notification listeners
   useNotificationSocket()
+  useFcmRegistration()
 
   useEffect(() => {
     fetchBalance().catch(() => { })
@@ -38,6 +41,9 @@ const LawyerLayout: FC = () => {
     { name: 'Mediations', path: '/lawyer/mediations' },
     { name: 'Call History', path: '/lawyer/call-history' },
     { name: 'Agreement Templates', path: '/lawyer/agreement-templates' },
+    { name: 'Salary', path: '/lawyer/salary' },
+    { name: 'Onboarding', path: '/lawyer/onboarding' },
+    { name: 'Legal Updates', path: '/lawyer/legal-updates' },
     { name: 'Calander', path: '/lawyer/under-development' },
     { name: 'Legal Eagle', path: '/lawyer/legal-eagle' },
   ]
@@ -227,7 +233,9 @@ const LawyerLayout: FC = () => {
       </nav>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Outlet />
+        <ErrorBoundary scope="lawyer page">
+          <Outlet />
+        </ErrorBoundary>
       </main>
       <NotificationModal open={showNotifications} onClose={() => setShowNotifications(false)} />
       <NotificationToast />

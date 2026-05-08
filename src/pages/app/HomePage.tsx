@@ -9,6 +9,7 @@ import {
 import { lawyersApi, appointmentsApi, casesApi, walletApi } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
 import { useUserStore } from '@/stores/userStore'
+import AppointmentDashboardStats from '@/components/molecules/AppointmentDashboardStats'
 import { format, isToday, isTomorrow, parseISO } from 'date-fns'
 
 // ── helpers ──────────────────────────────────────────────────────────────
@@ -246,6 +247,9 @@ const HomePage: FC = () => {
 
       {/* ── Main Content ── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+        {/* Server-driven dashboard stats (silently hidden if endpoint not exposed) */}
+        <AppointmentDashboardStats role="client" />
 
         {/* ── Quick Actions ── */}
         <section>

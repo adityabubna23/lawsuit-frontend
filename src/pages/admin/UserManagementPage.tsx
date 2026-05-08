@@ -4,6 +4,40 @@ import { Link } from 'react-router-dom'
 import { ChevronRight, Home, Users, UserCheck, Briefcase, Loader2, AlertCircle, Search } from 'lucide-react'
 import { adminApi } from '@/services/api'
 import KYCDetailsModal from '@/components/molecules/KYCDetailsModal'
+import { unwrapList } from '@/utils/unwrap'
+
+/**
+ * The KYC list endpoints (`/admin/not-verified-client`,
+ * `/admin/not-verified-lawyers`) return FLAT prisma rows, e.g.
+ *   { id, name, email, phone, isVerified, ... }
+ * but this page (and KYCDetailsModal) was written against a nested shape:
+ *   { id, userId, user: { id, name, email, phone, ... } }
+ * We normalise every row through this adapter so both shapes render
+ * identically. Backend can also be updated to nest under `user` later
+ * without breaking the frontend.
+ */
+function normalizeKycRow(row: any): KYCUser | null {
+  if (!row || typeof row !== 'object') return null
+  const hasNestedUser = row.user && typeof row.user === 'object' && row.user.name
+  const u = hasNestedUser ? row.user : row
+  if (!u?.name && !u?.email) return null
+  return {
+    ...row,
+    id: row.id,
+    userId: row.userId || u.id || row.id,
+    user: {
+      id: u.id || row.id,
+      name: u.name || '',
+      email: u.email || '',
+      phone: u.phone || '',
+      avatarUrl: u.avatarUrl,
+      isVerified: u.isVerified ?? row.isVerified ?? false,
+      emailVerified: u.emailVerified ?? false,
+      phoneVerified: u.phoneVerified ?? false,
+      createdAt: u.createdAt || row.createdAt || '',
+    },
+  } as KYCUser
+}
 
 interface KYCUser {
   id: string
@@ -65,7 +99,8 @@ const UserManagementPage: FC = () => {
     queryKey: ['notVerifiedClients'],
     queryFn: async () => {
       const response = await adminApi.getNotVerifiedClients()
-      return response.data.clients as KYCUser[]
+      const list = unwrapList(response.data, 'clients')
+      return list.map(normalizeKycRow).filter((r): r is KYCUser => r !== null)
     },
   })
 
@@ -78,7 +113,8 @@ const UserManagementPage: FC = () => {
     queryKey: ['notVerifiedLawyers'],
     queryFn: async () => {
       const response = await adminApi.getNotVerifiedLawyers()
-      return response.data.lawyers as KYCUser[]
+      const list = unwrapList(response.data, 'lawyers')
+      return list.map(normalizeKycRow).filter((r): r is KYCUser => r !== null)
     },
   })
 
@@ -130,14 +166,17 @@ const UserManagementPage: FC = () => {
       ? verifyClientMutation.isPending
       : verifyLawyerMutation.isPending
 
-  // Filter data based on search query
+  // Filter data based on search query — null-safe across each user field
+  // because the backend may return entries with partial info (e.g. missing
+  // phone for clients who registered with email only).
   const filteredData = currentData?.filter((user) => {
-    const query = searchQuery.toLowerCase()
-    return (
-      user.user.name.toLowerCase().includes(query) ||
-      user.user.email.toLowerCase().includes(query) ||
-      user.user.phone.includes(query)
-    )
+    if (!user?.user) return false
+    const query = searchQuery.trim().toLowerCase()
+    if (!query) return true
+    const name = (user.user.name || '').toLowerCase()
+    const email = (user.user.email || '').toLowerCase()
+    const phone = user.user.phone || ''
+    return name.includes(query) || email.includes(query) || phone.includes(query)
   })
 
   return (

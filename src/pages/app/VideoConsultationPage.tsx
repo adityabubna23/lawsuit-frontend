@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { videoApi } from '@/services/api'
 import { Loader2 } from 'lucide-react'
 import DailyVideoPlayer from '@/components/organisms/DailyVideoPlayer'
+import WebRTCRoom from '@/components/organisms/WebRTCRoom'
 
 interface MeetingResponse {
   meetingLink: string
@@ -24,6 +25,13 @@ const VideoConsultationPage: FC = () => {
   const [meeting, setMeeting] = useState<MeetingResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [fetching, setFetching] = useState(true)
+  /**
+   * Fallback flips on automatically when /video/meeting fails (Daily.co unavailable
+   * or appointment doesn't have a Daily room) — or via the manual toggle.
+   * The room id is the deterministic `appointment-{id}` string so both peers
+   * land in the same socket room without coordination.
+   */
+  const [useFallback, setUseFallback] = useState(false)
 
   useEffect(() => {
     if (!appointmentId) {
@@ -42,16 +50,19 @@ const VideoConsultationPage: FC = () => {
         if (cancelled) return
         const data = res.data as MeetingResponse
         if (!data?.meetingLink) {
-          setError('Failed to retrieve meeting details')
+          // Daily room not provisioned — fall back to peer-to-peer WebRTC.
+          setUseFallback(true)
           return
         }
         setMeeting(data)
       })
       .catch((err: any) => {
         if (cancelled) return
-        setError(
-          err?.response?.data?.error || err?.message || 'Failed to join the meeting'
-        )
+        // Network / 5xx / Daily unavailable — switch to WebRTC fallback rather
+        // than dead-ending the user. They can still leave via the back button.
+        const msg = err?.response?.data?.error || err?.message || 'Failed to join the meeting'
+        console.warn('[Video] Daily meeting fetch failed, switching to WebRTC fallback:', msg)
+        setUseFallback(true)
       })
       .finally(() => {
         if (!cancelled) setFetching(false)
@@ -87,23 +98,41 @@ const VideoConsultationPage: FC = () => {
       <div className="flex justify-between items-center mb-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Consultation Room</h1>
-          <p className="text-sm text-gray-500">Your secure, private video session.</p>
+          <p className="text-sm text-gray-500">
+            {useFallback ? 'Peer-to-peer fallback (WebRTC).' : 'Your secure, private video session.'}
+          </p>
         </div>
-        <button
-          onClick={() => navigate(-1)}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none"
-        >
-          Back
-        </button>
+        <div className="flex items-center gap-2">
+          {meeting && (
+            <button
+              onClick={() => setUseFallback((v) => !v)}
+              className="px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              title="Switch between Daily.co and WebRTC fallback"
+            >
+              {useFallback ? 'Use Daily.co' : 'Use fallback'}
+            </button>
+          )}
+          <button
+            onClick={() => navigate(-1)}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none"
+          >
+            Back
+          </button>
+        </div>
       </div>
 
       <div className="relative flex-grow w-full bg-gray-900 rounded-xl overflow-hidden shadow-lg border border-gray-200">
-        {fetching || !meeting ? (
+        {fetching ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900">
             <Loader2 className="h-10 w-10 text-white animate-spin mb-4" />
             <p className="text-white font-medium">Preparing secure room...</p>
           </div>
-        ) : (
+        ) : useFallback ? (
+          <WebRTCRoom
+            roomId={`appointment-${appointmentId}`}
+            onLeave={handleLeft}
+          />
+        ) : meeting ? (
           <DailyVideoPlayer
             roomUrl={meeting.meetingLink}
             token={meeting.token}
@@ -112,6 +141,10 @@ const VideoConsultationPage: FC = () => {
             onError={handleError}
             className="w-full h-full"
           />
+        ) : (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900">
+            <p className="text-white font-medium">Initializing fallback…</p>
+          </div>
         )}
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { io, Socket } from 'socket.io-client'
 import { useAuthStore } from '@/stores/authStore'
 import { queryClient } from '@/lib/queryClient'
+import { resolveSocketOrigin } from '@/utils/apiUrl'
 import type { Notification as AppNotification } from '@/types'
 import type {
   CallType,
@@ -13,21 +14,10 @@ import type {
   CallErrorEvent,
 } from '@/types/video'
 
-// Compute socket URL from VITE_API_URL (same host, different path)
-const _envUrl = (import.meta.env.VITE_API_URL as string) || ''
-let socketUrl = ''
-if (_envUrl && _envUrl.length > 0) {
-  // Extract the origin (protocol + host + port)
-  try {
-    const url = new URL(_envUrl)
-    socketUrl = url.origin
-  } catch {
-    // If VITE_API_URL is a relative path, use window.location.origin
-    socketUrl = typeof window !== 'undefined' ? window.location.origin : ''
-  }
-} else {
-  socketUrl = typeof window !== 'undefined' ? window.location.origin : ''
-}
+// Socket connects to the same host as the API. Naked hostnames in
+// VITE_API_URL (e.g. `api.nyayax.com`) get a protocol prepended so
+// new URL() parses cleanly.
+const socketUrl = resolveSocketOrigin(import.meta.env.VITE_API_URL as string)
 
 type MessageHandler = (message: ChatMessage) => void
 type TypingHandler = (data: { user: { id: string; name?: string } }) => void
@@ -45,6 +35,18 @@ type CallDeclinedHandler = (data: CallDeclinedEvent) => void
 type CallEndedHandler = (data: CallEndedEvent) => void
 type CallCancelledHandler = (data: CallCancelledEvent) => void
 type CallErrorHandler = (data: CallErrorEvent) => void
+
+// WebRTC fallback event handlers
+export interface WebRTCUserJoinedEvent { roomId: string; socketId: string; userId?: string }
+export interface WebRTCUserLeftEvent { roomId: string; socketId: string; userId?: string }
+export interface WebRTCOfferEvent { roomId: string; offer: RTCSessionDescriptionInit; from: string; userId?: string }
+export interface WebRTCAnswerEvent { roomId: string; answer: RTCSessionDescriptionInit; from: string; userId?: string }
+export interface WebRTCIceCandidateEvent { roomId: string; candidate: RTCIceCandidateInit; from: string; userId?: string }
+type RtcUserJoinedHandler = (e: WebRTCUserJoinedEvent) => void
+type RtcUserLeftHandler = (e: WebRTCUserLeftEvent) => void
+type RtcOfferHandler = (e: WebRTCOfferEvent) => void
+type RtcAnswerHandler = (e: WebRTCAnswerEvent) => void
+type RtcIceCandidateHandler = (e: WebRTCIceCandidateEvent) => void
 
 export interface ChatMessage {
   id: string
@@ -80,6 +82,13 @@ class SocketService {
   private callEndedHandlers: CallEndedHandler[] = []
   private callCancelledHandlers: CallCancelledHandler[] = []
   private callErrorHandlers: CallErrorHandler[] = []
+
+  // WebRTC fallback handlers
+  private rtcUserJoinedHandlers: RtcUserJoinedHandler[] = []
+  private rtcUserLeftHandlers: RtcUserLeftHandler[] = []
+  private rtcOfferHandlers: RtcOfferHandler[] = []
+  private rtcAnswerHandlers: RtcAnswerHandler[] = []
+  private rtcIceCandidateHandlers: RtcIceCandidateHandler[] = []
 
   private constructor() {}
 
@@ -213,6 +222,25 @@ class SocketService {
     this.socket.on('call:error', (data: CallErrorEvent) => {
       console.error('Call error:', data)
       this.callErrorHandlers.forEach((handler) => handler(data))
+    })
+
+    // ─────────────────────────────────────────────────────────────────────
+    // WebRTC fallback signaling
+    // ─────────────────────────────────────────────────────────────────────
+    this.socket.on('video:user-joined', (data: WebRTCUserJoinedEvent) => {
+      this.rtcUserJoinedHandlers.forEach((h) => h(data))
+    })
+    this.socket.on('video:user-left', (data: WebRTCUserLeftEvent) => {
+      this.rtcUserLeftHandlers.forEach((h) => h(data))
+    })
+    this.socket.on('video:offer', (data: WebRTCOfferEvent) => {
+      this.rtcOfferHandlers.forEach((h) => h(data))
+    })
+    this.socket.on('video:answer', (data: WebRTCAnswerEvent) => {
+      this.rtcAnswerHandlers.forEach((h) => h(data))
+    })
+    this.socket.on('video:ice-candidate', (data: WebRTCIceCandidateEvent) => {
+      this.rtcIceCandidateHandlers.forEach((h) => h(data))
     })
 
     return this.socket
@@ -414,6 +442,62 @@ class SocketService {
     return () => {
       this.callErrorHandlers = this.callErrorHandlers.filter((h) => h !== handler)
     }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────
+  // WebRTC fallback signaling — emitters
+  // ─────────────────────────────────────────────────────────────────────
+
+  /** Join a WebRTC room. Server will emit `video:user-joined` to existing peers. */
+  rtcJoin(roomId: string) {
+    if (this.socket?.connected) this.socket.emit('video:join', { roomId })
+  }
+
+  /** Send an SDP offer to a specific peer (identified by their socket id). */
+  rtcOffer(roomId: string, to: string, offer: RTCSessionDescriptionInit) {
+    if (this.socket?.connected) this.socket.emit('video:offer', { roomId, to, offer })
+  }
+
+  /** Send an SDP answer back to the offerer. */
+  rtcAnswer(roomId: string, to: string, answer: RTCSessionDescriptionInit) {
+    if (this.socket?.connected) this.socket.emit('video:answer', { roomId, to, answer })
+  }
+
+  /** Forward a local ICE candidate to a peer. */
+  rtcIceCandidate(roomId: string, to: string, candidate: RTCIceCandidateInit) {
+    if (this.socket?.connected) this.socket.emit('video:ice-candidate', { roomId, to, candidate })
+  }
+
+  /** Leave the WebRTC room. */
+  rtcLeave(roomId: string) {
+    if (this.socket?.connected) this.socket.emit('video:leave', { roomId })
+  }
+
+  // WebRTC subscribers — each returns an unsubscribe fn
+  onRtcUserJoined(handler: RtcUserJoinedHandler) {
+    this.rtcUserJoinedHandlers.push(handler)
+    return () => { this.rtcUserJoinedHandlers = this.rtcUserJoinedHandlers.filter((h) => h !== handler) }
+  }
+  onRtcUserLeft(handler: RtcUserLeftHandler) {
+    this.rtcUserLeftHandlers.push(handler)
+    return () => { this.rtcUserLeftHandlers = this.rtcUserLeftHandlers.filter((h) => h !== handler) }
+  }
+  onRtcOffer(handler: RtcOfferHandler) {
+    this.rtcOfferHandlers.push(handler)
+    return () => { this.rtcOfferHandlers = this.rtcOfferHandlers.filter((h) => h !== handler) }
+  }
+  onRtcAnswer(handler: RtcAnswerHandler) {
+    this.rtcAnswerHandlers.push(handler)
+    return () => { this.rtcAnswerHandlers = this.rtcAnswerHandlers.filter((h) => h !== handler) }
+  }
+  onRtcIceCandidate(handler: RtcIceCandidateHandler) {
+    this.rtcIceCandidateHandlers.push(handler)
+    return () => { this.rtcIceCandidateHandlers = this.rtcIceCandidateHandlers.filter((h) => h !== handler) }
+  }
+
+  /** Returns the local socket id (when connected). Needed so the WebRTC layer can ignore self events. */
+  getSocketId(): string | undefined {
+    return this.socket?.id
   }
 
   isConnected(): boolean {

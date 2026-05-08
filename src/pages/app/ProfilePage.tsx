@@ -6,6 +6,7 @@ import storage from '@/utils/storage'
 import { useUserStore } from '@/stores/userStore'
 import Button from '@/components/atoms/Button'
 import ClientInfo from '@/components/molecules/ClientInfo'
+import DangerZone from '@/components/molecules/DangerZone'
 
 const ProfilePage: FC = () => {
   const navigate = useNavigate()
@@ -253,9 +254,12 @@ const ProfilePage: FC = () => {
             <h1 className=" flex justify-center text-lg font-semibold text-midnight mb-2">Additional Information</h1>
             <ClientInfo />
           </div>
+          <div className="mt-8">
+            <DangerZone />
+          </div>
         </div>
       </section>
-      
+
     </div>
   )
 }

@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import { usersApi } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
-import { 
-  MapPin, 
-  User, 
-  FileText, 
-  Edit3, 
-  X, 
+import AddressPicker from '@/components/molecules/AddressPicker'
+import {
+  MapPin,
+  User,
+  FileText,
+  Edit3,
+  X,
   Save,
   Loader2,
   ExternalLink,
@@ -272,48 +273,47 @@ const ClientInfo: React.FC = () => {
             <MapPin className="w-5 h-5 text-primary" />
             <h4 className="text-base font-semibold text-midnight">Location</h4>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <label className={labelClasses}>City</label>
-              <input 
-                disabled={!editing} 
-                value={form.city || ''} 
-                onChange={(e) => onChange('city', e.target.value)} 
-                className={inputClasses}
-                placeholder="e.g. Mumbai"
-              />
+          {editing ? (
+            <AddressPicker
+              hideCountry={false}
+              value={{
+                state: form.state,
+                district: (form as any).district,
+                city: form.city,
+                pincode: form.pincode,
+                country: form.country,
+              }}
+              onChange={(next) => {
+                setForm((s) => ({
+                  ...s,
+                  state: next.state,
+                  city: next.city,
+                  pincode: next.pincode,
+                  country: next.country,
+                  ...(next.district !== undefined ? { district: next.district } : {}),
+                } as any))
+              }}
+            />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div>
+                <label className={labelClasses}>City</label>
+                <input disabled value={form.city || ''} className={inputClasses} />
+              </div>
+              <div>
+                <label className={labelClasses}>State</label>
+                <input disabled value={form.state || ''} className={inputClasses} />
+              </div>
+              <div>
+                <label className={labelClasses}>Country</label>
+                <input disabled value={form.country || ''} className={inputClasses} />
+              </div>
+              <div>
+                <label className={labelClasses}>Pincode</label>
+                <input disabled value={form.pincode || ''} className={inputClasses} />
+              </div>
             </div>
-            <div>
-              <label className={labelClasses}>State</label>
-              <input 
-                disabled={!editing} 
-                value={form.state || ''} 
-                onChange={(e) => onChange('state', e.target.value)} 
-                className={inputClasses}
-                placeholder="e.g. Maharashtra"
-              />
-            </div>
-            <div>
-              <label className={labelClasses}>Country</label>
-              <input 
-                disabled={!editing} 
-                value={form.country || ''} 
-                onChange={(e) => onChange('country', e.target.value)} 
-                className={inputClasses}
-                placeholder="e.g. India"
-              />
-            </div>
-            <div>
-              <label className={labelClasses}>Pincode</label>
-              <input 
-                disabled={!editing} 
-                value={form.pincode || ''} 
-                onChange={(e) => onChange('pincode', e.target.value)} 
-                className={inputClasses}
-                placeholder="e.g. 400001"
-              />
-            </div>
-          </div>
+          )}
         </section>
 
         {/* Financial & Category Section */}

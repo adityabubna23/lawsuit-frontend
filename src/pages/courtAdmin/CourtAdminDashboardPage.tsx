@@ -2,6 +2,7 @@ import { FC, useEffect, useState } from 'react';
 import { useCourtAdminStore, VerificationRequest } from '../../stores/courtAdminStore';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import CourtAdminAuthBanner from '../../components/molecules/CourtAdminAuthBanner';
 
 const CourtAdminDashboardPage: FC = () => {
     const { pendingVerifications, allVerifications, fetchPendingVerifications, fetchAllVerifications, isLoading } = useCourtAdminStore();
@@ -19,6 +20,7 @@ const CourtAdminDashboardPage: FC = () => {
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto">
+            <CourtAdminAuthBanner />
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <h1 className="text-2xl font-bold text-gray-900">Lawyer Verifications</h1>
 

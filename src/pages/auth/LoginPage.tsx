@@ -1,7 +1,8 @@
-import { FC, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { FC, useEffect, useState } from 'react'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import Button from '@/components/atoms/Button'
+import { ShieldCheck } from 'lucide-react'
 
 const EyeIcon: FC<{ className?: string }> = ({ className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
@@ -16,10 +17,21 @@ const EyeOffIcon: FC<{ className?: string }> = ({ className }) => (
   </svg>
 )
 
+type LoginMode = 'user' | 'admin'
+
 const LoginPage: FC = () => {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { login, isLoading, error, clearError } = useAuthStore()
   const [showPassword, setShowPassword] = useState(false)
+
+  // `?mode=admin` opens the form with the Super Admin tab active. This lets
+  // /auth/admin-login redirect users here while preserving the admin path.
+  const [mode, setMode] = useState<LoginMode>(() => (searchParams.get('mode') === 'admin' ? 'admin' : 'user'))
+
+  useEffect(() => {
+    if (searchParams.get('mode') === 'admin') setMode('admin')
+  }, [searchParams])
 
   const [formData, setFormData] = useState({
     email: '',
@@ -45,6 +57,16 @@ const LoginPage: FC = () => {
       // The returned value is the canonical post-login user.
       const loggedInUser = await login(formData.email, formData.password)
       const role = loggedInUser?.role?.toString?.().toUpperCase?.()
+
+      // If the Super Admin tab was selected but the credentials belong to a
+      // non-admin account, surface a clear error rather than silently routing
+      // to the user dashboard.
+      if (mode === 'admin' && role !== 'ADMIN') {
+        useAuthStore.getState().logout()
+        useAuthStore.setState({ error: 'These credentials are not for a platform admin account.' })
+        return
+      }
+
       if (role === 'LAWYER') {
         navigate('/lawyer/dashboard', { replace: true })
       } else if (role === 'ADMIN') {
@@ -61,49 +83,88 @@ const LoginPage: FC = () => {
     }
   }
 
+  const isAdmin = mode === 'admin'
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className={`min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 ${isAdmin ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900' : 'bg-gray-50'}`}>
       <div className="max-w-md w-full space-y-8">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to your account
+          {isAdmin && (
+            <div className="flex justify-center mb-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/20 border border-indigo-300/30 text-indigo-100 text-xs font-medium uppercase tracking-wider">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Platform admin access
+              </div>
+            </div>
+          )}
+          <h2 className={`mt-2 text-center text-3xl font-extrabold ${isAdmin ? 'text-white' : 'text-gray-900'}`}>
+            {isAdmin ? 'Super Admin Sign In' : 'Sign in to your account'}
           </h2>
-          <div className="mt-4 inline-flex w-full rounded-lg bg-gray-100 p-1 text-sm font-medium">
+          <div className={`mt-4 inline-flex w-full rounded-lg p-1 text-sm font-medium ${isAdmin ? 'bg-white/10 backdrop-blur' : 'bg-gray-100'}`}>
             <button
               type="button"
-              aria-pressed="true"
-              className="flex-1 px-3 py-1.5 rounded-md bg-white text-primary shadow-sm"
+              onClick={() => setMode('user')}
+              aria-pressed={mode === 'user'}
+              className={`flex-1 px-3 py-1.5 rounded-md transition-colors ${mode === 'user'
+                ? 'bg-white text-primary shadow-sm'
+                : isAdmin ? 'text-white/70 hover:text-white' : 'text-gray-600 hover:text-primary hover:bg-white/60'
+                }`}
               title="Clients, lawyers, and law firms all sign in here"
             >
-              Client / Lawyer / Law Firm
+              Client / Lawyer / Firm
             </button>
             <button
               type="button"
               onClick={() => navigate('/auth/court-admin-login')}
-              className="flex-1 px-3 py-1.5 rounded-md text-gray-600 hover:text-primary hover:bg-white/60"
+              className={`flex-1 px-3 py-1.5 rounded-md transition-colors ${isAdmin ? 'text-white/70 hover:text-white' : 'text-gray-600 hover:text-primary hover:bg-white/60'
+                }`}
             >
               Court Admin
             </button>
+            <button
+              type="button"
+              onClick={() => setMode('admin')}
+              aria-pressed={mode === 'admin'}
+              className={`flex-1 px-3 py-1.5 rounded-md transition-colors inline-flex items-center justify-center gap-1 ${mode === 'admin'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : isAdmin ? 'text-white/70 hover:text-white' : 'text-gray-600 hover:text-indigo-600 hover:bg-white/60'
+                }`}
+              title="Platform admins (SUPER_ADMIN / ADMIN) sign in here"
+            >
+              <ShieldCheck className="w-3.5 h-3.5" /> Super Admin
+            </button>
           </div>
-          <p className="mt-2 text-center text-xs text-gray-500">
-            Law firms: sign in with the email used while registering. New firm?{' '}
-            <Link to="/auth/register" className="text-primary hover:text-primary-dark font-medium">
-              Register your firm
-            </Link>
-            .
-          </p>
-          <p className="mt-4 text-center text-sm text-gray-600">
-            Or{' '}
-            <Link to="/auth/register" className="font-medium text-primary hover:text-primary-dark">
-              create a new account
-            </Link>
-          </p>
+
+          {isAdmin ? (
+            <p className="mt-3 text-center text-xs text-white/70">
+              Restricted access. Activity is audit-logged. Use your platform admin credentials.
+            </p>
+          ) : (
+            <>
+              <p className="mt-2 text-center text-xs text-gray-500">
+                Law firms: sign in with the email used while registering. New firm?{' '}
+                <Link to="/auth/register" className="text-primary hover:text-primary-dark font-medium">
+                  Register your firm
+                </Link>
+                .
+              </p>
+              <p className="mt-4 text-center text-sm text-gray-600">
+                Or{' '}
+                <Link to="/auth/register" className="font-medium text-primary hover:text-primary-dark">
+                  create a new account
+                </Link>
+              </p>
+            </>
+          )}
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form
+          className={`mt-8 space-y-6 ${isAdmin ? 'bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-6' : ''}`}
+          onSubmit={handleSubmit}
+        >
           {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="text-sm text-red-700">{error}</div>
+            <div className={`rounded-md p-4 ${isAdmin ? 'bg-red-500/20 border border-red-400/30' : 'bg-red-50'}`}>
+              <div className={`text-sm ${isAdmin ? 'text-red-100' : 'text-red-700'}`}>{error}</div>
             </div>
           )}
 
@@ -118,8 +179,11 @@ const LoginPage: FC = () => {
                 type="email"
                 autoComplete="email"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
-                placeholder="Email address"
+                className={`appearance-none rounded-none relative block w-full px-3 py-2 border placeholder-gray-500 rounded-t-md focus:outline-none focus:z-10 sm:text-sm ${isAdmin
+                  ? 'border-white/20 bg-white/10 text-white placeholder-white/50 focus:ring-indigo-400 focus:border-indigo-400'
+                  : 'border-gray-300 text-gray-900 focus:ring-primary focus:border-primary'
+                  }`}
+                placeholder={isAdmin ? 'Admin email' : 'Email address'}
                 value={formData.email}
                 onChange={handleChange}
               />
@@ -134,7 +198,10 @@ const LoginPage: FC = () => {
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="current-password"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
+                className={`appearance-none rounded-none relative block w-full px-3 py-2 pr-10 border placeholder-gray-500 rounded-b-md focus:outline-none focus:z-10 sm:text-sm ${isAdmin
+                  ? 'border-white/20 bg-white/10 text-white placeholder-white/50 focus:ring-indigo-400 focus:border-indigo-400'
+                  : 'border-gray-300 text-gray-900 focus:ring-primary focus:border-primary'
+                  }`}
                 placeholder="Password"
                 value={formData.password}
                 onChange={handleChange}
@@ -142,7 +209,7 @@ const LoginPage: FC = () => {
               <button
                 type="button"
                 onClick={() => setShowPassword(prev => !prev)}
-                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 focus:outline-none z-10"
+                className={`absolute inset-y-0 right-0 flex items-center pr-3 z-10 ${isAdmin ? 'text-white/60 hover:text-white' : 'text-gray-400 hover:text-gray-600'}`}
                 tabIndex={-1}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
@@ -159,28 +226,54 @@ const LoginPage: FC = () => {
                 type="checkbox"
                 className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
               />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
+              <label htmlFor="remember-me" className={`ml-2 block text-sm ${isAdmin ? 'text-white/80' : 'text-gray-900'}`}>
                 Remember me
               </label>
             </div>
 
-            <div className="text-sm">
-              <a href="#" className="font-medium text-primary hover:text-primary-dark">
-                Forgot your password?
-              </a>
-            </div>
+            {!isAdmin && (
+              <div className="text-sm">
+                <a href="#" className="font-medium text-primary hover:text-primary-dark">
+                  Forgot your password?
+                </a>
+              </div>
+            )}
           </div>
 
           <div>
-            <Button
-              type="submit"
-              variant="primary"
-              className="w-full"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Signing in...' : 'Sign in'}
-            </Button>
+            {isAdmin ? (
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-md bg-indigo-600 text-white font-medium hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                {isLoading ? 'Signing in…' : 'Sign in as Super Admin'}
+              </button>
+            ) : (
+              <Button
+                type="submit"
+                variant="primary"
+                className="w-full"
+                disabled={isLoading}
+              >
+                {isLoading ? 'Signing in...' : 'Sign in'}
+              </Button>
+            )}
           </div>
+
+          {isAdmin && (
+            <p className="text-center text-xs text-white/50">
+              Not a platform admin?{' '}
+              <button
+                type="button"
+                onClick={() => setMode('user')}
+                className="text-indigo-300 hover:text-indigo-200 underline"
+              >
+                Switch to user sign in
+              </button>
+            </p>
+          )}
         </form>
       </div>
     </div>

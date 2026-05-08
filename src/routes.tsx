@@ -33,11 +33,28 @@ import CaseDetailsClientPage from './pages/app/CaseDetailsClientPage'
 import VideoConsultationPage from './pages/app/VideoConsultationPage'
 import CallHistoryPage from './pages/app/CallHistoryPage'
 import TeleLawPage from './pages/app/TeleLawPage'
+import ReferralPage from './pages/app/ReferralPage'
+import BankAccountsPage from './pages/app/BankAccountsPage'
+import SubscriptionPage from './pages/app/SubscriptionPage'
+import ReportIssuePage from './pages/app/ReportIssuePage'
+import LegalUpdatesPage from './pages/app/LegalUpdatesPage'
 // Admin Pages
 import AdminLayout from './layouts/AdminLayout'
 import TemplatesPage from './pages/admin/TemplatesPage'
 import AdminDashboardPage from './pages/admin/AdminDashboardPage'
 import UserManagementPage from './pages/admin/UserManagementPage'
+import AdminPayoutsPage from './pages/admin/AdminPayoutsPage'
+import AdminUserModerationPage from './pages/admin/AdminUserModerationPage'
+import AdminLegalUpdatesPage from './pages/admin/AdminLegalUpdatesPage'
+import AdminReportsPage from './pages/admin/AdminReportsPage'
+import AdminConfigPage from './pages/admin/AdminConfigPage'
+import AdminCourtAdminsPage from './pages/admin/AdminCourtAdminsPage'
+import AdminSalaryPage from './pages/admin/AdminSalaryPage'
+import AdminCourtsPage from './pages/admin/AdminCourtsPage'
+import AdminTeamPage from './pages/admin/AdminTeamPage'
+import AdminWalletsPage from './pages/admin/AdminWalletsPage'
+import AdminAnnouncementsPage from './pages/admin/AdminAnnouncementsPage'
+import PaymentHistoryPage from './pages/app/PaymentHistoryPage'
 
 // Lawyer Pages
 import LawyerLayout from './layouts/LawyerLayout'
@@ -49,6 +66,8 @@ import ViewCasePagesLawyer from './pages/lawyer/ViewCasePagesLawyer'
 import CaseDetailsLawyerPage from './pages/lawyer/CaseDetailsLawyerPage'
 import AgreementTemplatesPage from './pages/lawyer/AgreementTemplatesPage'
 import LawyerMediatorSettingsPage from './pages/lawyer/LawyerMediatorSettingsPage'
+import LawyerSalaryPage from './pages/lawyer/LawyerSalaryPage'
+import LawyerOnboardingPage from './pages/lawyer/LawyerOnboardingPage'
 // Mediation Pages
 import MediationsPage from './pages/app/MediationsPage'
 import MediationDetailPage from './pages/app/MediationDetailPage'
@@ -62,6 +81,7 @@ import CourtAdminDashboardPage from './pages/courtAdmin/CourtAdminDashboardPage'
 import VerifyLawyerPage from './pages/courtAdmin/VerifyLawyerPage'
 import CourtAdminProfilePage from './pages/courtAdmin/CourtAdminProfilePage'
 import OrganizationVerificationsPage from './pages/courtAdmin/OrganizationVerificationsPage'
+import CourtAdminSalaryPage from './pages/courtAdmin/CourtAdminSalaryPage'
 
 // Organization (Law Firm) Pages
 import OrganizationLayout from './layouts/OrganizationLayout'
@@ -154,6 +174,12 @@ const AppRoutes = () => {
         <Route path="lex-rates" element={<LexRateTable />} />
         <Route path="tele-law" element={<TeleLawPage />} />
         <Route path="legal-eagle" element={<AiChatPage />} />
+        <Route path="referral" element={<ReferralPage />} />
+        <Route path="bank-accounts" element={<BankAccountsPage />} />
+        <Route path="subscription" element={<SubscriptionPage />} />
+        <Route path="report-issue" element={<ReportIssuePage />} />
+        <Route path="legal-updates" element={<LegalUpdatesPage />} />
+        <Route path="payments" element={<PaymentHistoryPage />} />
         <Route path="consultation/:appointmentId" element={<VideoConsultationPage />} />
         <Route path="call-history" element={<CallHistoryPage />} />
 
@@ -208,7 +234,17 @@ const AppRoutes = () => {
         <Route path="templates" element={<TemplatesPage />} />
         <Route path="dashboard" element={<AdminDashboardPage />} />
         <Route path="userManagement" element={<UserManagementPage />} />
-
+        <Route path="moderation" element={<AdminUserModerationPage />} />
+        <Route path="payouts" element={<AdminPayoutsPage />} />
+        <Route path="court-admins" element={<AdminCourtAdminsPage />} />
+        <Route path="legal-updates" element={<AdminLegalUpdatesPage />} />
+        <Route path="reports" element={<AdminReportsPage />} />
+        <Route path="settings" element={<AdminConfigPage />} />
+        <Route path="salary" element={<AdminSalaryPage />} />
+        <Route path="courts" element={<AdminCourtsPage />} />
+        <Route path="team" element={<AdminTeamPage />} />
+        <Route path="wallets" element={<AdminWalletsPage />} />
+        <Route path="announcements" element={<AdminAnnouncementsPage />} />
 
         <Route path="under-development" element={<UnderDevelopmentPlaceholder />} />
       </Route>
@@ -235,6 +271,8 @@ const AppRoutes = () => {
         <Route path="profile" element={<LawyerProfilePage />} />
         <Route path="agreement-templates" element={<AgreementTemplatesPage />} />
         <Route path="mediator-settings" element={<LawyerMediatorSettingsPage />} />
+        <Route path="salary" element={<LawyerSalaryPage />} />
+        <Route path="onboarding" element={<LawyerOnboardingPage />} />
         <Route path="mediations" element={<MediationsPage />} />
         <Route path="mediation/:id" element={<MediationDetailPage />} />
         <Route path="mediation/:id/room" element={<MediationRoomPage />} />
@@ -244,6 +282,12 @@ const AppRoutes = () => {
         <Route path="wallet" element={<WalletPage />} />
         <Route path="withdraw" element={<WithdrawPage />} />
         <Route path="legal-eagle" element={<AiChatPage />} />
+        <Route path="referral" element={<ReferralPage />} />
+        <Route path="bank-accounts" element={<BankAccountsPage />} />
+        <Route path="subscription" element={<SubscriptionPage />} />
+        <Route path="report-issue" element={<ReportIssuePage />} />
+        <Route path="legal-updates" element={<LegalUpdatesPage />} />
+        <Route path="payments" element={<PaymentHistoryPage />} />
         <Route path="under-development" element={<UnderDevelopmentPlaceholder />} />
       </Route>
 
@@ -260,6 +304,7 @@ const AppRoutes = () => {
         <Route path="dashboard" element={<CourtAdminDashboardPage />} />
         <Route path="verify/:lawyerId" element={<VerifyLawyerPage />} />
         <Route path="organization-verifications" element={<OrganizationVerificationsPage />} />
+        <Route path="salary" element={<CourtAdminSalaryPage />} />
         <Route path="profile" element={<CourtAdminProfilePage />} />
       </Route>
 

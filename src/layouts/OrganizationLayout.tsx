@@ -7,6 +7,7 @@ import { useNotificationStore } from '../stores/notificationStore'
 import { useNotificationSocket } from '../hooks/useNotificationSocket'
 import { useOrganizationStore } from '../stores/organizationStore'
 import UserMenu from '../components/molecules/UserMenu'
+import ErrorBoundary from '../components/organisms/ErrorBoundary'
 
 /**
  * Layout for ORGANIZATION (law-firm) users.
@@ -142,7 +143,9 @@ const OrganizationLayout: FC = () => {
       </nav>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Outlet />
+        <ErrorBoundary scope="organization page">
+          <Outlet />
+        </ErrorBoundary>
       </main>
       <NotificationModal open={showNotifications} onClose={() => setShowNotifications(false)} />
       <NotificationToast />
