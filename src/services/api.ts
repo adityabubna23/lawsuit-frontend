@@ -545,39 +545,6 @@ export const storageApi = {
     api.get('/storage/sign', { params: { folder } }),
 }
 
-export const organizationsApi = {
-  // Org self-service
-  getMe: () => api.get('/organizations/me'),
-  updateMe: (payload: Partial<{
-    name: string
-    phone: string
-    avatarUrl: string
-    registrationNumber: string
-    registrationCertUrl: string
-    gstNumber: string
-    gstProofUrl: string
-    panNumber: string
-    about: string
-    website: string
-    practiceAreas: string[]
-    consultationFee: number
-    country: string
-    state: string
-    district: string
-    city: string
-    pincode: string
-    address: string
-    latitude: number
-    longitude: number
-    fcmToken: string
-  }>) => api.put('/organizations/me', payload),
-
-  // Verification
-  getEligibleCourtAdmins: () => api.get('/organizations/me/eligible-court-admins'),
-  requestVerification: (courtAdminId: string) =>
-    api.post('/organizations/me/verification-request', { courtAdminId }),
-}
-
 export const teleLawApi = {
   getSchemeInfo: () => api.get('/tele-law/info'),
   checkEligibility: (data: { income?: number; caste?: string; gender?: string; state?: string; useProfile?: boolean }) =>
