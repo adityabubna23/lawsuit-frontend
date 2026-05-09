@@ -1,7 +1,10 @@
 import { FC, useEffect, useState } from 'react'
-import { Briefcase, Building2, Loader2, X, Pause, Play, Banknote, History, Save, Gavel, Calendar } from 'lucide-react'
-import { adminSalaryApi, adminCourtAdminSalaryApi } from '@/services/api'
+import { useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
+import { Briefcase, Building2, Loader2, X, Pause, Play, Banknote, History, Save, Gavel, Calendar, ArrowRight, Coins } from 'lucide-react'
+import { adminSalaryApi, adminCourtAdminSalaryApi, adminApi } from '@/services/api'
 import { unwrapList, unwrapObject } from '@/utils/unwrap'
+import { friendlyError } from '@/utils/errors'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n ?? 0)
@@ -13,11 +16,80 @@ interface PayableRow {
   id: string
   name?: string
   email?: string
+  avatarUrl?: string | null
   baseSalary?: number
   isHeld?: boolean
   netPayable?: number
+  // Lawyer / Org performance (inline from server)
   consultations?: number
+  caseClosed?: number
+  caseWon?: number
   rating?: number
+  // Court-admin performance (fetched lazily after list loads)
+  caProcessed?: number
+  caApprovalRate?: number | null
+  caScore?: number
+}
+
+/**
+ * Normalize the entity-salary list response into a flat row.
+ *
+ * Server shapes differ by subject:
+ *   - LAWYER / ORGANIZATION → { subject:{name,email,...}, config:{baseSalary,isHeld}, performance:{consultationCount,...}, breakdown:{netPayable} }
+ *   - COURT_ADMIN          → { courtAdmin:{name,email,...}, baseSalary, netPayable }
+ *
+ * This adapter unifies them so the table can render with one set of fields.
+ */
+function normalizePayableRow(raw: any): PayableRow | null {
+  if (!raw || typeof raw !== 'object') return null
+
+  // Court-admin variant
+  if (raw.courtAdmin) {
+    const ca = raw.courtAdmin
+    return {
+      id: ca.id,
+      name: ca.name,
+      email: ca.email,
+      avatarUrl: ca.avatarUrl ?? null,
+      baseSalary: Number(raw.baseSalary ?? 0),
+      netPayable: Number(raw.netPayable ?? raw.baseSalary ?? 0),
+      isHeld: false, // service already filters out held configs
+    }
+  }
+
+  // Entity-salary variant (LAWYER / ORGANIZATION)
+  if (raw.subject || raw.config || raw.breakdown) {
+    const s = raw.subject || {}
+    const cfg = raw.config || {}
+    const perf = raw.performance || {}
+    const br = raw.breakdown || {}
+    return {
+      id: s.id,
+      name: s.name,
+      email: s.email,
+      avatarUrl: s.avatarUrl ?? null,
+      baseSalary: Number(cfg.baseSalary ?? 0),
+      netPayable: Number(br.netPayable ?? br.net ?? cfg.baseSalary ?? 0),
+      isHeld: !!cfg.isHeld,
+      consultations: Number(perf.consultationCount ?? 0),
+      caseClosed: Number(perf.caseClosedCount ?? 0),
+      caseWon: Number(perf.caseWonCount ?? 0),
+      rating: typeof s.rating === 'number' ? s.rating : undefined,
+    }
+  }
+
+  // Already-flat fallback (defensive)
+  return {
+    id: raw.id,
+    name: raw.name,
+    email: raw.email,
+    avatarUrl: raw.avatarUrl ?? null,
+    baseSalary: raw.baseSalary,
+    netPayable: raw.netPayable,
+    isHeld: !!raw.isHeld,
+    consultations: raw.consultations,
+    rating: raw.rating,
+  }
 }
 
 interface SalaryConfig {
@@ -68,12 +140,22 @@ interface CycleHistoryRow {
 }
 
 const AdminSalaryPage: FC = () => {
-  const [tab, setTab] = useState<Tab>('lawyers')
+  // Deep-link support: e.g. /admin/salary?subject=organizations&id=abc auto-opens
+  // the drawer for that entity. Used by the Lawyers / Organizations master pages.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initialSubject = (searchParams.get('subject') || '') as Subject | ''
+  const initialId = searchParams.get('id') || null
+
+  const [tab, setTab] = useState<Tab>(
+    initialSubject === 'lawyers' || initialSubject === 'organizations' || initialSubject === 'court-admins'
+      ? initialSubject
+      : 'lawyers',
+  )
   const subject: Subject = tab === 'cycles-history' ? 'lawyers' : tab
   const [rows, setRows] = useState<PayableRow[]>([])
   const [cycles, setCycles] = useState<CycleHistoryRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [openId, setOpenId] = useState<string | null>(null)
+  const [openId, setOpenId] = useState<string | null>(initialId)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
   const showToast = (msg: string, type: 'success' | 'error') => {
@@ -92,11 +174,36 @@ const AdminSalaryPage: FC = () => {
         if (tab === 'lawyers') res = await adminSalaryApi.listPayableLawyers()
         else if (tab === 'organizations') res = await adminSalaryApi.listPayableOrganizations()
         else res = await adminCourtAdminSalaryApi.listPayable()
-        // Server returns { cycle, items: [...] } for the entity-salary lists.
-        setRows(unwrapList<PayableRow>(res.data))
+        // Server returns { cycle, items: [...] } where each item is shaped
+        // differently per subject — normalise to a flat PayableRow.
+        const raw = unwrapList<any>(res.data)
+        const normalized = raw.map(normalizePayableRow).filter((r): r is PayableRow => !!r && !!r.id)
+        setRows(normalized)
+
+        // Court-admin list endpoint is the "skinny variant" — it doesn't
+        // include performance metrics (decisions processed, approval rate).
+        // Fan out per-row performance fetches in parallel and merge in.
+        // Lawyer / org performance is already inline so no extra fetch.
+        if (tab === 'court-admins' && normalized.length > 0) {
+          const perfResults = await Promise.allSettled(
+            normalized.map((r) => adminCourtAdminSalaryApi.performance(r.id)),
+          )
+          setRows((prev) => prev.map((r, i) => {
+            const result = perfResults[i]
+            if (result.status !== 'fulfilled') return r
+            const p = (result.value.data?.data ?? result.value.data) as any
+            if (!p || (!p.totals && p.performanceScore == null)) return r
+            return {
+              ...r,
+              caProcessed: Number(p.totals?.processed ?? 0),
+              caApprovalRate: typeof p.ratios?.approvalRate === 'number' ? p.ratios.approvalRate : null,
+              caScore: typeof p.performanceScore === 'number' ? p.performanceScore : undefined,
+            }
+          }))
+        }
       }
-    } catch (err: any) {
-      showToast(err?.response?.data?.error || 'Failed to load', 'error')
+    } catch (err) {
+      showToast(friendlyError(err, "We couldn't load this salary cycle."), 'error')
     } finally {
       setLoading(false)
     }
@@ -189,8 +296,34 @@ const AdminSalaryPage: FC = () => {
           </div>
         )
       ) : rows.length === 0 ? (
-        <div className="bg-white border border-gray-100 rounded-xl p-12 text-center text-gray-500">
-          No payable {subject.replace('-', ' ')} this cycle.
+        <div className="bg-white border border-gray-100 rounded-xl p-10 text-center">
+          <Coins className="w-10 h-10 mx-auto text-gray-300 mb-3" />
+          <h3 className="text-base font-semibold text-gray-900">
+            No payable {subject === 'lawyers' ? 'lawyers' : subject === 'organizations' ? 'organizations' : 'court admins'} this cycle
+          </h3>
+          <p className="text-sm text-gray-500 mt-1.5 max-w-md mx-auto leading-relaxed">
+            {subject === 'court-admins' ? (
+              <>This list shows court admins with a base salary set, who haven't been paid yet this cycle. Configure salaries from the Court Admins management page.</>
+            ) : (
+              <>This list shows {subject} with a salary config and unpaid cycle. To populate it, set a base salary on a {subject === 'lawyers' ? 'lawyer' : 'organization'} via their detail page.</>
+            )}
+          </p>
+          <div className="mt-4 inline-flex flex-wrap items-center justify-center gap-2">
+            <Link
+              to={subject === 'court-admins' ? '/admin/court-admins'
+                : subject === 'organizations' ? '/admin/organizations'
+                  : '/admin/lawyers'}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700"
+            >
+              Open {subject === 'court-admins' ? 'court admins' : subject} <ArrowRight className="w-3 h-3" />
+            </Link>
+            <Link
+              to="/admin/dashboard"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-gray-200 text-xs font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Back to dashboard
+            </Link>
+          </div>
         </div>
       ) : (
         <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
@@ -207,16 +340,65 @@ const AdminSalaryPage: FC = () => {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {rows.map((r) => (
-                <tr key={r.id}>
+                <tr key={r.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-gray-900">{r.name || '—'}</div>
-                    {r.email && <div className="text-xs text-gray-500">{r.email}</div>}
+                    <div className="flex items-center gap-3">
+                      {r.avatarUrl ? (
+                        <img src={r.avatarUrl} alt={r.name || ''} className="w-8 h-8 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-semibold">
+                          {(r.name || '?').charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <div className="font-medium text-gray-900 truncate">{r.name || 'Unnamed'}</div>
+                        {r.email && <div className="text-xs text-gray-500 truncate">{r.email}</div>}
+                      </div>
+                    </div>
                   </td>
                   <td className="px-4 py-3">{fmt(r.baseSalary ?? 0)}</td>
                   <td className="px-4 py-3 font-semibold">{fmt(r.netPayable ?? 0)}</td>
                   <td className="px-4 py-3 text-xs text-gray-600">
-                    {r.consultations != null && <>{r.consultations} consults</>}
-                    {r.rating != null && <> · ⭐ {r.rating.toFixed(1)}</>}
+                    {/* Court-admin performance: decisions processed + approval rate
+                        + composite score. Lazy-loaded after the list renders,
+                        so we render a small spinner while in flight. */}
+                    {tab === 'court-admins' ? (
+                      r.caProcessed != null || r.caScore != null ? (
+                        <div className="space-y-0.5">
+                          <div className="font-medium text-gray-700">
+                            {r.caProcessed ?? 0} decision{r.caProcessed === 1 ? '' : 's'}
+                          </div>
+                          {r.caApprovalRate != null && (
+                            <div className="text-gray-500">
+                              {Math.round(r.caApprovalRate * 100)}% approved
+                            </div>
+                          )}
+                          {r.caScore != null && (
+                            <div className="text-indigo-700 font-medium">
+                              Score: {r.caScore}/100
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-gray-400">
+                          <Loader2 className="w-3 h-3 animate-spin" /> loading
+                        </span>
+                      )
+                    ) : r.consultations != null || r.caseClosed != null || r.caseWon != null ? (
+                      <div className="space-y-0.5">
+                        {r.consultations != null && <div>{r.consultations} consults</div>}
+                        {(r.caseClosed != null || r.caseWon != null) && (
+                          <div className="text-gray-500">
+                            {r.caseClosed != null && <>{r.caseClosed} closed</>}
+                            {r.caseWon != null && r.caseClosed != null && <> · </>}
+                            {r.caseWon != null && <>{r.caseWon} won</>}
+                          </div>
+                        )}
+                        {r.rating != null && <div className="text-gray-500">⭐ {r.rating.toFixed(1)}</div>}
+                      </div>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     {r.isHeld ? (
@@ -244,7 +426,16 @@ const AdminSalaryPage: FC = () => {
         <SalaryDrawer
           subject={tab as Subject}
           id={openId}
-          onClose={() => setOpenId(null)}
+          onClose={() => {
+            setOpenId(null)
+            // Strip the ?subject=&id= query params so a refresh doesn't reopen.
+            if (searchParams.has('subject') || searchParams.has('id')) {
+              const next = new URLSearchParams(searchParams)
+              next.delete('subject')
+              next.delete('id')
+              setSearchParams(next, { replace: true })
+            }
+          }}
           onChanged={async () => {
             await load()
           }}
@@ -271,10 +462,17 @@ interface DrawerProps {
   notify: (msg: string, type: 'success' | 'error') => void
 }
 
+interface SubjectIdentity {
+  name?: string
+  email?: string
+  avatarUrl?: string | null
+}
+
 const SalaryDrawer: FC<DrawerProps> = ({ subject, id, onClose, onChanged, notify }) => {
   const [tab, setTab] = useState<'config' | 'history' | 'payouts' | 'banks'>('config')
   const [config, setConfig] = useState<SalaryConfig | null>(null)
   const [edit, setEdit] = useState<SalaryConfig | null>(null)
+  const [identity, setIdentity] = useState<SubjectIdentity | null>(null)
   const [accounts, setAccounts] = useState<BankAccount[]>([])
   const [payouts, setPayouts] = useState<PayoutRow[]>([])
   const [adjustments, setAdjustments] = useState<AdjustmentRow[]>([])
@@ -283,9 +481,22 @@ const SalaryDrawer: FC<DrawerProps> = ({ subject, id, onClose, onChanged, notify
 
   const isCourtAdmin = subject === 'court-admins'
 
+  const subjectLabel = subject === 'lawyers' ? 'Lawyer'
+    : subject === 'organizations' ? 'Organization'
+      : 'Court admin'
+
   const loadAll = async () => {
     setLoading(true)
     try {
+      // Fetch subject identity in parallel — best-effort so the drawer still
+      // works if the user-lookup endpoint fails (e.g. permission blip).
+      const identityP = adminApi.getUserById(id)
+        .then((res) => {
+          const u = (res.data?.data ?? res.data?.user ?? res.data) as SubjectIdentity
+          if (u && (u.name || u.email)) setIdentity(u)
+        })
+        .catch(() => { /* silent */ })
+
       if (isCourtAdmin) {
         const [cfgRes, adjustRes] = await Promise.all([
           adminCourtAdminSalaryApi.getConfig(id),
@@ -315,8 +526,9 @@ const SalaryDrawer: FC<DrawerProps> = ({ subject, id, onClose, onChanged, notify
         setPayouts(unwrapList<PayoutRow>(payoutsRes.data))
         setAdjustments(unwrapList<AdjustmentRow>(adjustRes.data))
       }
-    } catch (err: any) {
-      notify(err?.response?.data?.error || 'Failed to load', 'error')
+      await identityP
+    } catch (err) {
+      notify(friendlyError(err, "We couldn't load this salary record."), 'error')
     } finally {
       setLoading(false)
     }
@@ -344,7 +556,7 @@ const SalaryDrawer: FC<DrawerProps> = ({ subject, id, onClose, onChanged, notify
       onChanged()
       await loadAll()
     } catch (err: any) {
-      notify(err?.response?.data?.error || 'Save failed', 'error')
+      notify(friendlyError(err, "We couldn't save those changes."), 'error')
     } finally {
       setBusy(null)
     }
@@ -364,7 +576,7 @@ const SalaryDrawer: FC<DrawerProps> = ({ subject, id, onClose, onChanged, notify
       onChanged()
       await loadAll()
     } catch (err: any) {
-      notify(err?.response?.data?.error || 'Hold failed', 'error')
+      notify(friendlyError(err, "We couldn't put the salary on hold."), 'error')
     } finally {
       setBusy(null)
     }
@@ -383,7 +595,7 @@ const SalaryDrawer: FC<DrawerProps> = ({ subject, id, onClose, onChanged, notify
       onChanged()
       await loadAll()
     } catch (err: any) {
-      notify(err?.response?.data?.error || 'Release failed', 'error')
+      notify(friendlyError(err, "We couldn't release the hold."), 'error')
     } finally {
       setBusy(null)
     }
@@ -402,7 +614,7 @@ const SalaryDrawer: FC<DrawerProps> = ({ subject, id, onClose, onChanged, notify
       onChanged()
       await loadAll()
     } catch (err: any) {
-      notify(err?.response?.data?.error || 'Pay failed', 'error')
+      notify(friendlyError(err, "We couldn't process the payout."), 'error')
     } finally {
       setBusy(null)
     }
@@ -412,9 +624,25 @@ const SalaryDrawer: FC<DrawerProps> = ({ subject, id, onClose, onChanged, notify
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <aside className="absolute right-0 top-0 h-full w-full max-w-xl bg-white shadow-xl overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b flex items-center justify-between p-4 z-10">
-          <h2 className="text-lg font-semibold">Manage salary</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+        <div className="sticky top-0 bg-white border-b flex items-center justify-between p-4 z-10 gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            {identity?.avatarUrl ? (
+              <img src={identity.avatarUrl} alt={identity?.name || ''} className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-semibold flex-shrink-0">
+                {(identity?.name || subjectLabel).charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold truncate">
+                {identity?.name || `Manage ${subjectLabel.toLowerCase()} salary`}
+              </h2>
+              <div className="text-xs text-gray-500 truncate">
+                {identity?.email ? <>{identity.email} · {subjectLabel}</> : subjectLabel}
+              </div>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 flex-shrink-0">
             <X className="w-5 h-5" />
           </button>
         </div>

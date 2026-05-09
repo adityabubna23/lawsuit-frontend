@@ -53,7 +53,7 @@ interface OrganizationState {
   addLawyer: (data: any) => Promise<any>
 
   fetchRequests: (params?: { status?: OrgAppointmentRequestStatus; page?: number; limit?: number }) => Promise<void>
-  assignRequest: (id: string, body: { lawyerId: string; paymentMethod: 'razorpay' | 'wallet' }) => Promise<any>
+  assignRequest: (id: string, body: { lawyerId: string }) => Promise<any>
   rejectRequest: (id: string, reason: string) => Promise<void>
 
   // Actions — client

@@ -1,7 +1,8 @@
 import { FC, useEffect, useState } from 'react'
-import { Plus, Loader2, X, ShieldCheck, ToggleRight, Trash2 } from 'lucide-react'
+import { Plus, Loader2, X, ShieldCheck, ToggleRight, Trash2, Lock } from 'lucide-react'
 import { adminApi } from '@/services/api'
 import { unwrapList } from '@/utils/unwrap'
+import { friendlyError } from '@/utils/errors'
 
 interface AdminUser {
   id: string
@@ -35,7 +36,7 @@ const AdminTeamPage: FC = () => {
       const res = await adminApi.listAdmins({ limit: 100 })
       setAdmins(unwrapList<AdminUser>(res.data))
     } catch (err: any) {
-      showToast(err?.response?.data?.error || 'Failed to load', 'error')
+      showToast(friendlyError(err, 'Failed to load admin team'), 'error')
     } finally {
       setLoading(false)
     }
@@ -49,18 +50,26 @@ const AdminTeamPage: FC = () => {
   }
 
   const handleEdit = (a: AdminUser) => {
+    if (a.level === 'SUPER_ADMIN') {
+      showToast('Super admins cannot be edited — they hold full platform access by design.', 'error')
+      return
+    }
     setEditing({ ...a, password: '' })
     setShowForm(true)
   }
 
   const handleDelete = async (a: AdminUser) => {
+    if (a.level === 'SUPER_ADMIN') {
+      showToast('Super admins cannot be removed from the team.', 'error')
+      return
+    }
     if (!confirm(`Remove admin ${a.email}? This is a soft delete.`)) return
     try {
       await adminApi.deleteAdmin(a.id)
-      showToast('Removed', 'success')
+      showToast('Admin removed', 'success')
       await load()
     } catch (err: any) {
-      showToast(err?.response?.data?.error || 'Remove failed', 'error')
+      showToast(friendlyError(err, 'Could not remove admin'), 'error')
     }
   }
 
@@ -86,7 +95,7 @@ const AdminTeamPage: FC = () => {
       setEditing(null)
       await load()
     } catch (err: any) {
-      showToast(err?.response?.data?.error || 'Save failed', 'error')
+      showToast(friendlyError(err, 'Could not save admin'), 'error')
     } finally {
       setSaving(false)
     }
@@ -165,12 +174,31 @@ const AdminTeamPage: FC = () => {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1.5">
-                      <button onClick={() => handleEdit(a)} className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-md">
-                        <ToggleRight className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => handleDelete(a)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {a.level === 'SUPER_ADMIN' ? (
+                        <span
+                          title="Super admin holds full platform access and cannot be edited or removed."
+                          className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-100"
+                        >
+                          <Lock className="w-3 h-3" /> Protected
+                        </span>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleEdit(a)}
+                            title="Edit admin"
+                            className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-md"
+                          >
+                            <ToggleRight className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(a)}
+                            title="Remove admin"
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

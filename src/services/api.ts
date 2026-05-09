@@ -319,8 +319,12 @@ export const adminApi = {
   deleteAdmin: (id: string) => api.delete(`/admin/admins/${id}`),
 
   // Payouts (SUPER_ADMIN)
-  listPayouts: (params?: { status?: string; page?: number; limit?: number }) =>
-    api.get('/admin/payouts', { params }),
+  listPayouts: (params?: {
+    payoutStatus?: 'HELD_BY_PLATFORM' | 'PAYABLE' | 'PAID_OUT' | 'REFUNDED'
+    beneficiaryType?: 'LAWYER' | 'ORGANIZATION'
+    page?: number
+    limit?: number
+  }) => api.get('/admin/payouts', { params }),
   getPayoutSummary: () => api.get('/admin/payouts/summary'),
   getEscrowLedger: (params?: { page?: number; limit?: number }) =>
     api.get('/admin/payouts/escrow-ledger', { params }),
@@ -821,9 +825,12 @@ export const organizationsApi = {
   // Appointment requests received by org
   listAppointmentRequests: (params?: { status?: string; page?: number; limit?: number }) =>
     api.get('/organizations/me/appointment-requests', { params }),
+  // Pure task assignment — the client paid at booking time, so the body
+  // only carries the lawyer id. The server materialises the appointment,
+  // repoints the existing pre-paid Payment to it, and notifies everyone.
   assignAppointmentRequest: (
     id: string,
-    body: { lawyerId: string; paymentMethod: 'razorpay' | 'wallet' }
+    body: { lawyerId: string }
   ) => api.post(`/organizations/me/appointment-requests/${id}/assign`, body),
   rejectAppointmentRequest: (id: string, reason: string) =>
     api.post(`/organizations/me/appointment-requests/${id}/reject`, { reason }),
@@ -837,6 +844,49 @@ export const organizationsApi = {
     api.get('/organizations/clients/me/requests', { params }),
   cancelMyRequest: (id: string) =>
     api.post(`/organizations/clients/me/requests/${id}/cancel`),
+
+  // ─── Org-head salary management for lawyers under the org ────────────
+  // Backed by `/organizations/me/lawyers/:id/salary*` (auth: ORGANIZATION).
+  // Server enforces ownership via assertLawyerInOrg.
+  getLawyerSalaryConfig: (lawyerId: string) =>
+    api.get(`/organizations/me/lawyers/${lawyerId}/salary`),
+  setLawyerSalaryConfig: (
+    lawyerId: string,
+    payload: {
+      baseSalary?: number
+      bonusPerConsultation?: number
+      bonusPerCaseClosed?: number
+      bonusPerWonCase?: number
+      reason?: string
+    }
+  ) => api.put(`/organizations/me/lawyers/${lawyerId}/salary`, payload),
+  holdLawyerSalary: (lawyerId: string, reason: string) =>
+    api.post(`/organizations/me/lawyers/${lawyerId}/salary/hold`, { reason }),
+  releaseLawyerSalary: (lawyerId: string, reason?: string) =>
+    api.post(`/organizations/me/lawyers/${lawyerId}/salary/release`, { reason }),
+  previewLawyerSalary: (
+    lawyerId: string,
+    params: { cycleMonth: number; cycleYear: number }
+  ) => api.get(`/organizations/me/lawyers/${lawyerId}/salary/preview`, { params }),
+  payLawyerSalary: (
+    lawyerId: string,
+    payload: {
+      cycleMonth?: number
+      cycleYear?: number
+      bonusAmount?: number
+      deductionAmount?: number
+      notes?: string
+      providerPayoutId?: string
+    }
+  ) => api.post(`/organizations/me/lawyers/${lawyerId}/salary/pay`, payload),
+  getLawyerSalaryAdjustmentHistory: (lawyerId: string, params?: { limit?: number }) =>
+    api.get(`/organizations/me/lawyers/${lawyerId}/salary/history`, { params }),
+  getLawyerSalaryPayoutHistory: (lawyerId: string, params?: { limit?: number }) =>
+    api.get(`/organizations/me/lawyers/${lawyerId}/salary/payouts`, { params }),
+  getLawyerBankAccounts: (lawyerId: string) =>
+    api.get(`/organizations/me/lawyers/${lawyerId}/bank-accounts`),
+  // The org's own performance salary view (paid by the platform, not by us).
+  getMyOrganizationSalary: () => api.get('/organizations/me/salary'),
 }
 
 export default api

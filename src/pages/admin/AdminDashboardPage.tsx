@@ -102,8 +102,8 @@ const AdminDashboardPage: FC = () => {
   ]
 
   const stats = [
-    { label: 'Total Users', value: data.users.total, icon: Users, color: 'bg-blue-500', to: '/admin/userManagement' },
-    { label: 'Active Lawyers', value: data.users.lawyers, icon: Scale, color: 'bg-green-500', to: '/admin/userManagement' },
+    { label: 'Total Users', value: data.users.total, icon: Users, color: 'bg-blue-500', to: '/admin/lawyers' },
+    { label: 'Active Lawyers', value: data.users.lawyers, icon: Scale, color: 'bg-green-500', to: '/admin/lawyers' },
     { label: 'Cases Tracked', value: data.cases.total, icon: FileText, color: 'bg-purple-500' },
     { label: 'Total Revenue', value: data.payments.totalRevenue, icon: IndianRupee, color: 'bg-yellow-500', isCurrency: true },
   ]
@@ -253,8 +253,8 @@ const AdminDashboardPage: FC = () => {
             icon={<ShieldAlert className="w-5 h-5 text-red-600" />}
             empty={data.pendingVerifications.clients + data.pendingVerifications.lawyers === 0}
             emptyMessage="Nothing in the verification queue 🎉"
-            actionLabel="Open queue"
-            actionTo="/admin/userManagement"
+            actionLabel="Open lawyers"
+            actionTo="/admin/lawyers"
           >
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={verificationData} layout="vertical">

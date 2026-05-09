@@ -42,7 +42,6 @@ import LegalUpdatesPage from './pages/app/LegalUpdatesPage'
 import AdminLayout from './layouts/AdminLayout'
 import TemplatesPage from './pages/admin/TemplatesPage'
 import AdminDashboardPage from './pages/admin/AdminDashboardPage'
-import UserManagementPage from './pages/admin/UserManagementPage'
 import AdminPayoutsPage from './pages/admin/AdminPayoutsPage'
 import AdminUserModerationPage from './pages/admin/AdminUserModerationPage'
 import AdminLegalUpdatesPage from './pages/admin/AdminLegalUpdatesPage'
@@ -54,6 +53,8 @@ import AdminCourtsPage from './pages/admin/AdminCourtsPage'
 import AdminTeamPage from './pages/admin/AdminTeamPage'
 import AdminWalletsPage from './pages/admin/AdminWalletsPage'
 import AdminAnnouncementsPage from './pages/admin/AdminAnnouncementsPage'
+import AdminLawyersPage from './pages/admin/AdminLawyersPage'
+import AdminOrganizationsPage from './pages/admin/AdminOrganizationsPage'
 import PaymentHistoryPage from './pages/app/PaymentHistoryPage'
 import HelpCenterPage from './pages/HelpCenterPage'
 import AboutPage from './pages/AboutPage'
@@ -96,6 +97,7 @@ import OrganizationProfilePage from './pages/organization/OrganizationProfilePag
 import OrganizationLawyersPage from './pages/organization/OrganizationLawyersPage'
 import OrganizationRequestsPage from './pages/organization/OrganizationRequestsPage'
 import OrganizationVerificationPage from './pages/organization/OrganizationVerificationPage'
+import OrganizationSalaryPage from './pages/organization/OrganizationSalaryPage'
 
 // Client-side firm discovery
 import FirmsListPage from './pages/app/firms/FirmsListPage'
@@ -251,6 +253,7 @@ const AppRoutes = () => {
         <Route path="dashboard" element={<OrganizationDashboardPage />} />
         <Route path="profile" element={<OrganizationProfilePage />} />
         <Route path="lawyers" element={<OrganizationLawyersPage />} />
+        <Route path="salary" element={<OrganizationSalaryPage />} />
         <Route path="requests" element={<OrganizationRequestsPage />} />
         <Route path="verification" element={<OrganizationVerificationPage />} />
       </Route>
@@ -270,8 +273,9 @@ const AppRoutes = () => {
       >
         <Route path="templates" element={<TemplatesPage />} />
         <Route path="dashboard" element={<AdminDashboardPage />} />
-        <Route path="userManagement" element={<UserManagementPage />} />
         <Route path="moderation" element={<AdminUserModerationPage />} />
+        <Route path="lawyers" element={<AdminLawyersPage />} />
+        <Route path="organizations" element={<AdminOrganizationsPage />} />
         <Route path="payouts" element={<AdminPayoutsPage />} />
         <Route path="court-admins" element={<AdminCourtAdminsPage />} />
         <Route path="legal-updates" element={<AdminLegalUpdatesPage />} />

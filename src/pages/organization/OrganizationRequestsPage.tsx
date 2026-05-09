@@ -104,8 +104,10 @@ const OrganizationRequestsPage: FC = () => {
           request={assignTarget}
           lawyers={lawyers}
           onClose={() => setAssignTarget(null)}
-          onAssign={async (lawyerId, paymentMethod) => {
-            await assignRequest(assignTarget.id, { lawyerId, paymentMethod })
+          onAssign={async (lawyerId) => {
+            // Pure task assignment — the client paid at booking time, so
+            // no payment-method choice is exposed here.
+            await assignRequest(assignTarget.id, { lawyerId })
           }}
         />
       )}
@@ -129,10 +131,9 @@ const AssignModal: FC<{
   request: OrgAppointmentRequest
   lawyers: VerifiedLawyer[]
   onClose: () => void
-  onAssign: (lawyerId: string, paymentMethod: 'razorpay' | 'wallet') => Promise<void>
+  onAssign: (lawyerId: string) => Promise<void>
 }> = ({ request, lawyers, onClose, onAssign }) => {
   const [lawyerId, setLawyerId] = useState<string>('')
-  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'wallet'>('razorpay')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -147,7 +148,7 @@ const AssignModal: FC<{
     setSubmitting(true)
     setError(null)
     try {
-      await onAssign(lawyerId, paymentMethod)
+      await onAssign(lawyerId)
       onClose()
     } catch (err: any) {
       const msg = err?.response?.data?.error || err?.response?.data?.message || 'Failed to assign'
@@ -194,28 +195,11 @@ const AssignModal: FC<{
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Payment method</label>
-            <div className="mt-2 flex gap-2">
-              <button
-                type="button"
-                onClick={() => setPaymentMethod('razorpay')}
-                className={`px-3 py-2 rounded-md text-sm border ${paymentMethod === 'razorpay' ? 'border-primary bg-primary/10 text-primary' : 'border-gray-200'}`}
-              >
-                Razorpay (client pays)
-              </button>
-              <button
-                type="button"
-                onClick={() => setPaymentMethod('wallet')}
-                className={`px-3 py-2 rounded-md text-sm border ${paymentMethod === 'wallet' ? 'border-primary bg-primary/10 text-primary' : 'border-gray-200'}`}
-              >
-                Wallet (client's wallet)
-              </button>
-            </div>
-            <p className="mt-2 text-xs text-gray-500">
-              The client receives a notification to complete payment (Razorpay) or the booking is confirmed instantly (Wallet).
-            </p>
-          </div>
+          <p className="text-xs text-gray-500">
+            The client has already paid for this booking. Assigning will drop
+            the appointment as a task on the lawyer's queue and notify the
+            client. You'll be notified when the lawyer accepts or declines.
+          </p>
         </div>
         <div className="px-5 py-4 border-t flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>

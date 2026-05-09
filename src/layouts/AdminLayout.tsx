@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, ShieldAlert, Banknote, Coins, Wallet,
   Landmark, UserCog, ShieldCheck, Megaphone, Newspaper, Bug,
   ScrollText, FileText, ChevronLeft, ChevronRight, Bell, Menu,
-  LogOut, Search,
+  LogOut, Search, Briefcase, Building2,
 } from 'lucide-react'
 import NotificationModal from '../components/molecules/NotificationModal'
 import NotificationToast from '../components/atoms/NotificationToast'
@@ -34,7 +34,8 @@ const SECTIONS: NavSection[] = [
   {
     heading: 'People',
     items: [
-      { to: '/admin/userManagement', label: 'User Management', icon: Users },
+      { to: '/admin/lawyers', label: 'Lawyers', icon: Briefcase },
+      { to: '/admin/organizations', label: 'Organizations', icon: Building2 },
       { to: '/admin/moderation', label: 'Moderation', icon: ShieldAlert },
       { to: '/admin/court-admins', label: 'Court Admins', icon: UserCog },
       { to: '/admin/team', label: 'Admin Team', icon: ShieldCheck },
@@ -240,7 +241,7 @@ const AdminLayout: FC = () => {
               {/* Search shortcut (decorative — opens nothing yet, but signals the surface) */}
               <button
                 className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-md border border-gray-200 text-xs text-gray-500 hover:bg-gray-50"
-                onClick={() => navigate('/admin/userManagement')}
+                onClick={() => navigate('/admin/lawyers')}
                 title="Quick search"
               >
                 <Search className="w-3.5 h-3.5" />
