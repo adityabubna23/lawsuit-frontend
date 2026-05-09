@@ -42,6 +42,7 @@ const LawyerLayout: FC = () => {
     { name: 'Call History', path: '/lawyer/call-history' },
     { name: 'Agreement Templates', path: '/lawyer/agreement-templates' },
     { name: 'Salary', path: '/lawyer/salary' },
+    { name: 'Availability', path: '/lawyer/availability' },
     { name: 'Onboarding', path: '/lawyer/onboarding' },
     { name: 'Legal Updates', path: '/lawyer/legal-updates' },
     { name: 'Calander', path: '/lawyer/under-development' },

@@ -3,6 +3,7 @@
 import { create } from 'zustand'
 import storage from '@/utils/storage'
 import { authApi } from '@/services/api'
+import { friendlyError } from '@/utils/errors'
 import type { User } from '@/types'
 
 /**
@@ -45,6 +46,12 @@ interface AuthState {
   register: (data: { name: string; email: string; password: string; role: string; phone?: number | string; registrationNumber?: string; pincode?: string; courtDetails?: any }) => Promise<User>
   verifyOtp: (identifier: string, code: string) => Promise<User>
   requestOtp: (identifier: string) => Promise<any>
+  /**
+   * Patch the authenticated user object in-place.
+   * Used after eKYC verification to mirror `ekycVerified=true` etc. onto the
+   * store without requiring a `/auth/me` round-trip.
+   */
+  setUser: (next: Partial<User> | ((prev: User | null) => User | null)) => void
   logout: () => void
   clearError: () => void
 }
@@ -70,7 +77,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ user: enrichedUser, token: accessToken ?? null, isAuthenticated: !!accessToken })
       return enrichedUser as User
     } catch (error: any) {
-      set({ error: error.response?.data?.message || 'Login failed' })
+      set({ error: friendlyError(error, "We couldn't sign you in. Please check your details and try again.") })
       throw error
     } finally {
       set({ isLoading: false })
@@ -96,7 +103,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ user: enrichedUser, token: accessToken ?? null, isAuthenticated: !!accessToken })
       return enrichedUser as User
     } catch (error: any) {
-      set({ error: error.response?.data?.message || 'Registration failed' })
+      set({ error: friendlyError(error, "We couldn't create your account. Please check your details and try again.") })
       throw error
     } finally {
       set({ isLoading: false })
@@ -116,7 +123,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ user: enrichedUser, token: accessToken ?? null, isAuthenticated: !!accessToken })
       return enrichedUser as User
     } catch (error: any) {
-      set({ error: error.response?.data?.message || 'OTP verification failed' })
+      set({ error: friendlyError(error, "That code didn't work. Double-check the 6 digits or request a new code.") })
       throw error
     } finally {
       set({ isLoading: false })
@@ -129,12 +136,20 @@ export const useAuthStore = create<AuthState>((set) => ({
       const response = await authApi.requestOtp(identifier)
       return response.data
     } catch (error: any) {
-      set({ error: error.response?.data?.message || 'OTP request failed' })
+      set({ error: friendlyError(error, "We couldn't send a verification code. Please try again.") })
       throw error
     } finally {
       set({ isLoading: false })
     }
   },
+
+  setUser: (next) => set((state) => {
+    const updated = typeof next === 'function'
+      ? next(state.user)
+      : (state.user ? { ...state.user, ...next } : null)
+    if (updated) storage.setUserData(updated as any)
+    return { user: updated }
+  }),
 
   logout: () => {
     try {

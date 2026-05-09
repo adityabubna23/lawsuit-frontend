@@ -80,8 +80,16 @@ const OtpVerifyPage: FC = () => {
       } else if (role === 'ORGANIZATION') {
         navigate('/organization/dashboard', { replace: true })
       } else {
-        // default to client home
-        navigate('/app/home', { replace: true })
+        // CLIENT — eKYC is mandatory before consultations, case filings,
+        // withdrawals, etc. Send unverified clients straight to the dedicated
+        // eKYC landing so they can verify in one go. Already-verified clients
+        // (returning users completing email re-verification) skip ahead to home.
+        const isVerified = !!(verifiedUser as any)?.ekycVerified
+        if (isVerified) {
+          navigate('/app/home', { replace: true })
+        } else {
+          navigate('/app/ekyc', { replace: true })
+        }
       }
     } catch (err) {
       // Error is handled by the store

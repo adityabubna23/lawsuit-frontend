@@ -186,8 +186,8 @@ const RegisterPage: FC = () => {
                   {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
                 </button>
               </div>
-              <p className="mt-1 text-xs text-red-400">
-                Must be at least 8 characters long with letters, numbers and special characters
+              <p className="mt-1 text-xs text-gray-500">
+                At least 8 characters. Mixing letters, numbers, and a special character is recommended.
               </p>
             </div>
 

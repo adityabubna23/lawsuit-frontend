@@ -90,6 +90,11 @@ class SocketService {
   private rtcAnswerHandlers: RtcAnswerHandler[] = []
   private rtcIceCandidateHandlers: RtcIceCandidateHandler[] = []
 
+  // Tracks an in-flight handshake. Set to true the moment `io()` returns a
+  // Socket and cleared on the first `connect` / `connect_error` event. Without
+  // this, four layout-mount calls race and create four parallel sockets.
+  private connecting = false
+
   private constructor() {}
 
   public static getInstance(): SocketService {
@@ -100,7 +105,12 @@ class SocketService {
   }
 
   connect(): Socket | null {
-    if (this.socket?.connected) return this.socket
+    // Idempotent: reuse any existing socket, whether it has already connected
+    // or is still mid-handshake. Without this guard, StrictMode + the 4
+    // layouts that each call connect() open multiple parallel sockets.
+    if (this.socket && (this.socket.connected || this.connecting)) {
+      return this.socket
+    }
 
     const token = useAuthStore.getState().token
     if (!token) {
@@ -108,6 +118,7 @@ class SocketService {
       return null
     }
 
+    this.connecting = true
     this.socket = io(socketUrl, {
       auth: { token },
       transports: ['websocket', 'polling'],
@@ -116,20 +127,26 @@ class SocketService {
       reconnectionDelay: 1000,
     })
 
-    this.socket.on('connect', () => {
-      console.log('Socket connected:', this.socket?.id)
+    // Capture the new socket in a local so the listener doesn't read a stale
+    // `this.socket` after a reconnect / replacement.
+    const sock = this.socket
+    sock.on('connect', () => {
+      this.connecting = false
+      console.log('Socket connected:', sock.id)
       // Rejoin current chat room if any
       if (this.currentChatId) {
         this.joinChat(this.currentChatId)
       }
     })
 
-    this.socket.on('disconnect', (reason) => {
-      console.log('Socket disconnected:', reason)
+    sock.on('connect_error', (err) => {
+      this.connecting = false
+      console.warn('Socket connect_error:', err?.message)
     })
 
-    this.socket.on('connect_error', (error) => {
-      console.error('Socket connection error:', error.message)
+    sock.on('disconnect', (reason) => {
+      this.connecting = false
+      console.log('Socket disconnected:', reason)
     })
 
     // Listen for new messages

@@ -2,6 +2,7 @@ import { FC, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Scale, Phone, Globe, Shield, CheckCircle, XCircle, ChevronRight, Users, Info, Heart } from 'lucide-react';
 import { teleLawApi } from '@/services/api';
+import EkycStatusCard from '@/components/molecules/EkycStatusCard';
 
 interface EligibilityResult {
     eligible: boolean;
@@ -95,6 +96,10 @@ const TeleLawPage: FC = () => {
             </section>
 
             <div className="max-w-7xl mx-auto px-6 py-12">
+                {/* Aadhaar eKYC — strengthens free-legal-aid eligibility verification */}
+                <div className="mb-8">
+                    <EkycStatusCard />
+                </div>
                 <div className="grid lg:grid-cols-2 gap-12">
 
                     {/* Left: Eligibility Form */}

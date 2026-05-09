@@ -54,6 +54,7 @@ const AppLayout: FC = () => {
     { name: 'Tele Law', path: '/app/tele-law' },
     { name: 'Legal Updates', path: '/app/legal-updates' },
     { name: 'Legal Eagle', path: '/app/legal-eagle' },
+    { name: 'Help', path: '/app/help' },
   ]
 
   return (

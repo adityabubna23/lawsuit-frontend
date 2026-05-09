@@ -28,6 +28,10 @@ const LoginPage: FC = () => {
   // `?mode=admin` opens the form with the Super Admin tab active. This lets
   // /auth/admin-login redirect users here while preserving the admin path.
   const [mode, setMode] = useState<LoginMode>(() => (searchParams.get('mode') === 'admin' ? 'admin' : 'user'))
+  // `?session=expired` is set by the axios interceptor when an in-app refresh
+  // fails — so we can show a friendly explainer instead of dropping the user
+  // at a blank form.
+  const sessionExpired = searchParams.get('session') === 'expired'
 
   useEffect(() => {
     if (searchParams.get('mode') === 'admin') setMode('admin')
@@ -162,6 +166,13 @@ const LoginPage: FC = () => {
           className={`mt-8 space-y-6 ${isAdmin ? 'bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-6' : ''}`}
           onSubmit={handleSubmit}
         >
+          {sessionExpired && !error && (
+            <div className={`rounded-md p-4 ${isAdmin ? 'bg-amber-500/20 border border-amber-400/30' : 'bg-amber-50 border border-amber-100'}`}>
+              <div className={`text-sm ${isAdmin ? 'text-amber-100' : 'text-amber-800'}`}>
+                Your session has expired. Please sign in again to continue.
+              </div>
+            </div>
+          )}
           {error && (
             <div className={`rounded-md p-4 ${isAdmin ? 'bg-red-500/20 border border-red-400/30' : 'bg-red-50'}`}>
               <div className={`text-sm ${isAdmin ? 'text-red-100' : 'text-red-700'}`}>{error}</div>

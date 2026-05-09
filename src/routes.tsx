@@ -55,6 +55,10 @@ import AdminTeamPage from './pages/admin/AdminTeamPage'
 import AdminWalletsPage from './pages/admin/AdminWalletsPage'
 import AdminAnnouncementsPage from './pages/admin/AdminAnnouncementsPage'
 import PaymentHistoryPage from './pages/app/PaymentHistoryPage'
+import HelpCenterPage from './pages/HelpCenterPage'
+import AboutPage from './pages/AboutPage'
+import SettingsPage from './pages/app/SettingsPage'
+import EkycPage from './pages/app/EkycPage'
 
 // Lawyer Pages
 import LawyerLayout from './layouts/LawyerLayout'
@@ -68,6 +72,8 @@ import AgreementTemplatesPage from './pages/lawyer/AgreementTemplatesPage'
 import LawyerMediatorSettingsPage from './pages/lawyer/LawyerMediatorSettingsPage'
 import LawyerSalaryPage from './pages/lawyer/LawyerSalaryPage'
 import LawyerOnboardingPage from './pages/lawyer/LawyerOnboardingPage'
+import LawyerAvailabilityPage from './pages/lawyer/LawyerAvailabilityPage'
+import LawyerClientDetailPage from './pages/lawyer/LawyerClientDetailPage'
 // Mediation Pages
 import MediationsPage from './pages/app/MediationsPage'
 import MediationDetailPage from './pages/app/MediationDetailPage'
@@ -95,6 +101,10 @@ import OrganizationVerificationPage from './pages/organization/OrganizationVerif
 import FirmsListPage from './pages/app/firms/FirmsListPage'
 import FirmDetailPage from './pages/app/firms/FirmDetailPage'
 import MyFirmRequestsPage from './pages/app/firms/MyFirmRequestsPage'
+
+// eKYC gate — required for any client-side action that touches money,
+// case filings, mediation, or consultations.
+import EkycGuard from './components/organisms/EkycGuard'
 
 // Resolve the user's role with a localStorage fallback. Other stores
 // (userStore, courtAdminStore) write to authStore.user via setState, so the
@@ -136,6 +146,8 @@ const AppRoutes = () => {
       <Route path="/auth/otp-verify" element={<OtpVerifyPage />} />
       <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
       <Route path="/terms-of-service" element={<TermsOfServicePage />} />
+      <Route path="/about" element={<AboutPage />} />
+      <Route path="/help" element={<HelpCenterPage />} />
 
       {/* Mediation invite link (public; acts based on auth) */}
       <Route path="/mediation/invite/:token" element={<MediationInviteAcceptPage />} />
@@ -160,14 +172,27 @@ const AppRoutes = () => {
         <Route path="home" element={<HomePage />} />
         <Route path="search" element={<SearchPage />} />
         <Route path="lawyers/:id" element={<LawyerDetailPage />} />
-        <Route path="book/:lawyerId" element={<BookingPage />} />
+        {/* Booking, withdrawals, case filing, mediation initiation are all
+            actions that move money or commit the user to legal proceedings —
+            we require Aadhaar eKYC before allowing any of them. The guard
+            renders a friendly explainer + Verify CTA for un-verified clients
+            and is a no-op for non-CLIENT roles. */}
+        <Route path="book/:lawyerId" element={
+          <EkycGuard action="book a consultation"><BookingPage /></EkycGuard>
+        } />
         <Route path="appointments" element={
           role === 'LAWYER' ? <Navigate to="/lawyer/appointments" replace /> : <AppointmentsPage />
         } />
         <Route path="wallet" element={<WalletPage />} />
-        <Route path="withdraw" element={<WithdrawPage />} />
-        <Route path="cases" element={<ViewCasePages />} />
-        <Route path="case/:caseId" element={<CaseDetailsClientPage />} />
+        <Route path="withdraw" element={
+          <EkycGuard action="withdraw money"><WithdrawPage /></EkycGuard>
+        } />
+        <Route path="cases" element={
+          <EkycGuard action="file or manage cases"><ViewCasePages /></EkycGuard>
+        } />
+        <Route path="case/:caseId" element={
+          <EkycGuard action="open this case"><CaseDetailsClientPage /></EkycGuard>
+        } />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="lex-rates" element={<LexRateTable />} />
         <Route path="tele-law" element={<TeleLawPage />} />
@@ -178,14 +203,28 @@ const AppRoutes = () => {
         <Route path="report-issue" element={<ReportIssuePage />} />
         <Route path="legal-updates" element={<LegalUpdatesPage />} />
         <Route path="payments" element={<PaymentHistoryPage />} />
-        <Route path="consultation/:appointmentId" element={<VideoConsultationPage />} />
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="help" element={<HelpCenterPage />} />
+        <Route path="about" element={<AboutPage />} />
+        {/* Aadhaar eKYC — full-page version. CLIENT only (page renders an
+            empty stub for non-clients). The on-card version lives on /app/profile. */}
+        <Route path="ekyc" element={<EkycPage />} />
+        <Route path="consultation/:appointmentId" element={
+          <EkycGuard action="join the consultation"><VideoConsultationPage /></EkycGuard>
+        } />
         <Route path="call-history" element={<CallHistoryPage />} />
 
-        {/* Mediation (client) */}
+        {/* Mediation (client) — gated because mediation creates a legal record */}
         <Route path="mediations" element={<MediationsPage />} />
-        <Route path="mediation/new" element={<NewMediationInvitePage />} />
-        <Route path="mediation/:id" element={<MediationDetailPage />} />
-        <Route path="mediation/:id/room" element={<MediationRoomPage />} />
+        <Route path="mediation/new" element={
+          <EkycGuard action="initiate a mediation"><NewMediationInvitePage /></EkycGuard>
+        } />
+        <Route path="mediation/:id" element={
+          <EkycGuard action="open this mediation"><MediationDetailPage /></EkycGuard>
+        } />
+        <Route path="mediation/:id/room" element={
+          <EkycGuard action="join the mediation room"><MediationRoomPage /></EkycGuard>
+        } />
 
         {/* Law firms (organization) discovery & booking */}
         <Route path="firms" element={<FirmsListPage />} />
@@ -271,6 +310,11 @@ const AppRoutes = () => {
         <Route path="mediator-settings" element={<LawyerMediatorSettingsPage />} />
         <Route path="salary" element={<LawyerSalaryPage />} />
         <Route path="onboarding" element={<LawyerOnboardingPage />} />
+        <Route path="availability" element={<LawyerAvailabilityPage />} />
+        <Route path="client/:clientId" element={<LawyerClientDetailPage />} />
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="help" element={<HelpCenterPage />} />
+        <Route path="about" element={<AboutPage />} />
         <Route path="mediations" element={<MediationsPage />} />
         <Route path="mediation/:id" element={<MediationDetailPage />} />
         <Route path="mediation/:id/room" element={<MediationRoomPage />} />

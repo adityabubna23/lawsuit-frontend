@@ -65,23 +65,33 @@ const UserMenu: FC<UserMenuProps> = ({ user, onLogout }) => {
                 {user?.role === 'LAWYER' ? (
                   <>
                     <Link to="/lawyer/profile" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Your Profile</Link>
+                    <Link to="/lawyer/availability" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Availability</Link>
                     <Link to="/lawyer/salary" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Salary Slip</Link>
                     <Link to="/lawyer/subscription" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Pro Subscription</Link>
                     <Link to="/lawyer/referral" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Refer & Earn</Link>
                     <Link to="/lawyer/bank-accounts" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Bank Accounts</Link>
                     <Link to="/lawyer/payments" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Payment History</Link>
                     <Link to="/lawyer/legal-updates" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Legal Updates</Link>
+                    <div className="my-1 border-t border-gray-100" />
+                    <Link to="/lawyer/settings" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Settings & Security</Link>
+                    <Link to="/lawyer/help" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Help Center</Link>
                     <Link to="/lawyer/report-issue" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Report an Issue</Link>
+                    <Link to="/lawyer/about" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">About NyayaX</Link>
                   </>
                 ) : (
                   <>
                     <Link to="/app/profile" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Your Profile</Link>
+                    <Link to="/app/ekyc" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Aadhaar Verification</Link>
                     <Link to="/app/referral" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Refer & Earn</Link>
                     <Link to="/app/bank-accounts" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Bank Accounts</Link>
                     <Link to="/app/subscription" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Subscription</Link>
                     <Link to="/app/payments" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Payment History</Link>
                     <Link to="/app/legal-updates" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Legal Updates</Link>
+                    <div className="my-1 border-t border-gray-100" />
+                    <Link to="/app/settings" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Settings & Security</Link>
+                    <Link to="/app/help" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Help Center</Link>
                     <Link to="/app/report-issue" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Report an Issue</Link>
+                    <Link to="/app/about" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">About NyayaX</Link>
                   </>
                 )}
               </div>

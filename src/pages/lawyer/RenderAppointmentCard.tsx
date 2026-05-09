@@ -1,4 +1,5 @@
 import { FC, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Calendar, Clock, FileText, MessageSquare, User, Video, Upload, RefreshCw, XCircle, ChevronDown, ChevronUp, Check, X, CheckCircle2 } from 'lucide-react'
 import AppointmentDiscussionPanel from '@/components/organisms/AppointmentDiscussionPanel'
 import { appointmentsExtApi } from '@/services/api'
@@ -167,9 +168,19 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
               )}
             </div>
             <div>
-              <h3 className="text-base font-medium text-primary">
-                {otherParty?.name || 'Unknown'}
-              </h3>
+              {otherParty?.id ? (
+                <Link
+                  to={`/lawyer/client/${otherParty.id}`}
+                  className="text-base font-medium text-primary hover:underline"
+                  title="View client history"
+                >
+                  {otherParty.name || 'Unknown'}
+                </Link>
+              ) : (
+                <h3 className="text-base font-medium text-primary">
+                  {otherParty?.name || 'Unknown'}
+                </h3>
+              )}
               <p className="text-sm text-secondary">{otherParty?.email}</p>
             </div>
           </div>

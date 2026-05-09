@@ -1,5 +1,5 @@
 import { FC, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import { casesApi, usersApi, authApi } from '@/services/api'
 import storage from '@/utils/storage'
@@ -7,9 +7,20 @@ import { useUserStore } from '@/stores/userStore'
 import Button from '@/components/atoms/Button'
 import ClientInfo from '@/components/molecules/ClientInfo'
 import DangerZone from '@/components/molecules/DangerZone'
+import EkycStatusCard from '@/components/molecules/EkycStatusCard'
 
 const ProfilePage: FC = () => {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  // Newly-registered clients land here with `?onboarding=ekyc` so we can show
+  // a one-time welcome banner above the eKYC card. Dismissable.
+  const [showOnboardingBanner, setShowOnboardingBanner] = useState(searchParams.get('onboarding') === 'ekyc')
+  const dismissOnboardingBanner = () => {
+    setShowOnboardingBanner(false)
+    const next = new URLSearchParams(searchParams)
+    next.delete('onboarding')
+    setSearchParams(next, { replace: true })
+  }
   const authUser = useAuthStore((s) => s.user)
   const { user: storeUser, getUser, updateUser, requestVerification, verifyCode } = useUserStore((s) => ({
     user: s.user,
@@ -253,6 +264,34 @@ const ProfilePage: FC = () => {
           <div className="mt-6">
             <h1 className=" flex justify-center text-lg font-semibold text-midnight mb-2">Additional Information</h1>
             <ClientInfo />
+          </div>
+          {/* Aadhaar eKYC — only renders for CLIENT role */}
+          <div className="mt-8 space-y-3">
+            {showOnboardingBanner && (
+              <div className="rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-4 flex items-start gap-3">
+                <div className="w-9 h-9 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
+                  ✓
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-indigo-900">
+                    Welcome to NyayaX! One last step.
+                  </h3>
+                  <p className="text-xs text-indigo-800 mt-0.5">
+                    Verify your Aadhaar to unlock consultations, case filings, and free legal aid eligibility.
+                    It takes less than a minute.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={dismissOnboardingBanner}
+                  className="text-xs text-indigo-600 hover:text-indigo-800 px-2 py-1 flex-shrink-0"
+                  aria-label="Dismiss"
+                >
+                  Skip for now
+                </button>
+              </div>
+            )}
+            <EkycStatusCard />
           </div>
           <div className="mt-8">
             <DangerZone />

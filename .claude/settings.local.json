@@ -4,7 +4,9 @@
       "Bash(ls \"C:/Users/chand/OneDrive/Desktop/NexusWS/NyayaX/\")",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\chand\\\\OneDrive\\\\Desktop\\\\NexusWS\\\\NyayaX\\\\lawsuit-server\\\\src\\\\routes\\\\\" -Filter \"*.ts\" | Select-Object Name)",
       "Bash(npx tsc *)",
-      "Bash(echo \"EXIT=$?\")"
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(Get-ChildItem -Path \"C:/Users/chand/OneDrive/Desktop/NexusWS/NyayaX/lawsuit-server/src/routes\" -Filter \"*.routes.ts\" -Recurse)",
+      "Bash(Select-Object FullName)"
     ]
   }
 }

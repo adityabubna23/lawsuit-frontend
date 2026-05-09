@@ -18,7 +18,19 @@ async function startApp() {
     ReactDOM.createRoot(document.getElementById('root')!).render(
       <React.StrictMode>
         <QueryClientProvider client={queryClient}>
-          <BrowserRouter>
+          {/*
+            Opt into v7 future flags so the upgrade is incremental and the
+            console deprecation warnings go away. `v7_startTransition` wraps
+            internal state updates in React.startTransition; `v7_relativeSplatPath`
+            adopts the v7 behaviour for relative routes inside splat routes.
+            Both are safe defaults for our routing setup.
+          */}
+          <BrowserRouter
+            future={{
+              v7_startTransition: true,
+              v7_relativeSplatPath: true,
+            }}
+          >
             <App />
           </BrowserRouter>
         </QueryClientProvider>

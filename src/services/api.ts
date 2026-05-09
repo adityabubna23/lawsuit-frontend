@@ -48,16 +48,25 @@ api.interceptors.response.use(
       else errMsg = JSON.stringify(respData)
     }
 
+    // Helper: when we have to bounce the user back to login because their
+    // session can't be refreshed, append `?session=expired` so the login page
+    // can show a friendly "Your session expired, please sign in again" hint
+    // instead of dumping them at a blank form with no context.
+    const bounceToLogin = () => {
+      try { useAuthStore.getState().logout() } catch (e) { /* noop */ }
+      if (typeof window !== 'undefined') {
+        const cur = window.location.pathname
+        // Skip the bounce if we're already on a public auth page — no need to
+        // loop the user back through login from the login screen itself.
+        if (!cur.startsWith('/auth/')) {
+          window.location.href = '/auth/login?session=expired'
+        }
+      }
+    }
+
     // If the token is expired according to backend message, force logout and redirect to login
     if (errMsg && /jwt expired|token expired|TokenExpiredError/i.test(errMsg)) {
-      try {
-        useAuthStore.getState().logout()
-      } catch (e) {
-        // ignore
-      }
-      if (typeof window !== 'undefined') {
-        window.location.href = '/auth/login'
-      }
+      bounceToLogin()
       return Promise.reject(error)
     }
 
@@ -65,15 +74,13 @@ api.interceptors.response.use(
 
     if (originalRequest && (originalRequest as any)._retry) {
       // already retried once -> force logout
-      try { useAuthStore.getState().logout() } catch (e) { }
-      if (typeof window !== 'undefined') window.location.href = '/auth/login'
+      bounceToLogin()
       return Promise.reject(error)
     }
 
     const storedRefresh = storage.getRefreshToken()
     if (!storedRefresh) {
-      try { useAuthStore.getState().logout() } catch (e) { }
-      if (typeof window !== 'undefined') window.location.href = '/auth/login'
+      bounceToLogin()
       return Promise.reject(error)
     }
 
@@ -93,8 +100,7 @@ api.interceptors.response.use(
           return res
         })
         .catch((err) => {
-          try { useAuthStore.getState().logout() } catch (e) { }
-          if (typeof window !== 'undefined') window.location.href = '/auth/login'
+          bounceToLogin()
           return Promise.reject(err)
         })
         .finally(() => {
@@ -219,6 +225,8 @@ export const usersApi = {
   getMe: () => api.get('/users/me'),
   updateMe: (payload: { name?: string; phone?: string; avatarUrl?: string }) => api.put('/users/me', payload),
   deleteMe: () => api.delete('/users/me'),
+  /** General user lookup — server resolves across CLIENT/LAWYER/ORG/COURT_ADMIN tables. */
+  getById: (id: string) => api.get(`/users/${id}`),
   getPresignedUrl: (userId: string, params?: { fileName?: string; mimeType?: string; size?: number }) =>
     api.get(`/cases/${userId}/getpresignedUrl`, { params }),
   // Cloudinary signed upload: returns { timestamp, signature, cloudName, apiKey, folder }
@@ -533,8 +541,29 @@ export const casesExtApi = {
 
 export const videoApi = {
   getMeeting: (appointmentId: string) => api.get(`/video/meeting/${appointmentId}`),
+  /** Manually provision a Daily.co room for an appointment (fallback when the
+   *  auto-create on appointment-confirm didn't fire). */
+  createMeeting: (appointmentId: string) =>
+    api.post('/video/meeting', { appointmentId }),
+  /** End an in-progress meeting. The lawyer (host) calls this on leave so the
+   *  server can release escrow / mark the consultation completed. */
+  endMeeting: (appointmentId: string) =>
+    api.post(`/video/meeting/${appointmentId}/end`),
   getCallHistory: (params?: { page?: number; limit?: number }) =>
     api.get('/video/call-history', { params }),
+}
+
+// ── eKYC (Aadhaar OTP-based, CLIENT only) ──────────────────────────────
+// Server: /api/v1/ekyc — Surepass-backed. Heavily rate-limited:
+//   POST /aadhaar/initiate    → 5/hour  (each call costs ~₹2-4)
+//   POST /aadhaar/submit-otp  → 10/15min
+// Both throw 429 with `{ error: 'Too many ... attempts ...' }` past the cap.
+export const ekycApi = {
+  getStatus: () => api.get('/ekyc/status'),
+  initiateAadhaar: (aadhaar: string) =>
+    api.post('/ekyc/aadhaar/initiate', { aadhaar }),
+  submitOtp: (submissionId: string, otp: string) =>
+    api.post('/ekyc/aadhaar/submit-otp', { submissionId, otp }),
 }
 
 export const storageApi = {
