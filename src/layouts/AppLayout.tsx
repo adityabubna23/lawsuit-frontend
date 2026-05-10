@@ -62,24 +62,28 @@ const AppLayout: FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white shadow relative z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
+        {/*
+          Use the full viewport width (not max-w-7xl) so 15+ nav items don't
+          push the right-side wallet/notification/profile controls off-screen.
+          The middle nav block is scroll-on-overflow with hidden scrollbars
+          as a safety net; right-side controls are pinned with flex-shrink-0
+          so they're always visible regardless of nav-item count.
+        */}
+        <div className="max-w-full px-3 sm:px-4 lg:px-6">
+          <div className="flex items-center justify-between h-16 gap-3">
+            <div className="flex items-center min-w-0 flex-1">
               {/* Logo */}
               <div className="flex-shrink-0 flex items-center">
                 <Link to="/app/home">
-                  {/* <img
-                    className="h-8 w-auto"
-                    src="/logo.png"
-                    alt="Lawsuit"
-                  /> */}
-                  <h1 className="text-2xl font-bold text-primary">Lawsuit</h1>
-
+                  <h1 className="text-xl lg:text-2xl font-bold text-primary">Lawsuit</h1>
                 </Link>
               </div>
 
-              {/* Desktop Navigation */}
-              <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+              {/* Desktop Navigation — scrolls horizontally as a fallback if
+                  somehow the items still overflow on a very narrow viewport */}
+              <div
+                className="hidden sm:flex sm:items-center sm:ml-3 lg:ml-6 sm:space-x-3 md:space-x-4 lg:space-x-5 xl:space-x-6 overflow-x-auto whitespace-nowrap min-w-0 flex-1 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
+              >
                 {navigation.map((item) => (
                   <Link
                     key={item.name}
@@ -87,7 +91,7 @@ const AppLayout: FC = () => {
                     className={`${location.pathname === item.path
                       ? 'border-primary text-gray-900'
                       : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                      } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+                      } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium flex-shrink-0`}
                   >
                     {item.name}
                   </Link>
@@ -95,8 +99,9 @@ const AppLayout: FC = () => {
               </div>
             </div>
 
-            {/* User Menu */}
-            <div className="hidden sm:ml-6 sm:flex sm:items-center">
+            {/* User Menu — pinned, never shrinks below its natural size so
+                wallet/notification/profile are always visible. */}
+            <div className="hidden sm:flex sm:items-center flex-shrink-0">
               {/* Wallet - routes to /app/wallet */}
               <Link to="/app/wallet" className="ml-3 relative p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
                 <span className="sr-only">Open wallet</span>

@@ -11,6 +11,8 @@
  * sees something readable instead of "[object Object]" or "Network Error".
  */
 
+import { rewriteSandboxError } from './ekycProvider'
+
 interface AxiosLikeError {
   response?: {
     status?: number
@@ -60,6 +62,13 @@ function humanizeServerMessage(raw: string): string {
   if (/cannot get|cannot post|cannot put|cannot delete|cannot patch/i.test(trimmed)) {
     return "That action isn't available right now."
   }
+
+  // Sandbox-specific rewrites — turn provider-side wording ("Invalid OTP",
+  // "Reference id has expired", "Aadhaar not linked to mobile") into copy
+  // that tells the user what to *do* next. No-op when the message doesn't
+  // match a known pattern.
+  const sandboxRewrite = rewriteSandboxError(trimmed)
+  if (sandboxRewrite !== trimmed) return sandboxRewrite
 
   // Sentence-case the first letter so server's lowercase verbs (`"failed to ..."`) read as polished UI copy.
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1)

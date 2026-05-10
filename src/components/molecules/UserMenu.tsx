@@ -40,8 +40,13 @@ const UserMenu: FC<UserMenuProps> = ({ user, onLogout }) => {
             onClick={() => setIsProfileOpen(false)}
           />
 
-          <aside className="fixed right-0 top-0 h-full w-96 bg-white shadow-xl z-50 transform transition-transform">
-            <div className="p-6 flex flex-col h-full">
+          <aside className="fixed right-0 top-0 h-full w-full max-w-sm sm:w-96 bg-white shadow-xl z-50 transform transition-transform flex flex-col">
+            {/*
+              Header — fixed at the top, doesn't shrink.
+              Padding kept on the inner divs so the scroll area below can
+              extend edge-to-edge for cleaner long lists.
+            */}
+            <div className="p-6 pb-0 flex-shrink-0">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-4">
@@ -60,8 +65,18 @@ const UserMenu: FC<UserMenuProps> = ({ user, onLogout }) => {
                 </div>
                 <button onClick={() => setIsProfileOpen(false)} className="text-gray-500 hover:text-gray-700">Close</button>
               </div>
+            </div>
 
-              <div className="mt-6 border-t pt-4">
+            {/*
+              Scrollable middle — `flex-1 min-h-0` lets it take the
+              remaining vertical space and `overflow-y-auto` makes the
+              menu items scroll when there are too many to fit. Without
+              `min-h-0` flexbox would let the section grow past the
+              container and the items at the bottom would be clipped
+              instead of scrollable (which is exactly what was happening).
+            */}
+            <div className="flex-1 min-h-0 overflow-y-auto px-6 mt-6 border-t pt-4">
+              <div>
                 {user?.role === 'LAWYER' ? (
                   <>
                     <Link to="/lawyer/profile" onClick={() => setIsProfileOpen(false)} className="block px-2 py-3 rounded text-gray-700 hover:bg-gray-100">Your Profile</Link>
@@ -95,17 +110,20 @@ const UserMenu: FC<UserMenuProps> = ({ user, onLogout }) => {
                   </>
                 )}
               </div>
+            </div>
 
-              <div className="mt-auto">
-                <div className="border-t pt-4">
-                  <button
-                    onClick={() => { setIsProfileOpen(false); onLogout() }}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                  >
-                    Sign out
-                  </button>
-                </div>
-              </div>
+            {/*
+              Footer — pinned to the bottom, never shrinks. Sits OUTSIDE the
+              scroll area so the Sign-out button is always visible regardless
+              of how far the user has scrolled the menu list.
+            */}
+            <div className="flex-shrink-0 px-6 pb-6 pt-3 border-t bg-white">
+              <button
+                onClick={() => { setIsProfileOpen(false); onLogout() }}
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded"
+              >
+                Sign out
+              </button>
             </div>
           </aside>
         </>

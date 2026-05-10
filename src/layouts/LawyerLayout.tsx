@@ -53,18 +53,23 @@ const LawyerLayout: FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white shadow relative z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
+        {/* Full-width nav so the wallet/notification/profile cluster stays
+            visible regardless of how many nav items the lawyer surface adds.
+            See AppLayout for the full rationale. */}
+        <div className="max-w-full px-3 sm:px-4 lg:px-6">
+          <div className="flex items-center justify-between h-16 gap-3">
+            <div className="flex items-center min-w-0 flex-1">
               {/* Logo */}
               <div className="flex-shrink-0 flex items-center">
                 <Link to="/lawyer/dashboard">
-                  <h1 className="text-2xl font-bold text-primary">Lawsuit</h1>
+                  <h1 className="text-xl lg:text-2xl font-bold text-primary">Lawsuit</h1>
                 </Link>
               </div>
 
-              {/* Desktop Navigation */}
-              <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+              {/* Desktop Navigation — scroll-on-overflow fallback */}
+              <div
+                className="hidden sm:flex sm:items-center sm:ml-3 lg:ml-6 sm:space-x-3 md:space-x-4 lg:space-x-5 xl:space-x-6 overflow-x-auto whitespace-nowrap min-w-0 flex-1 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
+              >
                 {navigation.map((item) => (
                   <Link
                     key={item.name}
@@ -72,7 +77,7 @@ const LawyerLayout: FC = () => {
                     className={`${location.pathname === item.path
                       ? 'border-primary text-gray-900'
                       : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                      } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+                      } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium flex-shrink-0`}
                   >
                     {item.name}
                   </Link>
@@ -80,8 +85,8 @@ const LawyerLayout: FC = () => {
               </div>
             </div>
 
-            {/* User Menu */}
-            <div className="hidden sm:ml-6 sm:flex sm:items-center">
+            {/* User Menu — pinned */}
+            <div className="hidden sm:flex sm:items-center flex-shrink-0">
               <Link to="/lawyer/wallet" className="ml-3 relative p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
                 <span className="sr-only">Open wallet</span>
                 <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

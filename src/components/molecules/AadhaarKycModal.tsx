@@ -1,8 +1,9 @@
 import { FC, useEffect, useState, useRef } from 'react'
-import { X, ShieldCheck, Loader2, AlertCircle, Check, RefreshCw, Lock } from 'lucide-react'
+import { X, ShieldCheck, Loader2, AlertCircle, Check, RefreshCw, Lock, Mail } from 'lucide-react'
 import { ekycApi } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
 import { friendlyError } from '@/utils/errors'
+import { ekycProviderLabel } from '@/utils/ekycProvider'
 
 interface AadhaarKycModalProps {
   open: boolean
@@ -13,7 +14,17 @@ interface AadhaarKycModalProps {
   onVerified?: () => void
 }
 
-type Step = 'aadhaar' | 'otp' | 'done'
+// Steps:
+//   aadhaar         → step 1 of the Aadhaar path (also hosts the OR-alternative card)
+//   otp             → step 2 of the Aadhaar path
+//   email-otp       → step 2 of the temporary email-OTP fallback path
+//   done            → success (works for either path)
+type Step = 'aadhaar' | 'otp' | 'email-otp' | 'done'
+
+// Which path the user is currently on. Drives copy ("Aadhaar verified" vs
+// "Identity verified — temporary"), the success-screen note, and the OTP
+// submit handler.
+type Path = 'AADHAAR' | 'EMAIL_OTP'
 
 // Format 1234 5678 9012 as the user types
 const formatAadhaar = (raw: string) => {
@@ -23,16 +34,23 @@ const formatAadhaar = (raw: string) => {
 
 const AadhaarKycModal: FC<AadhaarKycModalProps> = ({ open, onClose, resumeSubmission, onVerified }) => {
   const setUser = useAuthStore((s) => s.setUser)
+  const me = useAuthStore((s) => s.user)
   const [step, setStep] = useState<Step>('aadhaar')
+  const [path, setPath] = useState<Path>('AADHAAR')
   const [aadhaar, setAadhaar] = useState('')
   const [consent, setConsent] = useState(false)
   const [submissionId, setSubmissionId] = useState<string | null>(null)
   const [expiresAt, setExpiresAt] = useState<string | null>(null)
+  const [sentToEmailMasked, setSentToEmailMasked] = useState<string | null>(null)
   const [otp, setOtp] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null)
-  const [verifiedClient, setVerifiedClient] = useState<{ aadhaarLast4?: string; aadhaarName?: string } | null>(null)
+  const [verifiedClient, setVerifiedClient] = useState<{
+    aadhaarLast4?: string
+    aadhaarName?: string
+    ekycVerifiedVia?: 'AADHAAR' | 'EMAIL_OTP'
+  } | null>(null)
   const otpInputRef = useRef<HTMLInputElement>(null)
 
   // Reset on open / handle resume
@@ -42,6 +60,8 @@ const AadhaarKycModal: FC<AadhaarKycModalProps> = ({ open, onClose, resumeSubmis
     setOtp('')
     setVerifiedClient(null)
     setConsent(false)
+    setSentToEmailMasked(null)
+    setPath('AADHAAR')
     if (resumeSubmission?.id) {
       setSubmissionId(resumeSubmission.id)
       setExpiresAt(resumeSubmission.expiresAt ?? null)
@@ -55,9 +75,10 @@ const AadhaarKycModal: FC<AadhaarKycModalProps> = ({ open, onClose, resumeSubmis
     }
   }, [open, resumeSubmission?.id, resumeSubmission?.expiresAt])
 
-  // Countdown for OTP expiry
+  // Countdown for OTP expiry — covers both Aadhaar (step='otp') and email
+  // (step='email-otp') paths since both share `expiresAt`.
   useEffect(() => {
-    if (step !== 'otp' || !expiresAt) {
+    if ((step !== 'otp' && step !== 'email-otp') || !expiresAt) {
       setSecondsLeft(null)
       return
     }
@@ -71,9 +92,9 @@ const AadhaarKycModal: FC<AadhaarKycModalProps> = ({ open, onClose, resumeSubmis
     return () => clearInterval(id)
   }, [step, expiresAt])
 
-  // Autofocus OTP field when entering step 2
+  // Autofocus OTP field when entering either step-2 (Aadhaar OR email).
   useEffect(() => {
-    if (step === 'otp') {
+    if (step === 'otp' || step === 'email-otp') {
       const t = setTimeout(() => otpInputRef.current?.focus(), 50)
       return () => clearTimeout(t)
     }
@@ -113,20 +134,25 @@ const AadhaarKycModal: FC<AadhaarKycModalProps> = ({ open, onClose, resumeSubmis
     }
   }
 
+  // Shared OTP submitter — branches between the Aadhaar path and the
+  // temporary email-OTP fallback based on `path` state.
   const handleSubmitOtp = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!submissionId) return
     if (otp.length !== 6) {
-      setError('Enter the 6-digit OTP from your SMS.')
+      setError('Enter the 6-digit OTP.')
       return
     }
     setBusy(true)
     setError(null)
     try {
-      const res = await ekycApi.submitOtp(submissionId, otp)
+      const res = path === 'EMAIL_OTP'
+        ? await ekycApi.submitEmailOtp(submissionId, otp)
+        : await ekycApi.submitOtp(submissionId, otp)
       const client = (res.data?.data ?? res.data) as {
         ekycVerified?: boolean
         ekycVerifiedAt?: string
+        ekycVerifiedVia?: 'AADHAAR' | 'EMAIL_OTP'
         aadhaarLast4?: string
         aadhaarName?: string
       }
@@ -139,6 +165,7 @@ const AadhaarKycModal: FC<AadhaarKycModalProps> = ({ open, onClose, resumeSubmis
           ...prev,
           ekycVerified: true,
           ekycVerifiedAt: client.ekycVerifiedAt,
+          ekycVerifiedVia: client.ekycVerifiedVia ?? path,
           aadhaarLast4: client.aadhaarLast4,
           aadhaarName: client.aadhaarName,
         } as any) : prev)
@@ -148,13 +175,15 @@ const AadhaarKycModal: FC<AadhaarKycModalProps> = ({ open, onClose, resumeSubmis
     } catch (err: any) {
       const status = err?.response?.status
       if (status === 410) {
-        // Server returns 410 GONE when the OTP expired. Bounce the user
-        // back to step 1 so they can request a fresh OTP.
+        // Server returns 410 GONE when the OTP expired. Bounce back to the
+        // step-1 chooser so the user can re-request via either path.
         setError('That OTP has expired. Please request a new one.')
         setStep('aadhaar')
+        setPath('AADHAAR')
         setSubmissionId(null)
         setExpiresAt(null)
         setOtp('')
+        setSentToEmailMasked(null)
       } else if (status === 429) {
         setError("Too many OTP attempts. Please wait 15 minutes and try again.")
       } else {
@@ -168,11 +197,49 @@ const AadhaarKycModal: FC<AadhaarKycModalProps> = ({ open, onClose, resumeSubmis
     }
   }
 
+  // Temporary email-OTP fallback: triggered from the OR-alternative card on
+  // the step-1 Aadhaar screen. No input from the user — server uses the
+  // registered email and replies with a masked version we display.
+  const handleInitiateEmailOtp = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await ekycApi.initiateEmailOtp()
+      const data = (res.data?.data ?? res.data) as {
+        id: string
+        expiresAt?: string
+        sentToEmailMasked?: string
+      }
+      setPath('EMAIL_OTP')
+      setSubmissionId(data.id)
+      setExpiresAt(data.expiresAt ?? null)
+      setSentToEmailMasked(data.sentToEmailMasked ?? null)
+      setStep('email-otp')
+      setOtp('')
+    } catch (err: any) {
+      const status = err?.response?.status
+      if (status === 429) {
+        setError("You've requested too many OTPs in the last hour. Please wait and try again.")
+      } else if (status === 409) {
+        setError('Your account is already verified — no further action needed.')
+      } else if (status === 502) {
+        setError("We couldn't send the email right now. Please try again in a moment.")
+      } else {
+        setError(friendlyError(err, "We couldn't send the OTP email right now."))
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const handleResend = () => {
-    // Resending = restart from step 1 with the same Aadhaar (server creates a new submission).
+    // Restart from step 1. For EMAIL_OTP, that means tapping the alternative
+    // card again — same UX as Aadhaar resend.
     setStep('aadhaar')
+    setPath('AADHAAR')
     setSubmissionId(null)
     setExpiresAt(null)
+    setSentToEmailMasked(null)
     setOtp('')
     setError(null)
   }
@@ -189,11 +256,14 @@ const AadhaarKycModal: FC<AadhaarKycModalProps> = ({ open, onClose, resumeSubmis
               <ShieldCheck className="w-5 h-5 text-indigo-600" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-gray-900">Aadhaar eKYC</h2>
+              <h2 className="text-base font-semibold text-gray-900">
+                {path === 'EMAIL_OTP' ? 'Identity verification' : 'Aadhaar eKYC'}
+              </h2>
               <p className="text-xs text-gray-500">
-                {step === 'aadhaar' && 'Step 1 of 2 · Enter Aadhaar'}
-                {step === 'otp' && 'Step 2 of 2 · Enter OTP'}
-                {step === 'done' && 'Verified'}
+                {step === 'aadhaar' && 'Step 1 of 2 · Aadhaar or email OTP'}
+                {step === 'otp' && 'Step 2 of 2 · Enter Aadhaar OTP'}
+                {step === 'email-otp' && 'Step 2 of 2 · Enter email OTP (temporary)'}
+                {step === 'done' && (path === 'EMAIL_OTP' ? 'Verified (temporary)' : 'Verified')}
               </p>
             </div>
           </div>
@@ -253,6 +323,53 @@ const AadhaarKycModal: FC<AadhaarKycModalProps> = ({ open, onClose, resumeSubmis
             <p className="text-xs text-gray-400 text-center">
               Up to 5 OTP requests per hour. Delivery is handled by UIDAI.
             </p>
+            <p className="text-[10px] text-gray-400 text-center -mt-2">
+              Powered by <span className="font-medium">{ekycProviderLabel('sandbox')}</span>
+            </p>
+
+            {/* ─── OR — Temporary alternative (email OTP) ───────────────
+                Shown while the Aadhaar provider API key is not yet active.
+                Sends a 6-digit OTP to the email registered on the account
+                and grants the same `ekycVerified=true` flag (tagged as
+                EMAIL_OTP so the badge / super-admin filter can distinguish
+                it from a full Aadhaar verification). */}
+            <div className="relative pt-2">
+              <div className="flex items-center gap-3 text-xs text-gray-400">
+                <div className="flex-1 h-px bg-gray-200" />
+                <span className="font-medium tracking-wider">OR</span>
+                <div className="flex-1 h-px bg-gray-200" />
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4">
+              <div className="flex items-start gap-2">
+                <Mail className="w-4 h-4 text-amber-700 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-sm font-semibold text-amber-900">
+                    Temporary alternative — Email OTP
+                  </h4>
+                  <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                    The Aadhaar provider isn't connected yet. As a temporary
+                    measure, you can verify with a 6-digit OTP sent to your
+                    registered email
+                    {me?.email ? <> (<span className="font-mono">{me.email}</span>)</> : null}.
+                    You'll be marked verified for now; we'll ask you to upgrade
+                    to Aadhaar verification once that flow is live.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleInitiateEmailOtp}
+                    disabled={busy}
+                    className="mt-3 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border border-amber-300 bg-white text-amber-900 text-xs font-medium hover:bg-amber-100 disabled:opacity-50"
+                  >
+                    {busy && path === 'EMAIL_OTP'
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <Mail className="w-3.5 h-3.5" />}
+                    {busy && path === 'EMAIL_OTP' ? 'Sending…' : 'Send email OTP instead'}
+                  </button>
+                </div>
+              </div>
+            </div>
           </form>
         )}
 
@@ -306,21 +423,92 @@ const AadhaarKycModal: FC<AadhaarKycModalProps> = ({ open, onClose, resumeSubmis
           </form>
         )}
 
+        {/* Step 2 of the temporary email-OTP fallback. Same OTP input as the
+            Aadhaar path; copy + colour cues mark this as the temporary route. */}
+        {step === 'email-otp' && (
+          <form onSubmit={handleSubmitOtp} className="p-5 space-y-4">
+            <div className="rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs text-amber-900 flex items-start gap-2">
+              <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+              Temporary verification — using email OTP while the Aadhaar
+              provider is unavailable.
+            </div>
+            <p className="text-sm text-gray-600">
+              Enter the 6-digit OTP we sent to{' '}
+              <span className="font-medium">
+                {sentToEmailMasked || me?.email || 'your registered email'}
+              </span>.
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">OTP</label>
+              <input
+                ref={otpInputRef}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                inputMode="numeric"
+                placeholder="••••••"
+                maxLength={6}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400 font-mono tracking-[0.4em] text-center text-lg"
+              />
+              {secondsLeft != null && (
+                <div className={`mt-1.5 text-xs ${otpExpired ? 'text-red-600' : 'text-gray-500'}`}>
+                  {otpExpired
+                    ? 'OTP expired. Please request a new one.'
+                    : `Expires in ${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`}
+                </div>
+              )}
+            </div>
+            {error && (
+              <div className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" /> {error}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={busy}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Back
+              </button>
+              <button
+                type="submit"
+                disabled={busy || otp.length !== 6 || otpExpired}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-700 disabled:opacity-50"
+              >
+                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                {busy ? 'Verifying…' : 'Verify'}
+              </button>
+            </div>
+          </form>
+        )}
+
         {step === 'done' && (
           <div className="p-6 text-center">
-            <div className="w-14 h-14 mx-auto rounded-full bg-green-50 flex items-center justify-center mb-3">
-              <Check className="w-7 h-7 text-green-600" />
+            <div className={`w-14 h-14 mx-auto rounded-full ${path === 'EMAIL_OTP' ? 'bg-amber-50' : 'bg-green-50'} flex items-center justify-center mb-3`}>
+              <Check className={`w-7 h-7 ${path === 'EMAIL_OTP' ? 'text-amber-600' : 'text-green-600'}`} />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900">Aadhaar verified</h3>
+            <h3 className="text-lg font-semibold text-gray-900">
+              {path === 'EMAIL_OTP' ? 'Identity verified — temporary' : 'Aadhaar verified'}
+            </h3>
             <p className="text-sm text-gray-600 mt-1">
-              {verifiedClient?.aadhaarName ? `Welcome, ${verifiedClient.aadhaarName}.` : 'Your eKYC is complete.'}
-              {verifiedClient?.aadhaarLast4 && (
-                <> Aadhaar ending <strong>{verifiedClient.aadhaarLast4}</strong>.</>
+              {path === 'EMAIL_OTP' ? (
+                <>
+                  Your account is verified via email OTP for now. We'll prompt
+                  you to upgrade to Aadhaar verification once that flow is live.
+                </>
+              ) : (
+                <>
+                  {verifiedClient?.aadhaarName ? `Welcome, ${verifiedClient.aadhaarName}.` : 'Your eKYC is complete.'}
+                  {verifiedClient?.aadhaarLast4 && (
+                    <> Aadhaar ending <strong>{verifiedClient.aadhaarLast4}</strong>.</>
+                  )}
+                </>
               )}
             </p>
             <button
               onClick={onClose}
-              className="mt-5 px-5 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700"
+              className={`mt-5 px-5 py-2 rounded-lg text-white text-sm font-medium ${path === 'EMAIL_OTP' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}
             >
               Done
             </button>

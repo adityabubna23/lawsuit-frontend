@@ -2,6 +2,7 @@ import { FC, useState } from 'react'
 import { ShieldCheck, ShieldAlert, ShieldOff, Clock, Loader2, AlertCircle, RefreshCw } from 'lucide-react'
 import useEkycStatus from '@/hooks/useEkycStatus'
 import { friendlyError } from '@/utils/errors'
+import { ekycProviderLabel, verifiedViaLabel } from '@/utils/ekycProvider'
 import AadhaarKycModal from './AadhaarKycModal'
 
 interface EkycStatusCardProps {
@@ -62,10 +63,18 @@ const EkycStatusCard: FC<EkycStatusCardProps> = ({ compact, onVerified, classNam
   let cta: React.ReactNode | null = null
 
   if (verified) {
-    icon = <ShieldCheck className="w-5 h-5 text-green-600" />
-    pillText = 'Verified'
-    pillClass = 'bg-green-50 text-green-700 border-green-200'
-    title = 'Aadhaar verified'
+    // ekycVerifiedVia tells us which path cleared the verification:
+    // AADHAAR (via Sandbox.co.in) is the full route; EMAIL_OTP is the
+    // temporary fallback. The pill colour stays green either way; the
+    // "via …" subtitle makes the temporary status visible at a glance.
+    const via = (status?.client as any)?.ekycVerifiedVia as 'AADHAAR' | 'EMAIL_OTP' | null | undefined
+    const isTempPath = via === 'EMAIL_OTP'
+    icon = <ShieldCheck className={`w-5 h-5 ${isTempPath ? 'text-amber-600' : 'text-green-600'}`} />
+    pillText = isTempPath ? 'Verified (temp)' : 'Verified'
+    pillClass = isTempPath
+      ? 'bg-amber-50 text-amber-700 border-amber-200'
+      : 'bg-green-50 text-green-700 border-green-200'
+    title = isTempPath ? 'Identity verified — temporary' : 'Aadhaar verified'
     body = (
       <>
         {status?.client?.aadhaarName && <strong>{status.client.aadhaarName}</strong>}
@@ -78,11 +87,15 @@ const EkycStatusCard: FC<EkycStatusCardProps> = ({ compact, onVerified, classNam
         {status?.client?.ekycVerifiedAt && (
           <div className="text-xs text-gray-400 mt-0.5">
             Verified {new Date(status.client.ekycVerifiedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+            {' · '}
+            {verifiedViaLabel(via)}
           </div>
         )}
         {!compact && (
           <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">
-            Your identity is locked to your Aadhaar profile. Contact support to change your name, date of birth, or gender.
+            {isTempPath
+              ? 'You verified via the temporary email-OTP path. Once Aadhaar verification is back online we may ask you to upgrade.'
+              : 'Your identity is locked to your Aadhaar profile. Contact support to change your name, date of birth, or gender.'}
           </p>
         )}
       </>
@@ -132,7 +145,14 @@ const EkycStatusCard: FC<EkycStatusCardProps> = ({ compact, onVerified, classNam
     pillClass = 'bg-gray-100 text-gray-600 border-gray-200'
     title = 'Verify your Aadhaar'
     body = (
-      <>Aadhaar verification unlocks free legal aid eligibility (Tele-Law) and faster lawyer onboarding.</>
+      <>
+        Aadhaar verification unlocks free legal aid eligibility (Tele-Law) and faster lawyer onboarding.
+        {!compact && (
+          <span className="block text-[11px] text-gray-400 mt-1">
+            Powered by {ekycProviderLabel('sandbox')}
+          </span>
+        )}
+      </>
     )
     cta = (
       <button

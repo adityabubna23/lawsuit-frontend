@@ -570,7 +570,7 @@ export const videoApi = {
 }
 
 // ── eKYC (Aadhaar OTP-based, CLIENT only) ──────────────────────────────
-// Server: /api/v1/ekyc — Surepass-backed. Heavily rate-limited:
+// Server: /api/v1/ekyc — Sandbox.co.in-backed. Heavily rate-limited:
 //   POST /aadhaar/initiate    → 5/hour  (each call costs ~₹2-4)
 //   POST /aadhaar/submit-otp  → 10/15min
 // Both throw 429 with `{ error: 'Too many ... attempts ...' }` past the cap.
@@ -580,6 +580,13 @@ export const ekycApi = {
     api.post('/ekyc/aadhaar/initiate', { aadhaar }),
   submitOtp: (submissionId: string, otp: string) =>
     api.post('/ekyc/aadhaar/submit-otp', { submissionId, otp }),
+
+  // Temporary email-OTP fallback while the Aadhaar provider key is
+  // unavailable. Server sends a 6-digit OTP to the registered email and
+  // flips ekycVerified=true on success with ekycVerifiedVia='EMAIL_OTP'.
+  initiateEmailOtp: () => api.post('/ekyc/email-otp/initiate', {}),
+  submitEmailOtp: (submissionId: string, otp: string) =>
+    api.post('/ekyc/email-otp/submit', { submissionId, otp }),
 }
 
 export const storageApi = {
