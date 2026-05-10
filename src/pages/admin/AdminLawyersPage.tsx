@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   Briefcase, Search, Loader2, X, BadgeCheck, ShieldOff, Trash2, Filter, Star,
   Mail, Phone, MapPin, FileText, Coins, ExternalLink, AlertCircle, Check, Users,
+  User as UserIcon, Building2, PauseCircle, TrendingUp, Wallet,
 } from 'lucide-react'
 import { adminApi } from '@/services/api'
 import { unwrapList } from '@/utils/unwrap'
@@ -34,6 +35,39 @@ interface LawyerRow {
   pincode?: string | null
   isAvailable?: boolean
   organizationId?: string | null
+  /** Parent firm — present on detail responses when the lawyer is org-affiliated. */
+  organization?: {
+    id: string
+    name?: string | null
+    avatarUrl?: string | null
+    isVerified?: boolean
+  } | null
+  /** Salary surface — server bundles config + last payout for the admin drawer. */
+  salary?: {
+    paidBy?: 'PLATFORM' | 'ORGANIZATION'
+    config?: {
+      id?: string
+      baseSalary?: number
+      bonusPerConsultation?: number
+      bonusPerCaseClosed?: number
+      bonusPerWonCase?: number
+      isOnHold?: boolean
+      holdReason?: string | null
+      updatedAt?: string
+    } | null
+    lastPayout?: {
+      id?: string
+      cycleMonth?: number
+      cycleYear?: number
+      baseSalary?: number
+      bonusAmount?: number
+      deductionAmount?: number
+      netPayable?: number
+      paidAt?: string
+      notes?: string | null
+    } | null
+  }
+  address?: string | null
   _count?: { cases?: number; appointments?: number; reviewsReceived?: number }
 }
 
@@ -45,6 +79,12 @@ const fmtDate = (iso?: string | null) =>
 // Lawyer fee is stored in paise.
 const fmtFee = (paise?: number | null) =>
   paise != null ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(paise / 100) : '—'
+
+// EntitySalary amounts (baseSalary, bonuses, payouts) are stored in rupees.
+const fmtRupee = (n?: number | null) =>
+  n != null ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(n)) : '—'
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 const AdminLawyersPage: FC = () => {
   const [lawyers, setLawyers] = useState<LawyerRow[]>([])
@@ -354,6 +394,57 @@ const LawyerDetailDrawer: FC<{ id: string; onClose: () => void }> = ({ id, onClo
               </div>
             </div>
 
+            {/* Affiliation — surfaces parent firm or "Independent" */}
+            <Section title="Affiliation">
+              {lawyer.organization ? (
+                <Link
+                  to={`/admin/organizations?id=${lawyer.organization.id}`}
+                  onClick={onClose}
+                  className="flex items-center gap-3 px-3 py-2 -mx-1 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  {lawyer.organization.avatarUrl ? (
+                    <img
+                      src={lawyer.organization.avatarUrl}
+                      alt=""
+                      className="w-9 h-9 rounded-lg object-cover bg-gray-100 flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-9 h-9 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-semibold flex-shrink-0">
+                      {(lawyer.organization.name || '?').charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-medium text-gray-900 truncate">
+                        {lawyer.organization.name || 'Organization'}
+                      </span>
+                      {lawyer.organization.isVerified && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">
+                          <BadgeCheck className="w-2.5 h-2.5" /> Verified
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-gray-500">
+                      Salary &amp; payouts managed by this firm
+                    </div>
+                  </div>
+                  <ExternalLink className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                </Link>
+              ) : (
+                <div className="flex items-center gap-3 px-3 py-2">
+                  <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                    <UserIcon className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-medium text-gray-900">Independent lawyer</div>
+                    <div className="text-[11px] text-gray-500">
+                      Salary &amp; payouts managed directly by the platform (super admin)
+                    </div>
+                  </div>
+                </div>
+              )}
+            </Section>
+
             {/* Contact */}
             <Section title="Contact">
               <Row icon={<Mail className="w-3.5 h-3.5" />} label="Email" value={lawyer.email} />
@@ -368,6 +459,94 @@ const LawyerDetailDrawer: FC<{ id: string; onClose: () => void }> = ({ id, onClo
               <Row label="Experience" value={lawyer.experienceYears != null ? `${lawyer.experienceYears} yrs` : '—'} />
               <Row icon={<Coins className="w-3.5 h-3.5" />} label="Fee" value={fmtFee(lawyer.feePerConsultation)} />
               <Row label="Available" value={lawyer.isAvailable === false ? 'Not accepting' : 'Accepting bookings'} />
+            </Section>
+
+            {/* Salary — base + bonus rates + last payout */}
+            <Section title="Salary">
+              <Row
+                icon={<Building2 className="w-3.5 h-3.5" />}
+                label="Paid by"
+                value={
+                  lawyer.salary?.paidBy === 'ORGANIZATION'
+                    ? lawyer.organization?.name || 'Organization'
+                    : 'Platform (super admin)'
+                }
+              />
+              {lawyer.salary?.config ? (
+                <>
+                  <Row
+                    icon={<Coins className="w-3.5 h-3.5" />}
+                    label="Base salary"
+                    value={fmtRupee(lawyer.salary.config.baseSalary)}
+                  />
+                  <Row
+                    label="Per consultation bonus"
+                    value={fmtRupee(lawyer.salary.config.bonusPerConsultation)}
+                  />
+                  <Row
+                    label="Per case-closed bonus"
+                    value={fmtRupee(lawyer.salary.config.bonusPerCaseClosed)}
+                  />
+                  <Row
+                    label="Per case-won bonus"
+                    value={fmtRupee(lawyer.salary.config.bonusPerWonCase)}
+                  />
+                  {lawyer.salary.config.isOnHold ? (
+                    <div className="mt-2 rounded-md border border-amber-100 bg-amber-50 px-2 py-1.5 flex items-start gap-1.5 text-[11px] text-amber-800">
+                      <PauseCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <div className="font-semibold">On hold</div>
+                        {lawyer.salary.config.holdReason && (
+                          <div className="text-amber-700/90">{lawyer.salary.config.holdReason}</div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-green-50 text-green-700">
+                      <TrendingUp className="w-2.5 h-2.5" /> Active
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-md p-2 mt-1">
+                  No salary configuration set yet.
+                  {lawyer.salary?.paidBy === 'ORGANIZATION'
+                    ? ' Their organization head can set it from /organization/salary.'
+                    : ' Set it from the Salary controls below.'}
+                </div>
+              )}
+
+              {lawyer.salary?.lastPayout && (
+                <div className="mt-3 border-t border-gray-100 pt-2">
+                  <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-1 flex items-center gap-1">
+                    <Wallet className="w-3 h-3" /> Last payout
+                  </div>
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <div>
+                      <div className="font-medium text-gray-900">
+                        {lawyer.salary.lastPayout.cycleMonth
+                          ? MONTHS[lawyer.salary.lastPayout.cycleMonth - 1]
+                          : '—'}{' '}
+                        {lawyer.salary.lastPayout.cycleYear ?? ''}
+                      </div>
+                      <div className="text-[10px] text-gray-500">
+                        {lawyer.salary.lastPayout.paidAt ? `Paid ${fmtDate(lawyer.salary.lastPayout.paidAt)}` : '—'}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-semibold text-emerald-700">
+                        {fmtRupee(lawyer.salary.lastPayout.netPayable)}
+                      </div>
+                      <div className="text-[10px] text-gray-500">
+                        Base {fmtRupee(lawyer.salary.lastPayout.baseSalary)}
+                        {(lawyer.salary.lastPayout.bonusAmount ?? 0) > 0
+                          ? ` + ${fmtRupee(lawyer.salary.lastPayout.bonusAmount)}`
+                          : ''}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </Section>
 
             {/* Tags */}
