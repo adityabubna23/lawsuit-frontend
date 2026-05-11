@@ -355,6 +355,16 @@ export const adminApi = {
   updateAdmin: (id: string, payload: any) => api.put(`/admin/admins/${id}`, payload),
   deleteAdmin: (id: string) => api.delete(`/admin/admins/${id}`),
 
+  // Monthly activity / performance logs (SUPER_ADMIN). Each returns headline
+  // metrics + a detailed activity timeline + the auto-computed salary breakdown
+  // for the selected cycle. Used by the /admin/{role}/:id/activity pages.
+  getLawyerMonthlyActivity: (id: string, params: { month: number; year: number }) =>
+    api.get(`/admin/performance/lawyer/${id}`, { params }),
+  getOrganizationMonthlyActivity: (id: string, params: { month: number; year: number }) =>
+    api.get(`/admin/performance/organization/${id}`, { params }),
+  getCourtAdminMonthlyActivity: (id: string, params: { month: number; year: number }) =>
+    api.get(`/admin/performance/court-admin/${id}`, { params }),
+
   // Payouts (SUPER_ADMIN)
   listPayouts: (params?: {
     payoutStatus?: 'HELD_BY_PLATFORM' | 'PAYABLE' | 'PAID_OUT' | 'REFUNDED'

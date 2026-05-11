@@ -1,4 +1,5 @@
-import { FC, useState, useEffect } from 'react'
+import { FC, useState, useEffect, useRef } from 'react'
+import { ChevronDown } from 'lucide-react'
 import NotificationModal from '../components/molecules/NotificationModal'
 import NotificationToast from '../components/atoms/NotificationToast'
 import VideoCallProvider from '../components/organisms/VideoCallProvider'
@@ -41,23 +42,98 @@ const AppLayout: FC = () => {
     navigate('/auth/login')
   }
 
-  const navigation = [
+  /**
+   * Nav is split into two tiers:
+   *  - `primaryNav` — 5 always-visible top-level items the user lands on most
+   *  - `moreGroups` — the rest, organised into themed sections inside a
+   *    single "More" dropdown
+   *
+   * Rationale:
+   *  - "Home / Find Lawyers / Appointments / Cases / Chats" cover the day-to-day
+   *    high-frequency surfaces. Wallet + Tele Law + Lex Rates etc. are reachable
+   *    from Home's Quick Actions anyway, so they don't need permanent top-bar
+   *    real estate.
+   *  - Grouping the rest by *intent* (Browse / Resolution / AI Tools / Resources)
+   *    makes the dropdown scannable instead of a 10-item dump.
+   *  - Same `navigation` flat array is still derived for the mobile menu so we
+   *    don't have to maintain two source lists.
+   */
+  const primaryNav = [
     { name: 'Home', path: '/app/home' },
-    { name: 'Search Lawyers', path: '/app/search' },
-    { name: 'Law Firms', path: '/app/firms' },
+    { name: 'Find Lawyers', path: '/app/search' },
     { name: 'Appointments', path: '/app/appointments' },
-    { name: 'Firm Requests', path: '/app/firms-requests' },
     { name: 'Cases', path: '/app/cases' },
     { name: 'Chats', path: '/app/chats' },
-    { name: 'Mediations', path: '/app/mediations' },
-    { name: 'Call History', path: '/app/call-history' },
-    { name: 'Document AI', path: '/app/document-ai' },
-    { name: 'Lex Rates', path: '/app/lex-rates' },
-    { name: 'Tele Law', path: '/app/tele-law' },
-    { name: 'Legal Updates', path: '/app/legal-updates' },
-    { name: 'Legal Eagle', path: '/app/legal-eagle' },
-    { name: 'Help', path: '/app/help' },
   ]
+
+  const moreGroups: { heading: string; items: { name: string; path: string }[] }[] = [
+    {
+      heading: 'Browse',
+      items: [
+        { name: 'Law Firms', path: '/app/firms' },
+        { name: 'Firm Requests', path: '/app/firms-requests' },
+        { name: 'Lex Rates', path: '/app/lex-rates' },
+      ],
+    },
+    {
+      heading: 'Resolution',
+      items: [
+        { name: 'Mediations', path: '/app/mediations' },
+        { name: 'Call History', path: '/app/call-history' },
+      ],
+    },
+    {
+      heading: 'AI Tools',
+      items: [
+        { name: 'Legal Eagle', path: '/app/legal-eagle' },
+        { name: 'Document AI', path: '/app/document-ai' },
+      ],
+    },
+    {
+      heading: 'Resources',
+      items: [
+        { name: 'Tele Law', path: '/app/tele-law' },
+        { name: 'Legal Updates', path: '/app/legal-updates' },
+        { name: 'Help', path: '/app/help' },
+      ],
+    },
+  ]
+
+  // Flat list used by the mobile menu so we don't fork the data source.
+  const allMoreItems = moreGroups.flatMap((g) => g.items)
+  const navigation = [...primaryNav, ...allMoreItems]
+
+  // Does the current route belong to a "More" item? — used to highlight the
+  // dropdown button so users get the same active-tab feedback they'd get on a
+  // primary link.
+  const isMoreActive = allMoreItems.some((i) => location.pathname === i.path)
+
+  // Dropdown open/close + click-outside handling
+  const [isMoreOpen, setIsMoreOpen] = useState(false)
+  const moreRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!isMoreOpen) return
+    const onDocClick = (e: MouseEvent) => {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
+        setIsMoreOpen(false)
+      }
+    }
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsMoreOpen(false)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    document.addEventListener('keydown', onEsc)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+      document.removeEventListener('keydown', onEsc)
+    }
+  }, [isMoreOpen])
+
+  // Close the dropdown whenever the route changes (e.g. user clicks a link
+  // inside the dropdown — we want it to dismiss).
+  useEffect(() => {
+    setIsMoreOpen(false)
+  }, [location.pathname])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -79,12 +155,12 @@ const AppLayout: FC = () => {
                 </Link>
               </div>
 
-              {/* Desktop Navigation — scrolls horizontally as a fallback if
-                  somehow the items still overflow on a very narrow viewport */}
-              <div
-                className="hidden sm:flex sm:items-center sm:ml-3 lg:ml-6 sm:space-x-3 md:space-x-4 lg:space-x-5 xl:space-x-6 overflow-x-auto whitespace-nowrap min-w-0 flex-1 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
-              >
-                {navigation.map((item) => (
+              {/* Desktop Navigation — 5 primary items + a grouped "More"
+                  dropdown that holds the secondary surfaces. Spacing is
+                  generous now (only 6 things to fit) so the bar reads as
+                  clean rather than cramped. */}
+              <div className="hidden sm:flex sm:items-center sm:ml-3 lg:ml-6 sm:space-x-4 md:space-x-6 lg:space-x-7 min-w-0 flex-1">
+                {primaryNav.map((item) => (
                   <Link
                     key={item.name}
                     to={item.path}
@@ -96,6 +172,58 @@ const AppLayout: FC = () => {
                     {item.name}
                   </Link>
                 ))}
+
+                {/* More dropdown — grouped secondary items */}
+                <div ref={moreRef} className="relative flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsMoreOpen((s) => !s)}
+                    aria-haspopup="true"
+                    aria-expanded={isMoreOpen}
+                    className={`${isMoreActive
+                      ? 'border-primary text-gray-900'
+                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                      } inline-flex items-center gap-1 px-1 pt-1 border-b-2 text-sm font-medium`}
+                  >
+                    More
+                    <ChevronDown
+                      className={`w-4 h-4 transition-transform ${isMoreOpen ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+
+                  {isMoreOpen && (
+                    <div
+                      role="menu"
+                      className="absolute left-0 top-full mt-1 w-72 sm:w-80 bg-white rounded-xl shadow-lg ring-1 ring-black/5 py-2 z-50"
+                    >
+                      {moreGroups.map((group, idx) => (
+                        <div key={group.heading}>
+                          {idx > 0 && <div className="my-1 border-t border-gray-100" />}
+                          <div className="px-4 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                            {group.heading}
+                          </div>
+                          {group.items.map((item) => {
+                            const active = location.pathname === item.path
+                            return (
+                              <Link
+                                key={item.path}
+                                to={item.path}
+                                role="menuitem"
+                                onClick={() => setIsMoreOpen(false)}
+                                className={`block px-4 py-2 text-sm transition-colors ${active
+                                  ? 'bg-primary-50 text-primary font-medium'
+                                  : 'text-gray-700 hover:bg-gray-50'
+                                  }`}
+                              >
+                                {item.name}
+                              </Link>
+                            )
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -194,14 +322,17 @@ const AppLayout: FC = () => {
             </div>
           </div>
 
-          {/* Mobile menu */}
+          {/* Mobile menu — same primary + grouped structure as desktop,
+              just rendered linearly with section headings instead of a
+              dropdown (more usable on phones). */}
           {isMobileMenuOpen && (
             <div className="sm:hidden">
               <div className="pt-2 pb-3 space-y-1">
-                {navigation.map((item) => (
+                {primaryNav.map((item) => (
                   <Link
                     key={item.name}
                     to={item.path}
+                    onClick={() => setIsMobileMenuOpen(false)}
                     className={`${location.pathname === item.path
                       ? 'bg-primary-50 border-primary text-primary'
                       : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
@@ -209,6 +340,27 @@ const AppLayout: FC = () => {
                   >
                     {item.name}
                   </Link>
+                ))}
+
+                {moreGroups.map((group) => (
+                  <div key={group.heading} className="pt-2">
+                    <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                      {group.heading}
+                    </div>
+                    {group.items.map((item) => (
+                      <Link
+                        key={item.path}
+                        to={item.path}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className={`${location.pathname === item.path
+                          ? 'bg-primary-50 border-primary text-primary'
+                          : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
+                          } block pl-3 pr-4 py-2 border-l-4 text-base font-medium`}
+                      >
+                        {item.name}
+                      </Link>
+                    ))}
+                  </div>
                 ))}
               </div>
               <div className="pt-4 pb-3 border-t border-gray-200">

@@ -1,4 +1,5 @@
 import { FC, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Loader2, Check, X, Users, Building2, ChevronRight, Mail, Phone, Hash,
   Landmark, BadgeCheck, Pause, Play, Banknote, Save,
@@ -448,9 +449,18 @@ const CourtAdminDetailDrawer: FC<{
               <div className="text-xs text-gray-500 truncate">{detail?.email}</div>
             </div>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 flex-shrink-0">
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Link
+              to={`/admin/court-admins/${id}/activity`}
+              onClick={onClose}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700"
+            >
+              Activity
+            </Link>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {loading ? (

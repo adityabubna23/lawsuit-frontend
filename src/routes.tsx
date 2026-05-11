@@ -56,6 +56,9 @@ import AdminCourtsPage from './pages/admin/AdminCourtsPage'
 import AdminTeamPage from './pages/admin/AdminTeamPage'
 import AdminWalletsPage from './pages/admin/AdminWalletsPage'
 import AdminBankAccountsPage from './pages/admin/AdminBankAccountsPage'
+import AdminLawyerActivityPage from './pages/admin/AdminLawyerActivityPage'
+import AdminOrganizationActivityPage from './pages/admin/AdminOrganizationActivityPage'
+import AdminCourtAdminActivityPage from './pages/admin/AdminCourtAdminActivityPage'
 import AdminAnnouncementsPage from './pages/admin/AdminAnnouncementsPage'
 import AdminLawyersPage from './pages/admin/AdminLawyersPage'
 import AdminOrganizationsPage from './pages/admin/AdminOrganizationsPage'
@@ -315,6 +318,10 @@ const AppRoutes = () => {
         <Route path="team" element={<AdminTeamPage />} />
         <Route path="wallets" element={<AdminWalletsPage />} />
         <Route path="bank-accounts" element={<AdminBankAccountsPage />} />
+        {/* Monthly activity / performance logs */}
+        <Route path="lawyers/:id/activity" element={<AdminLawyerActivityPage />} />
+        <Route path="organizations/:id/activity" element={<AdminOrganizationActivityPage />} />
+        <Route path="court-admins/:id/activity" element={<AdminCourtAdminActivityPage />} />
         <Route path="announcements" element={<AdminAnnouncementsPage />} />
 
         <Route path="under-development" element={<UnderDevelopmentPlaceholder />} />

@@ -1,4 +1,5 @@
-import { FC, useEffect, useState } from 'react'
+import { FC, useEffect, useRef, useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { Outlet, Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import NotificationModal from '../components/molecules/NotificationModal'
 import NotificationToast from '../components/atoms/NotificationToast'
@@ -40,15 +41,60 @@ const OrganizationLayout: FC = () => {
 
   const isVerified = me?.isVerified === true
 
-  const navigation = [
+  /**
+   * Same lean-nav pattern as `AppLayout` / `LawyerLayout`:
+   *  - 5 primary items the org head uses every day
+   *  - The 2 secondary items (My Salary, Verification) under a "More" dropdown
+   *
+   * Note: the amber "Verification pending — complete now" pill on the right
+   * side still renders independently when `isVerified === false`, so demoting
+   * Verification into "More" does NOT hide the prompt for unverified orgs.
+   */
+  const primaryNav = [
     { name: 'Dashboard', path: '/organization/dashboard' },
     { name: 'Lawyers', path: '/organization/lawyers' },
-    { name: 'Salary', path: '/organization/salary' },
-    { name: 'My Salary', path: '/organization/my-salary' },
     { name: 'Requests', path: '/organization/requests' },
-    { name: 'Verification', path: '/organization/verification' },
+    { name: 'Salary', path: '/organization/salary' },
     { name: 'Profile', path: '/organization/profile' },
   ]
+
+  const moreGroups: { heading: string; items: { name: string; path: string }[] }[] = [
+    {
+      heading: 'Earnings',
+      items: [{ name: 'My Salary', path: '/organization/my-salary' }],
+    },
+    {
+      heading: 'Compliance',
+      items: [{ name: 'Verification', path: '/organization/verification' }],
+    },
+  ]
+
+  const allMoreItems = moreGroups.flatMap((g) => g.items)
+  // Kept for the mobile menu fallback if anything still wants a flat list.
+  const navigation = [...primaryNav, ...allMoreItems]
+  void navigation
+  const isMoreActive = allMoreItems.some((i) => location.pathname === i.path)
+
+  const [isMoreOpen, setIsMoreOpen] = useState(false)
+  const moreRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!isMoreOpen) return
+    const onDocClick = (e: MouseEvent) => {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setIsMoreOpen(false)
+    }
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsMoreOpen(false)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    document.addEventListener('keydown', onEsc)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+      document.removeEventListener('keydown', onEsc)
+    }
+  }, [isMoreOpen])
+  useEffect(() => {
+    setIsMoreOpen(false)
+  }, [location.pathname])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -63,10 +109,8 @@ const OrganizationLayout: FC = () => {
                   <h1 className="text-xl lg:text-2xl font-bold text-primary whitespace-nowrap">Lawsuit · Org</h1>
                 </Link>
               </div>
-              <div
-                className="hidden sm:flex sm:items-center sm:ml-3 lg:ml-6 sm:space-x-3 md:space-x-4 lg:space-x-5 xl:space-x-6 overflow-x-auto whitespace-nowrap min-w-0 flex-1 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
-              >
-                {navigation.map((item) => (
+              <div className="hidden sm:flex sm:items-center sm:ml-3 lg:ml-6 sm:space-x-4 md:space-x-6 lg:space-x-7 min-w-0 flex-1">
+                {primaryNav.map((item) => (
                   <NavLink
                     key={item.name}
                     to={item.path}
@@ -80,6 +124,55 @@ const OrganizationLayout: FC = () => {
                     {item.name}
                   </NavLink>
                 ))}
+
+                <div ref={moreRef} className="relative flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsMoreOpen((s) => !s)}
+                    aria-haspopup="true"
+                    aria-expanded={isMoreOpen}
+                    className={`${isMoreActive
+                      ? 'border-primary text-gray-900'
+                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                      } inline-flex items-center gap-1 px-1 pt-1 border-b-2 text-sm font-medium`}
+                  >
+                    More
+                    <ChevronDown className={`w-4 h-4 transition-transform ${isMoreOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {isMoreOpen && (
+                    <div
+                      role="menu"
+                      className="absolute left-0 top-full mt-1 w-64 bg-white rounded-xl shadow-lg ring-1 ring-black/5 py-2 z-50"
+                    >
+                      {moreGroups.map((group, idx) => (
+                        <div key={group.heading}>
+                          {idx > 0 && <div className="my-1 border-t border-gray-100" />}
+                          <div className="px-4 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                            {group.heading}
+                          </div>
+                          {group.items.map((item) => {
+                            const active = location.pathname === item.path
+                            return (
+                              <Link
+                                key={item.path}
+                                to={item.path}
+                                role="menuitem"
+                                onClick={() => setIsMoreOpen(false)}
+                                className={`block px-4 py-2 text-sm transition-colors ${active
+                                  ? 'bg-primary-50 text-primary font-medium'
+                                  : 'text-gray-700 hover:bg-gray-50'
+                                  }`}
+                              >
+                                {item.name}
+                              </Link>
+                            )
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -126,10 +219,11 @@ const OrganizationLayout: FC = () => {
 
           {isMobileMenuOpen && (
             <div className="sm:hidden pb-3 space-y-1">
-              {navigation.map((item) => (
+              {primaryNav.map((item) => (
                 <Link
                   key={item.name}
                   to={item.path}
+                  onClick={() => setIsMobileMenuOpen(false)}
                   className={`${location.pathname === item.path
                     ? 'bg-primary-50 border-primary text-primary'
                     : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
@@ -138,6 +232,28 @@ const OrganizationLayout: FC = () => {
                   {item.name}
                 </Link>
               ))}
+
+              {moreGroups.map((group) => (
+                <div key={group.heading} className="pt-2">
+                  <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                    {group.heading}
+                  </div>
+                  {group.items.map((item) => (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={`${location.pathname === item.path
+                        ? 'bg-primary-50 border-primary text-primary'
+                        : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
+                        } block pl-3 pr-4 py-2 border-l-4 text-base font-medium`}
+                    >
+                      {item.name}
+                    </Link>
+                  ))}
+                </div>
+              ))}
+
               <button
                 onClick={handleLogout}
                 className="block w-full text-left px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"

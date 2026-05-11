@@ -1,4 +1,5 @@
-import { FC, useState, useEffect } from 'react'
+import { FC, useState, useEffect, useRef } from 'react'
+import { ChevronDown } from 'lucide-react'
 import NotificationModal from '../components/molecules/NotificationModal'
 import NotificationToast from '../components/atoms/NotificationToast'
 import VideoCallProvider from '../components/organisms/VideoCallProvider'
@@ -34,21 +35,84 @@ const LawyerLayout: FC = () => {
     navigate('/auth/login')
   }
 
-  const navigation = [
+  /**
+   * Same lean-nav pattern as `AppLayout` (client):
+   *  - 5 primary items the lawyer touches every day
+   *  - The remaining 8 organised by intent inside a single "More" dropdown
+   *
+   * Rationale for the primary 5:
+   *  - Dashboard = KPIs + landing
+   *  - Appointments / Cases = the lawyer's daily work queue
+   *  - Chats = real-time client comms; not duplicated anywhere else
+   *  - Mediations = high-value lawyer-specific surface
+   *
+   * Availability + Onboarding + Agreement Templates live under Practice
+   * because they're setup-ish (touched occasionally, not every day).
+   * Salary + Call History under Records (look-back / history).
+   */
+  const primaryNav = [
     { name: 'Dashboard', path: '/lawyer/dashboard' },
     { name: 'Appointments', path: '/lawyer/appointments' },
     { name: 'Cases', path: '/lawyer/cases' },
     { name: 'Chats', path: '/lawyer/chats' },
     { name: 'Mediations', path: '/lawyer/mediations' },
-    { name: 'Call History', path: '/lawyer/call-history' },
-    { name: 'Document AI', path: '/lawyer/document-ai' },
-    { name: 'Agreement Templates', path: '/lawyer/agreement-templates' },
-    { name: 'Salary', path: '/lawyer/salary' },
-    { name: 'Availability', path: '/lawyer/availability' },
-    { name: 'Onboarding', path: '/lawyer/onboarding' },
-    { name: 'Legal Updates', path: '/lawyer/legal-updates' },
-    { name: 'Legal Eagle', path: '/lawyer/legal-eagle' },
   ]
+
+  const moreGroups: { heading: string; items: { name: string; path: string }[] }[] = [
+    {
+      heading: 'Practice',
+      items: [
+        { name: 'Agreement Templates', path: '/lawyer/agreement-templates' },
+        { name: 'Availability', path: '/lawyer/availability' },
+        { name: 'Onboarding', path: '/lawyer/onboarding' },
+      ],
+    },
+    {
+      heading: 'Records',
+      items: [
+        { name: 'Call History', path: '/lawyer/call-history' },
+        { name: 'Salary', path: '/lawyer/salary' },
+      ],
+    },
+    {
+      heading: 'AI Tools',
+      items: [
+        { name: 'Legal Eagle', path: '/lawyer/legal-eagle' },
+        { name: 'Document AI', path: '/lawyer/document-ai' },
+      ],
+    },
+    {
+      heading: 'Resources',
+      items: [
+        { name: 'Legal Updates', path: '/lawyer/legal-updates' },
+      ],
+    },
+  ]
+
+  const allMoreItems = moreGroups.flatMap((g) => g.items)
+  const isMoreActive = allMoreItems.some((i) => location.pathname === i.path)
+
+  // Dropdown open/close + click-outside + Escape handling
+  const [isMoreOpen, setIsMoreOpen] = useState(false)
+  const moreRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!isMoreOpen) return
+    const onDocClick = (e: MouseEvent) => {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setIsMoreOpen(false)
+    }
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsMoreOpen(false)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    document.addEventListener('keydown', onEsc)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+      document.removeEventListener('keydown', onEsc)
+    }
+  }, [isMoreOpen])
+  useEffect(() => {
+    setIsMoreOpen(false)
+  }, [location.pathname])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -66,11 +130,9 @@ const LawyerLayout: FC = () => {
                 </Link>
               </div>
 
-              {/* Desktop Navigation — scroll-on-overflow fallback */}
-              <div
-                className="hidden sm:flex sm:items-center sm:ml-3 lg:ml-6 sm:space-x-3 md:space-x-4 lg:space-x-5 xl:space-x-6 overflow-x-auto whitespace-nowrap min-w-0 flex-1 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
-              >
-                {navigation.map((item) => (
+              {/* Desktop Navigation — 5 primary + grouped More dropdown */}
+              <div className="hidden sm:flex sm:items-center sm:ml-3 lg:ml-6 sm:space-x-4 md:space-x-6 lg:space-x-7 min-w-0 flex-1">
+                {primaryNav.map((item) => (
                   <Link
                     key={item.name}
                     to={item.path}
@@ -82,6 +144,55 @@ const LawyerLayout: FC = () => {
                     {item.name}
                   </Link>
                 ))}
+
+                <div ref={moreRef} className="relative flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsMoreOpen((s) => !s)}
+                    aria-haspopup="true"
+                    aria-expanded={isMoreOpen}
+                    className={`${isMoreActive
+                      ? 'border-primary text-gray-900'
+                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                      } inline-flex items-center gap-1 px-1 pt-1 border-b-2 text-sm font-medium`}
+                  >
+                    More
+                    <ChevronDown className={`w-4 h-4 transition-transform ${isMoreOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {isMoreOpen && (
+                    <div
+                      role="menu"
+                      className="absolute left-0 top-full mt-1 w-72 sm:w-80 bg-white rounded-xl shadow-lg ring-1 ring-black/5 py-2 z-50"
+                    >
+                      {moreGroups.map((group, idx) => (
+                        <div key={group.heading}>
+                          {idx > 0 && <div className="my-1 border-t border-gray-100" />}
+                          <div className="px-4 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                            {group.heading}
+                          </div>
+                          {group.items.map((item) => {
+                            const active = location.pathname === item.path
+                            return (
+                              <Link
+                                key={item.path}
+                                to={item.path}
+                                role="menuitem"
+                                onClick={() => setIsMoreOpen(false)}
+                                className={`block px-4 py-2 text-sm transition-colors ${active
+                                  ? 'bg-primary-50 text-primary font-medium'
+                                  : 'text-gray-700 hover:bg-gray-50'
+                                  }`}
+                              >
+                                {item.name}
+                              </Link>
+                            )
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -174,14 +285,16 @@ const LawyerLayout: FC = () => {
             </div>
           </div>
 
-          {/* Mobile menu */}
+          {/* Mobile menu — primary then grouped sections (matches the desktop
+              dropdown structure but rendered linearly for touch usability) */}
           {isMobileMenuOpen && (
             <div className="sm:hidden">
               <div className="pt-2 pb-3 space-y-1">
-                {navigation.map((item) => (
+                {primaryNav.map((item) => (
                   <Link
                     key={item.name}
                     to={item.path}
+                    onClick={() => setIsMobileMenuOpen(false)}
                     className={`${location.pathname === item.path
                       ? 'bg-primary-50 border-primary text-primary'
                       : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
@@ -189,6 +302,27 @@ const LawyerLayout: FC = () => {
                   >
                     {item.name}
                   </Link>
+                ))}
+
+                {moreGroups.map((group) => (
+                  <div key={group.heading} className="pt-2">
+                    <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                      {group.heading}
+                    </div>
+                    {group.items.map((item) => (
+                      <Link
+                        key={item.path}
+                        to={item.path}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className={`${location.pathname === item.path
+                          ? 'bg-primary-50 border-primary text-primary'
+                          : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
+                          } block pl-3 pr-4 py-2 border-l-4 text-base font-medium`}
+                      >
+                        {item.name}
+                      </Link>
+                    ))}
+                  </div>
                 ))}
               </div>
               <div className="pt-4 pb-3 border-t border-gray-200">

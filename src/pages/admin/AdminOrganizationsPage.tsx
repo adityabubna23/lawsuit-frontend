@@ -2,7 +2,7 @@ import { FC, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Building2, Search, Loader2, X, BadgeCheck, ShieldOff, Trash2, Filter,
-  Mail, Phone, MapPin, Users, Coins, ExternalLink, AlertCircle, Check,
+  Mail, Phone, MapPin, Users, Coins, ExternalLink, AlertCircle, Check, Activity,
 } from 'lucide-react'
 import { adminApi } from '@/services/api'
 import { unwrapList } from '@/utils/unwrap'
@@ -450,13 +450,20 @@ const OrgDetailDrawer: FC<{ id: string; onClose: () => void }> = ({ id, onClose 
             </Section>
 
             {/* Quick actions */}
-            <div className="pt-2 border-t border-gray-100 grid grid-cols-2 gap-2">
+            <div className="pt-2 border-t border-gray-100 grid grid-cols-3 gap-2">
+              <Link
+                to={`/admin/organizations/${org.id}/activity`}
+                onClick={onClose}
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700"
+              >
+                <Activity className="w-4 h-4" /> Activity
+              </Link>
               <Link
                 to={`/admin/salary?subject=organizations&id=${org.id}`}
                 onClick={onClose}
                 className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
-                <Coins className="w-4 h-4" /> Salary controls
+                <Coins className="w-4 h-4" /> Salary
               </Link>
               <Link
                 to="/admin/moderation"

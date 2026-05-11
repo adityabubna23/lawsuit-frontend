@@ -588,7 +588,14 @@ const LawyerDetailDrawer: FC<{ id: string; onClose: () => void }> = ({ id, onClo
             </Section>
 
             {/* Quick actions */}
-            <div className="pt-2 border-t border-gray-100 grid grid-cols-3 gap-2">
+            <div className="pt-2 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <Link
+                to={`/admin/lawyers/${lawyer.id}/activity`}
+                onClick={onClose}
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700"
+              >
+                <TrendingUp className="w-3.5 h-3.5" /> Activity
+              </Link>
               <Link
                 to={`/admin/salary?subject=lawyers&id=${lawyer.id}`}
                 onClick={onClose}
