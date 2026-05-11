@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   ScrollText,
 } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
 import { casesApi, documentAiApi } from '@/services/api'
 import { unwrapList, unwrapObject } from '@/utils/unwrap'
 import { friendlyError } from '@/utils/errors'
@@ -393,6 +394,12 @@ const SummaryTab: FC<{ caseId: string; doc: DocumentRow; onChanged: () => void }
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Backend's /extract now auto-populates `summary`. Sync from prop so the
+  // user sees it here without an extra click after extraction finishes.
+  useEffect(() => {
+    setSummary(doc.summary || '')
+  }, [doc.summary, doc.id])
+
   const generate = async () => {
     setBusy(true)
     setError(null)
@@ -415,7 +422,7 @@ const SummaryTab: FC<{ caseId: string; doc: DocumentRow; onChanged: () => void }
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs text-gray-500">
-          A short, plain-English summary of what's in this document.
+          A structured summary of what's in this document.
         </p>
         <button
           onClick={generate}
@@ -433,12 +440,12 @@ const SummaryTab: FC<{ caseId: string; doc: DocumentRow; onChanged: () => void }
         </div>
       )}
       {summary ? (
-        <div className="rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
-          {summary}
+        <div className="rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm text-gray-800 leading-relaxed [&_h1]:text-base [&_h1]:font-semibold [&_h1]:text-gray-900 [&_h1]:mt-3 [&_h1]:mb-1 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-gray-900 [&_h2]:mt-3 [&_h2]:mb-1 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-gray-800 [&_h3]:mt-2 [&_h3]:mb-1 [&_p]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1 [&_li]:my-0.5 [&_strong]:font-semibold [&_em]:italic [&_hr]:my-2 [&_hr]:border-gray-200 [&_code]:bg-gray-100 [&_code]:px-1 [&_code]:rounded [&_code]:text-xs">
+          <ReactMarkdown>{summary}</ReactMarkdown>
         </div>
       ) : (
         <div className="rounded-lg border border-dashed border-gray-200 p-6 text-center text-sm text-gray-500">
-          No summary yet. Click <strong>Generate summary</strong> to create one.
+          No summary yet. Extracting text will auto-generate one, or click <strong>Generate summary</strong> to create it now.
         </div>
       )}
     </div>
@@ -456,17 +463,20 @@ const ExtractTab: FC<{ caseId: string; doc: DocumentRow; onChanged: () => void }
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  useEffect(() => {
+    setText(doc.extractedText || '')
+    setStatus(doc.extractionStatus || 'NOT_STARTED')
+  }, [doc.extractedText, doc.extractionStatus, doc.id])
+
   const extract = async () => {
     setBusy(true)
     setError(null)
     try {
       const res = await documentAiApi.extract(caseId, doc.id)
-      const next =
-        (res.data as any)?.extractedText ||
-        (res.data as any)?.data?.extractedText ||
-        ''
+      const payload = (res.data as any)?.document ?? (res.data as any)?.data?.document ?? (res.data as any)
+      const next = payload?.extractedText || ''
       setText(next)
-      setStatus('COMPLETED')
+      setStatus(payload?.extractionStatus || 'COMPLETED')
       onChanged()
     } catch (err) {
       setError(friendlyError(err, "We couldn't extract text from this document."))

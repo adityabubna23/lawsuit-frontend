@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
+import ReactMarkdown from "react-markdown"
 import { documentAiApi } from "@/services/api"
 import { Sparkles, FileText, MessageSquare, Loader2, ShieldCheck, AlertCircle, Copy, Check } from "lucide-react"
 
@@ -91,7 +92,12 @@ const DocumentAIPanel = ({ caseId, document }: DocumentAIPanelProps) => {
     askMutation.mutate(trimmed)
   }
 
-  const summary = summarizeMutation.data?.data?.summary ?? document.summary ?? null
+  const extractedSummary = (extractMutation.data?.data as any)?.document?.summary ?? null
+  const summary =
+    summarizeMutation.data?.data?.summary ??
+    extractedSummary ??
+    document.summary ??
+    null
   const isProcessing = document.extractionStatus === "PROCESSING" || extractMutation.isPending
 
   if (!supported) {
@@ -151,7 +157,7 @@ const DocumentAIPanel = ({ caseId, document }: DocumentAIPanelProps) => {
             ) : (
               <Sparkles className="w-3.5 h-3.5" />
             )}
-            Summarize
+            {summary ? "Regenerate summary" : "Summarize"}
           </button>
         </div>
 
@@ -182,8 +188,8 @@ const DocumentAIPanel = ({ caseId, document }: DocumentAIPanelProps) => {
                 {copied ? "Copied" : "Copy"}
               </button>
             </div>
-            <div className="p-3 text-sm text-gray-800 whitespace-pre-wrap leading-relaxed max-h-48 overflow-auto">
-              {summary}
+            <div className="p-3 text-sm text-gray-800 leading-relaxed max-h-96 overflow-auto [&_h1]:text-base [&_h1]:font-semibold [&_h1]:text-gray-900 [&_h1]:mt-3 [&_h1]:mb-1 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-gray-900 [&_h2]:mt-3 [&_h2]:mb-1 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-gray-800 [&_h3]:mt-2 [&_h3]:mb-1 [&_p]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1 [&_li]:my-0.5 [&_strong]:font-semibold [&_em]:italic [&_hr]:my-2 [&_hr]:border-gray-200 [&_code]:bg-gray-100 [&_code]:px-1 [&_code]:rounded [&_code]:text-xs">
+              <ReactMarkdown>{summary}</ReactMarkdown>
             </div>
           </div>
         )}
@@ -247,9 +253,9 @@ const DocumentAIPanel = ({ caseId, document }: DocumentAIPanelProps) => {
 
         {!hasText && document.extractionStatus !== "PROCESSING" && !extractMutation.isPending && (
           <p className="text-xs text-gray-500 leading-relaxed">
-            Click <span className="font-medium text-gray-700">Extract text</span> to let our AI read this document.
-            You can then generate a summary or ask questions about its contents — processed securely and never shared
-            outside your case.
+            Click <span className="font-medium text-gray-700">Extract text</span> to read this document.
+            We'll automatically generate a structured summary alongside the extracted text, and you can ask follow-up
+            questions — processed securely and never shared outside your case.
           </p>
         )}
       </div>
