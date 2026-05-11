@@ -1,6 +1,22 @@
 import { useState, useEffect } from "react";
 import { storageApi } from "../../services/api";
 
+// =============================================================================
+// UploadInput — picks a file from the device and uploads it directly to
+// Cloudinary using a server-issued signature. The previous version POSTed to
+// `${baseURL}/storage/presigned` which doesn't exist on the server (only
+// `/storage/sign` does), so every upload silently 404'd and the document AI
+// page could never persist anything. We now mirror the mobile-app flow:
+//
+//   1. GET /storage/sign?folder=documents  →  { timestamp, signature, apiKey,
+//                                              cloudName, folder }
+//   2. POST FormData(file + signed params)  →
+//        https://api.cloudinary.com/v1_1/{cloudName}/{image|raw}/upload
+//      (resource_type=image for images, raw for PDFs/DOCX so Cloudinary
+//      doesn't reject non-image bytes on the /image/upload endpoint).
+//   3. Hand the resulting `secure_url` back to the caller via setImageUrl.
+// =============================================================================
+
 const UploadInput = ({
   imageUrl,
   setImageUrl,
@@ -21,6 +37,7 @@ const UploadInput = ({
     if (file && uploadState === "idle") {
       handleUpload();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [file]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -51,40 +68,55 @@ const UploadInput = ({
       setUploadState("uploading");
       setProgress(10);
 
-      const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const encodedFileName = encodeURIComponent(sanitizedFileName);
-      
+      // Step 1: ask our server to mint a Cloudinary signature scoped to
+      // the `documents` folder. The signing key never leaves the server.
+      const sigRes = await storageApi.getSignature("documents");
+      const sig = sigRes.data as {
+        timestamp: number;
+        signature: string;
+        apiKey: string;
+        cloudName: string;
+        folder: string;
+      };
+      if (!sig?.signature || !sig?.cloudName) {
+        throw new Error("Could not obtain upload signature from server");
+      }
       setProgress(30);
-      const response = await fetch(
-        `${storageApi.getPresignedUrl}?fileName=${encodedFileName}&fileType=${file.type}`
+
+      // Step 2: POST the file straight to Cloudinary with the signed
+      // params. Cloudinary's /image/upload endpoint rejects non-image
+      // bytes, so PDFs / DOCX / other docs must hit /raw/upload instead.
+      const isImage = (file.type || "").startsWith("image/");
+      const resourceType = isImage ? "image" : "raw";
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("timestamp", String(sig.timestamp));
+      formData.append("signature", sig.signature);
+      formData.append("api_key", sig.apiKey);
+      formData.append("folder", sig.folder);
+
+      setProgress(50);
+      const uploadResponse = await fetch(
+        `https://api.cloudinary.com/v1_1/${encodeURIComponent(sig.cloudName)}/${resourceType}/upload`,
+        { method: "POST", body: formData }
       );
 
-      if (!response.ok) {
-        throw new Error("Failed to get upload URL");
-      }
-
-      const { uploadUrl, fileUrl } = await response.json();
-      setProgress(50);
-
-      const uploadResponse = await fetch(uploadUrl, {
-        method: "PUT",
-        body: file,
-        headers: {
-          "Content-Type": file.type,
-          "x-amz-acl": "public-read",
-        },
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error("Upload failed");
+      const uploadData = await uploadResponse.json().catch(() => ({} as any));
+      if (!uploadResponse.ok || !uploadData?.secure_url) {
+        throw new Error(
+          uploadData?.error?.message ||
+            `Cloudinary upload failed (status ${uploadResponse.status})`,
+        );
       }
 
       setProgress(100);
-      setImageUrl(fileUrl);
+      setImageUrl(uploadData.secure_url);
       setUploadState("uploaded");
     } catch (err) {
       setUploadState("error");
       setError(err instanceof Error ? err.message : "Upload failed");
+      // eslint-disable-next-line no-console
       console.error("Upload error:", err);
     }
   };
@@ -135,7 +167,7 @@ const UploadInput = ({
           <p className="mb-1 text-sm font-medium text-gray-700">
             <span className="text-primary">Click to upload</span> or drag and drop
           </p>
-          <p className="text-xs text-gray-500">Any file type accepted (Max 10MB)</p>
+          <p className="text-xs text-gray-500">PDF, DOCX, or images (Max 10MB)</p>
         </label>
       )}
 
@@ -144,9 +176,9 @@ const UploadInput = ({
           {/* Preview Section */}
           {preview && uploadState !== "error" && (
             <div className="relative h-32 bg-gray-100 flex items-center justify-center overflow-hidden">
-              <img 
-                src={preview} 
-                alt="Preview" 
+              <img
+                src={preview}
+                alt="Preview"
                 className="max-h-full max-w-full object-contain"
               />
             </div>
@@ -158,7 +190,7 @@ const UploadInput = ({
               <div className="text-2xl flex-shrink-0 mt-1">
                 {getFileIcon()}
               </div>
-              
+
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-gray-900 truncate">
                   {file?.name || "Uploaded file"}
@@ -177,7 +209,7 @@ const UploadInput = ({
                       <span className="text-xs text-gray-600">{progress}%</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-1.5">
-                      <div 
+                      <div
                         className="bg-primary h-1.5 rounded-full transition-all duration-300"
                         style={{ width: `${progress}%` }}
                       />
