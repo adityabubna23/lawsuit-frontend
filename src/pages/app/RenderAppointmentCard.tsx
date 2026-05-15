@@ -96,7 +96,13 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
   onEscalateToCase,
 }) => {
   const navigate = useNavigate()
-  const [documentsOpen, setDocumentsOpen] = useState(false)
+  // Auto-open the documents panel for PENDING bookings so the client can
+  // see what they (or the system) attached at booking time without having
+  // to expand a section first. The lawyer-side card already inlines this
+  // for PENDING — matching it on the client side keeps the experience
+  // symmetric. For CONFIRMED/COMPLETED we keep it collapsed so the list
+  // page stays compact.
+  const [documentsOpen, setDocumentsOpen] = useState(appointment.status === 'PENDING')
   const otherParty = userRole === 'client' ? appointment.lawyer : appointment.client
 
   // Where the unified chat lives for this role. Used by both the "Discuss"

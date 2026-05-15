@@ -149,10 +149,18 @@ const LawyerCard: FC<LawyerCardProps> = ({
    * itself isn't rolled back because the lawyer can still see the typed
    * notes, and the client can re-upload via the AppointmentDocumentsPanel
    * later.
+   *
+   * Returns a small summary so the caller can decide whether to alert the
+   * user about failed uploads before navigating away from the booking
+   * widget. Previously every result was swallowed — failures during the
+   * post-booking upload were invisible to the client (the widget unmounts
+   * on navigate, and `resetBookingState` wipes the `pendingDocs` list).
    */
-  const uploadPendingDocsTo = async (appointmentId: string) => {
+  const uploadPendingDocsTo = async (
+    appointmentId: string,
+  ): Promise<{ attempted: number; failed: number }> => {
     const docsToUpload = pendingDocs.filter((d) => d.status === 'pending')
-    if (docsToUpload.length === 0) return
+    if (docsToUpload.length === 0) return { attempted: 0, failed: 0 }
 
     // One signed payload covers an entire upload session — Cloudinary's
     // timestamp tolerance is generous enough for serial uploads.
@@ -170,11 +178,12 @@ const LawyerCard: FC<LawyerCardProps> = ({
             : d,
         ),
       )
-      return
+      return { attempted: docsToUpload.length, failed: docsToUpload.length }
     }
 
     const { cloudName, apiKey, signature, timestamp, folder } = sig
 
+    let failed = 0
     for (const doc of docsToUpload) {
       setPendingDocs((prev) =>
         prev.map((d) => (d.localId === doc.localId ? { ...d, status: 'uploading' } : d)),
@@ -213,6 +222,7 @@ const LawyerCard: FC<LawyerCardProps> = ({
           prev.map((d) => (d.localId === doc.localId ? { ...d, status: 'uploaded' } : d)),
         )
       } catch (err: any) {
+        failed++
         setPendingDocs((prev) =>
           prev.map((d) =>
             d.localId === doc.localId
@@ -222,6 +232,7 @@ const LawyerCard: FC<LawyerCardProps> = ({
         )
       }
     }
+    return { attempted: docsToUpload.length, failed }
   }
 
   const handleConfirm = async () => {
@@ -267,15 +278,28 @@ const LawyerCard: FC<LawyerCardProps> = ({
         try { await fetchBalance() } catch { }
 
         // Attach any pending documents to the appointment we just created.
-        // Best-effort: failures are surfaced in the picker UI but never
-        // block navigation away from the widget.
+        // Best-effort: per-file failures are tracked in the picker UI; if
+        // any failed, alert the user before we navigate away so they know
+        // to re-attach them from the appointment card.
         const appointmentId =
           (res as any)?.data?.appointment?.id ?? (res as any)?.appointment?.id
+        let docUploadFailed = 0
         if (appointmentId) {
-          await uploadPendingDocsTo(appointmentId)
+          const summary = await uploadPendingDocsTo(appointmentId)
+          docUploadFailed = summary.failed
         }
 
         setIsProcessing(false)
+        if (docUploadFailed > 0) {
+          // Surface the failure as a blocking alert so the user notices.
+          // We don't roll back the booking — the appointment is already
+          // created — but we tell them they need to re-upload from the
+          // appointment card (which has the same docs panel).
+          alert(
+            `Your appointment was booked, but ${docUploadFailed} document upload${docUploadFailed > 1 ? 's' : ''} failed. ` +
+              `Open the appointment card and use "Documents & AI summaries" to upload them again.`,
+          )
+        }
         resetBookingState()
         navigate(authUser?.role === 'LAWYER' ? '/lawyer/appointments' : '/app/appointments', { replace: true })
         return
@@ -331,9 +355,27 @@ const LawyerCard: FC<LawyerCardProps> = ({
               razorpay_signature: resp.razorpay_signature,
             })
             const confirmPayload = (confirmRes as any)?.data ?? confirmRes
-            const apptId: string | null = confirmPayload?.appointmentId ?? null
+            // Read both response shapes defensively. The new-booking branch
+            // of the server returns `{ appointmentId, appointment }`; the
+            // existing-appointment branch returns just `{ appointmentId }`.
+            // Older server deploys may only return `{ appointment }` — without
+            // this fallback the pending docs uploaded by the client never get
+            // attached to the appointment and neither party sees them in the
+            // PENDING tab.
+            const apptId: string | null =
+              confirmPayload?.appointmentId ??
+              confirmPayload?.appointment?.id ??
+              null
+            let docUploadFailed = 0
             if (apptId) {
-              await uploadPendingDocsTo(apptId)
+              const summary = await uploadPendingDocsTo(apptId)
+              docUploadFailed = summary.failed
+            }
+            if (docUploadFailed > 0) {
+              alert(
+                `Your appointment was booked, but ${docUploadFailed} document upload${docUploadFailed > 1 ? 's' : ''} failed. ` +
+                  `Open the appointment card and use "Documents & AI summaries" to upload them again.`,
+              )
             }
             resetBookingState()
             navigate(authUser?.role === 'LAWYER' ? '/lawyer/appointments' : '/app/appointments', { replace: true })

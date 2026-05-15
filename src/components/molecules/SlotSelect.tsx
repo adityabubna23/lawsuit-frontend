@@ -231,7 +231,33 @@ const SlotSelect: FC<SlotSelectProps> = ({
           </div>
 
           {(['morning', 'afternoon', 'evening'] as const).map((section) => {
-            const sectionSlots = TIME_SLOTS.filter((s) => s.section === section);
+            // Hide slots whose end-time has already passed when the user
+            // is looking at today. Without this the booking panel renders
+            // 6:00 AM / 6:30 AM / ... etc as struck-through cells for the
+            // rest of the day, which both looks broken and tempts users to
+            // click them. Server already excludes these from `availableSet`
+            // by default, but we still rendered them in the grid as
+            // disabled — so this is purely a UI culling step.
+            const isToday = isSameDay(selectedDate as Date, new Date())
+            const nowMs = Date.now()
+            const slotIsPast = (time: string): boolean => {
+              if (!isToday) return false
+              const [hm, period] = time.split(' ')
+              const [hStr, mStr] = hm.split(':')
+              let h = parseInt(hStr, 10)
+              const m = parseInt(mStr || '0', 10)
+              if (period === 'PM' && h < 12) h += 12
+              if (period === 'AM' && h === 12) h = 0
+              const slotStart = new Date(selectedDate as Date)
+              slotStart.setHours(h, m, 0, 0)
+              // 30-min slot — the slot is "past" once its end time is in
+              // the past. Lets the client still book the current half-hour
+              // if it hasn't fully elapsed.
+              return slotStart.getTime() + 30 * 60 * 1000 <= nowMs
+            }
+            const sectionSlots = TIME_SLOTS
+              .filter((s) => s.section === section)
+              .filter((s) => !slotIsPast(s.time));
             const cfg = sectionConfig[section];
             const Icon = cfg.icon;
             const availableInSection = sectionSlots.filter(s => availableSet.has(s.time)).length;

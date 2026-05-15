@@ -189,9 +189,11 @@ const LawyerDetailPage: FC = () => {
    * rolled back — the lawyer still sees the typed notes, and the client can
    * re-upload via the AppointmentDocumentsPanel from their appointments list.
    */
-  const uploadPendingDocsTo = async (appointmentId: string) => {
+  const uploadPendingDocsTo = async (
+    appointmentId: string,
+  ): Promise<{ attempted: number; failed: number }> => {
     const docsToUpload = pendingDocs.filter((d) => d.status === 'pending')
-    if (docsToUpload.length === 0) return
+    if (docsToUpload.length === 0) return { attempted: 0, failed: 0 }
 
     let sig: any
     try {
@@ -205,11 +207,12 @@ const LawyerDetailPage: FC = () => {
             : d,
         ),
       )
-      return
+      return { attempted: docsToUpload.length, failed: docsToUpload.length }
     }
 
     const { cloudName, apiKey, signature, timestamp, folder } = sig
 
+    let failed = 0
     for (const doc of docsToUpload) {
       setPendingDocs((prev) =>
         prev.map((d) => (d.localId === doc.localId ? { ...d, status: 'uploading' } : d)),
@@ -246,6 +249,7 @@ const LawyerDetailPage: FC = () => {
           prev.map((d) => (d.localId === doc.localId ? { ...d, status: 'uploaded' } : d)),
         )
       } catch (err: any) {
+        failed++
         setPendingDocs((prev) =>
           prev.map((d) =>
             d.localId === doc.localId
@@ -255,6 +259,7 @@ const LawyerDetailPage: FC = () => {
         )
       }
     }
+    return { attempted: docsToUpload.length, failed }
   }
 
   const parseSlotToISO = (date: Date, slot: string) => {
@@ -291,10 +296,20 @@ const LawyerDetailPage: FC = () => {
 
         // Attach any pending documents to the just-created appointment so the
         // lawyer sees them (and the auto-generated AI summary) in their card.
+        // If uploads fail mid-flight, surface a non-blocking alert so the
+        // user knows to re-attach from the appointment page.
         const appointmentId =
           (res as any)?.data?.appointment?.id ?? (res as any)?.appointment?.id
+        let docUploadFailed = 0
         if (appointmentId) {
-          await uploadPendingDocsTo(appointmentId)
+          const summary = await uploadPendingDocsTo(appointmentId)
+          docUploadFailed = summary.failed
+        }
+        if (docUploadFailed > 0) {
+          alert(
+            `Your appointment was booked, but ${docUploadFailed} document upload${docUploadFailed > 1 ? 's' : ''} failed. ` +
+              `Open the appointment card and use "Documents & AI summaries" to upload them again.`,
+          )
         }
 
         setPaymentSuccess(true)
@@ -380,9 +395,26 @@ const LawyerDetailPage: FC = () => {
                 razorpay_signature: resp.razorpay_signature,
               })
               const confirmPayload = (confirmRes as any)?.data ?? confirmRes
-              const apptId: string | null = confirmPayload?.appointmentId ?? null
+              // Read both response shapes defensively. Server's new-booking
+              // branch returns `{ appointmentId, appointment }`; existing-
+              // appointment branch returns `{ appointmentId }`. Older deploys
+              // may only return `{ appointment }` — without this fallback the
+              // pending docs uploaded by the client never attach to the new
+              // appointment and neither party sees them in PENDING.
+              const apptId: string | null =
+                confirmPayload?.appointmentId ??
+                confirmPayload?.appointment?.id ??
+                null
+              let docUploadFailed = 0
               if (apptId) {
-                await uploadPendingDocsTo(apptId)
+                const summary = await uploadPendingDocsTo(apptId)
+                docUploadFailed = summary.failed
+              }
+              if (docUploadFailed > 0) {
+                alert(
+                  `Your appointment was booked, but ${docUploadFailed} document upload${docUploadFailed > 1 ? 's' : ''} failed. ` +
+                    `Open the appointment card and use "Documents & AI summaries" to upload them again.`,
+                )
               }
               setPaymentSuccess(true)
               try { await useNotificationStore.getState().fetchNotifications() } catch { }
