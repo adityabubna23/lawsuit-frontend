@@ -850,6 +850,98 @@ export const mediationApi = {
     api.post(`/mediations/${id}/conclude`, data),
 }
 
+/**
+ * Phase 1 mediation flow client (Mediation Act 2023 compliant).
+ * Mounts on /mediations/flow/* — distinct from the legacy mediationApi
+ * above so the two flows don't share state on the FE either.
+ */
+export const mediationFlowApi = {
+  // Stage 0
+  initiate: (data: {
+    caseId?: string
+    respondentName: string
+    respondentEmail: string
+    respondentPhone?: string
+    respondentLawyerEmail?: string
+    disputeTitle: string
+    disputeDescription: string
+  }) => api.post('/mediations/flow/initiate', data),
+
+  list: () => api.get('/mediations/flow'),
+  getById: (id: string) => api.get(`/mediations/flow/${id}`),
+
+  // Stage 1 — idempotent
+  sendInvitation: (id: string, data: {
+    respondentName: string
+    respondentEmail: string
+    respondentLawyerEmail?: string
+  }) => api.post(`/mediations/flow/${id}/send-invitation`, data),
+
+  // Stage 2 — public preview, authed accept/decline
+  previewInvite: (token: string) =>
+    api.get(`/mediations/flow/invites/${encodeURIComponent(token)}/preview`),
+  acceptInvite: (token: string) =>
+    api.post(`/mediations/flow/invites/${encodeURIComponent(token)}/accept`),
+  declineInvite: (token: string, reason: string) =>
+    api.post(`/mediations/flow/invites/${encodeURIComponent(token)}/decline`, { reason }),
+
+  // Stage 5 baseline — activate group chat + daily room
+  activate: (id: string) => api.post(`/mediations/flow/${id}/activate`),
+
+  // Stage 3 — Lawyer assignment (pick or skip)
+  chooseLawyer: (id: string, data: { choice: 'PICK'; lawyerId: string } | { choice: 'SKIP' }) =>
+    api.post(`/mediations/flow/${id}/lawyer`, data),
+
+  // Stage 4 — Mediator selection
+  listMediators: () => api.get('/mediations/flow/mediators'),
+  proposeShortlist: (id: string, mediatorIds: string[]) =>
+    api.post(`/mediations/flow/${id}/mediator-shortlist`, { mediatorIds }),
+  pickMediator: (id: string, mediatorId: string) =>
+    api.post(`/mediations/flow/${id}/mediator-pick`, { mediatorId }),
+  autoAssignMediator: (id: string) =>
+    api.post(`/mediations/flow/${id}/mediator-auto-assign`),
+  acceptMediator: (id: string) =>
+    api.post(`/mediations/flow/${id}/mediator-accept`),
+
+  // Stage 5 full — Side channels
+  listSideChannels: (id: string) =>
+    api.get(`/mediations/flow/${id}/side-channels`),
+
+  // Stage 6 — Outcome
+  draftSettlement: (id: string, settlementTerms: string) =>
+    api.post(`/mediations/flow/${id}/settlement-draft`, { settlementTerms }),
+  draftNonSettlement: (id: string, closureNotes: string) =>
+    api.post(`/mediations/flow/${id}/non-settlement-draft`, { closureNotes }),
+  sign: (id: string, documentKind: 'SETTLEMENT' | 'NON_SETTLEMENT_REPORT', signatureUrl?: string) =>
+    api.post(`/mediations/flow/${id}/sign`, { documentKind, signatureUrl }),
+  signatureStatus: (id: string, kind: 'SETTLEMENT' | 'NON_SETTLEMENT_REPORT') =>
+    api.get(`/mediations/flow/${id}/signatures/${kind}`),
+  withdraw: (id: string, reason: string) =>
+    api.post(`/mediations/flow/${id}/withdraw`, { reason }),
+
+  // Stage 7 — Post-mediation
+  /** Returns a plain-text §27 enforcement application. The browser
+   *  treats it as a download. */
+  enforcementUrl: (id: string) => `/api/v1/mediations/flow/${id}/enforcement`,
+  reescalate: (id: string) => api.post(`/mediations/flow/${id}/re-escalate`),
+
+  // Mediator profile (lawyer opt-in)
+  getMyMediatorProfile: () => api.get('/mediations/flow/me/mediator-profile'),
+  updateMediatorProfile: (data: {
+    isMediator: boolean
+    mediatorRegistrationNumber?: string
+    mediatorBio?: string
+    mediationFee?: number
+    mediationSpecializations?: string[]
+  }) => api.put('/mediations/flow/me/mediator-profile', data),
+
+  // §18 60-day extension
+  requestExtension: (id: string, reason?: string) =>
+    api.post(`/mediations/flow/${id}/extension/request`, { reason }),
+  approveExtension: (id: string) =>
+    api.post(`/mediations/flow/${id}/extension/approve`),
+}
+
 export const courtAdminApi = {
   login: (email: string, password: string) => api.post('/court-admin/login', { email, password }),
   getCourtsByPincode: (pincode: string) => api.get(`/court-admin/public/courts/by-pincode/${pincode}`),

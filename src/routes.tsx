@@ -87,6 +87,14 @@ import MediationDetailPage from './pages/app/MediationDetailPage'
 import NewMediationInvitePage from './pages/app/NewMediationInvitePage'
 import MediationRoomPage from './pages/app/MediationRoomPage'
 import MediationInviteAcceptPage from './pages/mediation/MediationInviteAcceptPage'
+// Phase 1 mediation flow (Mediation Act 2023 compliant). Distinct pages
+// from the legacy MediationsPage/MediationDetailPage above so the two
+// flows don't share state on the FE.
+import MediationInitiatePage from './pages/app/MediationInitiatePage'
+import MediationFlowDetailPage from './pages/app/MediationFlowDetailPage'
+import MediationFlowListPage from './pages/app/MediationFlowListPage'
+import MediationFlowInvitePage from './pages/mediation/MediationFlowInvitePage'
+import MediatorProfilePage from './pages/lawyer/MediatorProfilePage'
 // Court Admin Pages
 import CourtAdminLayout from './layouts/CourtAdminLayout'
 import CourtAdminLoginPage from './pages/auth/CourtAdminLoginPage'
@@ -177,6 +185,10 @@ const AppRoutes = () => {
 
       {/* Mediation invite link (public; acts based on auth) */}
       <Route path="/mediation/invite/:token" element={<MediationInviteAcceptPage />} />
+      {/* Phase 1 mediation invite — token comes via ?token=... query string
+          rather than path param. Routed to a separate component so the
+          legacy `/mediation/invite/:token` path stays unchanged. */}
+      <Route path="/mediation/invite" element={<MediationFlowInvitePage />} />
 
       {/* Universal document preview. Renders any uploaded asset URL using
           <embed type="application/pdf"> for PDFs (so Cloudinary `raw`
@@ -252,6 +264,16 @@ const AppRoutes = () => {
         <Route path="mediations" element={<MediationsPage />} />
         <Route path="mediation/new" element={
           <EkycGuard action="initiate a mediation"><NewMediationInvitePage /></EkycGuard>
+        } />
+        {/* Phase 1+2 mediation flow. Distinct paths so the legacy
+            MediationsPage / MediationDetailPage aren't disturbed.
+            Order matters — list at /mediations/flow before the /:id. */}
+        <Route path="mediations/flow" element={<MediationFlowListPage />} />
+        <Route path="mediations/new" element={
+          <EkycGuard action="initiate a mediation"><MediationInitiatePage /></EkycGuard>
+        } />
+        <Route path="mediations/:id" element={
+          <EkycGuard action="open this mediation"><MediationFlowDetailPage /></EkycGuard>
         } />
         <Route path="mediation/:id" element={
           <EkycGuard action="open this mediation"><MediationDetailPage /></EkycGuard>
@@ -387,6 +409,12 @@ const AppRoutes = () => {
         <Route path="mediations" element={<MediationsPage />} />
         <Route path="mediation/:id" element={<MediationDetailPage />} />
         <Route path="mediation/:id/room" element={<MediationRoomPage />} />
+        {/* Phase 1+2 mediation flow for lawyers — same components as the
+            client surface (they consume the same authed API). */}
+        <Route path="mediations/flow" element={<MediationFlowListPage />} />
+        <Route path="mediations/:id" element={<MediationFlowDetailPage />} />
+        {/* Lawyer's mediator-profile (opt-in to the panel). */}
+        <Route path="mediator-profile" element={<MediatorProfilePage />} />
         <Route path="consultation/:appointmentId" element={<VideoConsultationPage />} />
         <Route path="call-history" element={<CallHistoryPage />} />
 

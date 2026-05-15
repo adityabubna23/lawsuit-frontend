@@ -120,7 +120,31 @@ const NotificationModal: FC<{ open: boolean; onClose: () => void }> = ({ open, o
 
     // Mediation events → mediation detail. (`mediationId` is loose-typed in
     // the payload — already cast through `anyData` at the top of this fn.)
-    if (anyData?.mediationId) return `${rolePrefix}/mediation/${anyData.mediationId}`
+    // Phase 1+2 mediation flow notifications use the PLURAL `mediations/:id`
+    // path (which renders the Mediation Act 2023 compliant detail page).
+    // Legacy notifications go to the SINGULAR `mediation/:id` (older
+    // standalone flow). The type prefix disambiguates.
+    if (anyData?.mediationId) {
+      const phase2Types = new Set([
+        'MEDIATION_INITIATED',
+        'MEDIATION_INVITED',
+        'MEDIATION_INVITE_EXPIRED',
+        'MEDIATION_LAWYER_NEEDED',
+        'MEDIATION_MEDIATOR_PROPOSED',
+        'MEDIATION_MEDIATOR_PICKED',
+        'MEDIATION_ACTIVE',
+        'MEDIATION_SETTLEMENT_DRAFT',
+        'MEDIATION_SETTLED',
+        'MEDIATION_NON_SETTLEMENT',
+        'MEDIATION_WITHDRAWN',
+        'MEDIATION_WARNING_14D',
+        'MEDIATION_EXPIRED',
+      ])
+      if (phase2Types.has(t)) {
+        return `${rolePrefix}/mediations/${anyData.mediationId}`
+      }
+      return `${rolePrefix}/mediation/${anyData.mediationId}`
+    }
 
     // Payment / wallet credits → wallet page.
     if (t === 'WALLET_CREDIT' || t === 'PAYMENT_RECEIVED') return `${rolePrefix}/wallet`
