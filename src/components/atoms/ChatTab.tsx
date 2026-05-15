@@ -640,42 +640,68 @@ const ChatTab: FC<ChatTabProps> = ({ chatId: propChatId, onClose, caseId, inline
         </div>
         <div className="flex items-center gap-2">
           {otherUser && activeChatId && (
-            // Single Start/Join CTA. The label flips based on
-            // `call:room:state` broadcasts from the server — the moment
-            // the other party clicks "Start" their click triggers a
-            // state broadcast and this button switches to "Join". This
-            // is the Daily.co-native flow the user asked for: one
-            // shared room per chat, no ringing / accept / decline.
-            <button
-              onClick={() => {
-                if (roomCall.isJoined) return
-                if (roomCall.isActive) roomCall.join()
-                else roomCall.start('video')
-              }}
-              disabled={isInCall || roomCall.isJoined}
-              title={
-                roomCall.isJoined
-                  ? 'You are in the call'
+            <>
+              {/* "X has started the meeting" pill.
+                  Only rendered when:
+                   1. The room is active (someone is in the Daily room), AND
+                   2. The local user is NOT already in the call, AND
+                   3. The caller is the OTHER participant (not us — when
+                      we start a call ourselves we don't need this hint).
+                  Sits immediately left of the Join button so the lawyer/
+                  client immediately sees who's waiting on the other end. */}
+              {roomCall.isActive &&
+                !roomCall.isJoined &&
+                roomCall.startedBy &&
+                roomCall.startedBy !== authUserId && (
+                  <div
+                    className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium animate-pulse"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <span className="relative flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                    </span>
+                    <span className="truncate max-w-[180px]">
+                      {otherUser.name} has started the meeting
+                    </span>
+                  </div>
+                )}
+              {/* Single Start/Join CTA. The label flips based on
+                  `call:room:state` broadcasts from the server — the moment
+                  the other party clicks "Start" their click triggers a
+                  state broadcast and this button switches to "Join". */}
+              <button
+                onClick={() => {
+                  if (roomCall.isJoined) return
+                  if (roomCall.isActive) roomCall.join()
+                  else roomCall.start('video')
+                }}
+                disabled={isInCall || roomCall.isJoined}
+                title={
+                  roomCall.isJoined
+                    ? 'You are in the call'
+                    : roomCall.isActive
+                      ? 'Join the ongoing video call'
+                      : 'Start a video call'
+                }
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition ${
+                  roomCall.isJoined
+                    ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                    : roomCall.isActive
+                      ? 'bg-emerald-600 text-white hover:bg-emerald-700 animate-pulse'
+                      : 'bg-primary text-white hover:bg-primary/90'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                aria-label={roomCall.isActive ? 'Join video call' : 'Start video call'}
+              >
+                <Video className="w-4 h-4" />
+                {roomCall.isJoined
+                  ? 'In call'
                   : roomCall.isActive
-                    ? 'Join the ongoing video call'
-                    : 'Start a video call'
-              }
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition ${
-                roomCall.isJoined
-                  ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
-                  : roomCall.isActive
-                    ? 'bg-emerald-600 text-white hover:bg-emerald-700 animate-pulse'
-                    : 'bg-primary text-white hover:bg-primary/90'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
-              aria-label={roomCall.isActive ? 'Join video call' : 'Start video call'}
-            >
-              <Video className="w-4 h-4" />
-              {roomCall.isJoined
-                ? 'In call'
-                : roomCall.isActive
-                  ? `Join video call${roomCall.participantCount ? ` (${roomCall.participantCount})` : ''}`
-                  : 'Start video call'}
-            </button>
+                    ? `Join video call${roomCall.participantCount ? ` (${roomCall.participantCount})` : ''}`
+                    : 'Start video call'}
+              </button>
+            </>
           )}
           {onClose && !inline && (
             <button

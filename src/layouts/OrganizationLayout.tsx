@@ -60,6 +60,18 @@ const OrganizationLayout: FC = () => {
 
   const moreGroups: { heading: string; items: { name: string; path: string }[] }[] = [
     {
+      heading: 'AI Tools',
+      // Same Legal Eagle / Document AI surface the client + lawyer layouts
+      // get. The server endpoint `/model/chat` is open to every authenticated
+      // role, it just wasn't wired into the org nav before. Document AI is
+      // already routed under /organization/document-ai for chat doc deep-
+      // links; this exposes it (and Legal Eagle) in the sidebar.
+      items: [
+        { name: 'Legal Eagle', path: '/organization/legal-eagle' },
+        { name: 'Document AI', path: '/organization/document-ai' },
+      ],
+    },
+    {
       heading: 'Earnings',
       items: [{ name: 'My Salary', path: '/organization/my-salary' }],
     },

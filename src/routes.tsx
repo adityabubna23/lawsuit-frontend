@@ -305,6 +305,10 @@ const AppRoutes = () => {
             `/organization/document-ai?documentId=…` instead of being
             bounced to a /app route the org layout doesn't render. */}
         <Route path="document-ai" element={<DocumentAiPage />} />
+        {/* Legal Eagle — AI legal chat. Backed by /api/v1/model/chat
+            which already accepts any authenticated role. Reuses the
+            same AiChatPage the client + lawyer routes mount. */}
+        <Route path="legal-eagle" element={<AiChatPage />} />
       </Route>
 
       {/* Admin Routes */}
