@@ -1,7 +1,39 @@
-import { FC, useRef, useEffect, useState } from 'react';
+import { FC, useRef, useEffect, useMemo, useState } from 'react';
 import { format, addDays, startOfDay, isSameDay } from 'date-fns';
 import { appointmentsApi } from '@/services/api'
 import { Clock, Sun, Sunset, Moon, Loader2 } from 'lucide-react'
+
+/**
+ * Parse a "h:mm AM/PM" string into hours + minutes (24h).
+ * Returns null on a malformed string so the caller can defensively skip.
+ */
+function parseTimeLabel(time: string): { h: number; m: number } | null {
+  const parts = time.split(' ')
+  if (parts.length !== 2) return null
+  const [hStr, mStr] = parts[0].split(':')
+  let h = parseInt(hStr, 10)
+  const m = parseInt(mStr || '0', 10)
+  if (Number.isNaN(h) || Number.isNaN(m)) return null
+  const period = parts[1].toUpperCase()
+  if (period === 'PM' && h < 12) h += 12
+  if (period === 'AM' && h === 12) h = 0
+  return { h, m }
+}
+
+/**
+ * True if the slot starting at `time` on `date` is already in the past.
+ * A 30-minute slot is considered "past" once its end has elapsed so the
+ * current half-hour can still be booked if it hasn't finished. Future dates
+ * always return false — they can't be past.
+ */
+function isSlotInPast(date: Date, time: string, durationMins = 30): boolean {
+  if (!isSameDay(date, new Date())) return false
+  const parsed = parseTimeLabel(time)
+  if (!parsed) return false
+  const slotStart = new Date(date)
+  slotStart.setHours(parsed.h, parsed.m, 0, 0)
+  return slotStart.getTime() + durationMins * 60 * 1000 <= Date.now()
+}
 
 interface SlotSelectProps {
   /** Currently selected date (or null) */
@@ -54,9 +86,12 @@ const SlotSelect: FC<SlotSelectProps> = ({
   lawyerId,
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [availableSet, setAvailableSet] = useState<Set<string>>(new Set())
+  // The raw set returned by the server. Past-time filtering is applied
+  // downstream when we render and when we compute the displayed counts —
+  // we keep the raw set here so we don't lose information if the user
+  // happens to switch dates faster than the past-time check ticks over.
+  const [serverAvailable, setServerAvailable] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
-  const [totalAvailable, setTotalAvailable] = useState(0)
 
   /** 30 days starting from today */
   const next30Days = Array.from({ length: 30 }, (_, i) => addDays(startOfDay(new Date()), i));
@@ -65,8 +100,7 @@ const SlotSelect: FC<SlotSelectProps> = ({
   useEffect(() => {
     let mounted = true
     if (!selectedDate || !lawyerId) {
-      setAvailableSet(new Set())
-      setTotalAvailable(0)
+      setServerAvailable(new Set())
       return
     }
 
@@ -90,13 +124,11 @@ const SlotSelect: FC<SlotSelectProps> = ({
             }
           }).filter(Boolean)
         )
-        setAvailableSet(times)
-        setTotalAvailable(times.size)
+        setServerAvailable(times)
       })
       .catch(() => {
         if (!mounted) return
-        setAvailableSet(new Set())
-        setTotalAvailable(0)
+        setServerAvailable(new Set())
       })
       .finally(() => {
         if (!mounted) return
@@ -107,6 +139,25 @@ const SlotSelect: FC<SlotSelectProps> = ({
       mounted = false
     }
   }, [selectedDate, lawyerId])
+
+  /**
+   * Defensively strip past-time entries from the server's available set.
+   * The server already excludes them by default (`excludePastSlots: true`),
+   * but a server-side timezone mismatch (e.g. Node running in UTC while the
+   * client is IST) can occasionally leak a past slot through. We belt-and-
+   * braces filter here so the displayed count, the section "X available"
+   * chip, and the rendered cells all stay consistent.
+   */
+  const availableSet = useMemo<Set<string>>(() => {
+    if (!selectedDate) return serverAvailable
+    const filtered = new Set<string>()
+    for (const t of serverAvailable) {
+      if (!isSlotInPast(selectedDate, t)) filtered.add(t)
+    }
+    return filtered
+  }, [serverAvailable, selectedDate])
+
+  const totalAvailable = availableSet.size
 
   const scroll = (direction: 'left' | 'right') => {
     if (!scrollContainerRef.current) return;
@@ -232,32 +283,13 @@ const SlotSelect: FC<SlotSelectProps> = ({
 
           {(['morning', 'afternoon', 'evening'] as const).map((section) => {
             // Hide slots whose end-time has already passed when the user
-            // is looking at today. Without this the booking panel renders
-            // 6:00 AM / 6:30 AM / ... etc as struck-through cells for the
-            // rest of the day, which both looks broken and tempts users to
-            // click them. Server already excludes these from `availableSet`
-            // by default, but we still rendered them in the grid as
-            // disabled — so this is purely a UI culling step.
-            const isToday = isSameDay(selectedDate as Date, new Date())
-            const nowMs = Date.now()
-            const slotIsPast = (time: string): boolean => {
-              if (!isToday) return false
-              const [hm, period] = time.split(' ')
-              const [hStr, mStr] = hm.split(':')
-              let h = parseInt(hStr, 10)
-              const m = parseInt(mStr || '0', 10)
-              if (period === 'PM' && h < 12) h += 12
-              if (period === 'AM' && h === 12) h = 0
-              const slotStart = new Date(selectedDate as Date)
-              slotStart.setHours(h, m, 0, 0)
-              // 30-min slot — the slot is "past" once its end time is in
-              // the past. Lets the client still book the current half-hour
-              // if it hasn't fully elapsed.
-              return slotStart.getTime() + 30 * 60 * 1000 <= nowMs
-            }
+            // is looking at today (via `isSlotInPast`). The same helper
+            // also gates `availableSet` / `totalAvailable` above, so the
+            // section grid, the "X available" chip, and the top
+            // "N slots available on …" banner all agree.
             const sectionSlots = TIME_SLOTS
               .filter((s) => s.section === section)
-              .filter((s) => !slotIsPast(s.time));
+              .filter((s) => !isSlotInPast(selectedDate as Date, s.time));
             const cfg = sectionConfig[section];
             const Icon = cfg.icon;
             const availableInSection = sectionSlots.filter(s => availableSet.has(s.time)).length;
