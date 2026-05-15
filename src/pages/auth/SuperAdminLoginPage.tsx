@@ -1,7 +1,7 @@
 import { FC, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Gavel, ArrowLeft } from 'lucide-react'
-import { useCourtAdminStore } from '../../stores/courtAdminStore'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { ShieldCheck, ArrowLeft } from 'lucide-react'
+import { useAuthStore } from '@/stores/authStore'
 import BrandLogo from '@/components/atoms/BrandLogo'
 
 const EyeIcon: FC<{ className?: string }> = ({ className }) => (
@@ -17,22 +17,47 @@ const EyeOffIcon: FC<{ className?: string }> = ({ className }) => (
   </svg>
 )
 
-const CourtAdminLoginPage: FC = () => {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+/**
+ * Super Admin (platform admin) sign-in.
+ *
+ * Lives at /auth/super-admin-login. Strict role check — only accounts with
+ * server role `ADMIN` are accepted. Anything else is signed back out with a
+ * friendly error.
+ *
+ * Reachable from the Administrators hub (/auth/administrators). Legacy
+ * /auth/admin-login still redirects here.
+ */
+const SuperAdminLoginPage: FC = () => {
   const navigate = useNavigate()
-  const { login, isLoading } = useCourtAdminStore()
+  const [searchParams] = useSearchParams()
+  const { login, isLoading, error, clearError } = useAuthStore()
+  const [showPassword, setShowPassword] = useState(false)
+  const sessionExpired = searchParams.get('session') === 'expired'
 
-  const handleSignIn = async (e: React.FormEvent) => {
+  const [formData, setFormData] = useState({ email: '', password: '' })
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setFormData(prev => ({ ...prev, [name]: value }))
+    if (error) clearError()
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
     try {
-      await login(email, password)
-      navigate('/court-admin/dashboard')
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Login failed')
+      const loggedInUser = await login(formData.email, formData.password)
+      const role = loggedInUser?.role?.toString?.().toUpperCase?.()
+
+      if (role !== 'ADMIN') {
+        useAuthStore.getState().logout()
+        useAuthStore.setState({
+          error: 'These credentials are not for a platform admin account.',
+        })
+        return
+      }
+      navigate('/admin/dashboard', { replace: true })
+    } catch (err) {
+      console.error('Login failed:', err)
     }
   }
 
@@ -44,11 +69,13 @@ const CourtAdminLoginPage: FC = () => {
             <BrandLogo to={null} size="lg" className="text-white [&_.text-primary]:text-white" />
           </div>
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/20 border border-indigo-300/30 text-indigo-100 text-xs font-medium uppercase tracking-wider">
-            <Gavel className="w-3.5 h-3.5" />
-            Court Admin Access
+            <ShieldCheck className="w-3.5 h-3.5" />
+            Platform admin access
           </div>
-          <h2 className="mt-4 text-3xl font-extrabold text-white">Court Admin Portal</h2>
-          <p className="mt-1 text-sm text-white/70">Sign in to verify lawyers & manage your court</p>
+          <h2 className="mt-4 text-3xl font-extrabold text-white">Super Admin Sign In</h2>
+          <p className="mt-1 text-sm text-white/70">
+            Restricted access. Activity is audit-logged.
+          </p>
         </div>
 
         <Link
@@ -58,14 +85,17 @@ const CourtAdminLoginPage: FC = () => {
           <ArrowLeft className="w-3.5 h-3.5" /> Back to administrators
         </Link>
 
-        <p className="text-center text-xs text-white/70 mb-3">
-          Restricted access. Your account must be authorised by a platform super admin before features unlock.
-        </p>
-
         <form
-          className="mt-6 space-y-5 bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-6"
-          onSubmit={handleSignIn}
+          className="space-y-5 bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-6"
+          onSubmit={handleSubmit}
         >
+          {sessionExpired && !error && (
+            <div className="rounded-md p-3 bg-amber-500/20 border border-amber-400/30">
+              <div className="text-sm text-amber-100">
+                Your session has expired. Please sign in again to continue.
+              </div>
+            </div>
+          )}
           {error && (
             <div className="rounded-md p-3 bg-red-500/20 border border-red-400/30">
               <div className="text-sm text-red-100">{error}</div>
@@ -74,15 +104,15 @@ const CourtAdminLoginPage: FC = () => {
 
           <div className="space-y-3">
             <input
-              id="email-address"
+              id="email"
               name="email"
               type="email"
               autoComplete="email"
               required
               className="block w-full px-3 py-2.5 border border-white/20 bg-white/10 text-white placeholder-white/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 sm:text-sm"
-              placeholder="Email address"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
+              placeholder="Admin email"
+              value={formData.email}
+              onChange={handleChange}
             />
             <div className="relative">
               <input
@@ -93,8 +123,8 @@ const CourtAdminLoginPage: FC = () => {
                 required
                 className="block w-full px-3 py-2.5 pr-10 border border-white/20 bg-white/10 text-white placeholder-white/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 sm:text-sm"
                 placeholder="Password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
+                value={formData.password}
+                onChange={handleChange}
               />
               <button
                 type="button"
@@ -108,31 +138,31 @@ const CourtAdminLoginPage: FC = () => {
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={isLoading || !email || !password}
-            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-          >
-            <Gavel className="w-4 h-4" />
-            {isLoading ? 'Signing in…' : 'Sign in as Court Admin'}
-          </button>
-
-          <div className="flex items-center justify-between text-sm pt-1">
-            <Link to="/auth/forgot-password" className="text-indigo-300 hover:text-indigo-200">
-              Forgot password?
-            </Link>
-            <Link to="/auth/court-admin-register" className="text-indigo-300 hover:text-indigo-200 font-medium">
-              Create an account
-            </Link>
+          <div className="flex items-center">
+            <input
+              id="remember-me"
+              name="remember-me"
+              type="checkbox"
+              className="h-4 w-4 text-indigo-500 border-white/30 rounded bg-white/10"
+            />
+            <label htmlFor="remember-me" className="ml-2 block text-sm text-white/80">
+              Remember me
+            </label>
           </div>
 
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+          >
+            <ShieldCheck className="w-4 h-4" />
+            {isLoading ? 'Signing in…' : 'Sign in as Super Admin'}
+          </button>
+
           <p className="text-center text-xs text-white/50 pt-2 border-t border-white/10">
-            Not a court admin?{' '}
-            <Link
-              to="/auth/administrators"
-              className="text-indigo-300 hover:text-indigo-200 underline"
-            >
-              See other administrator options
+            Looking for the regular sign in?{' '}
+            <Link to="/auth/login" className="text-indigo-300 hover:text-indigo-200 underline">
+              Switch to user sign in
             </Link>
           </p>
         </form>
@@ -141,4 +171,4 @@ const CourtAdminLoginPage: FC = () => {
   )
 }
 
-export default CourtAdminLoginPage
+export default SuperAdminLoginPage

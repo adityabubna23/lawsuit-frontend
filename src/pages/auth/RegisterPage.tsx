@@ -1,8 +1,9 @@
-import { FC, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { FC, useEffect, useState } from 'react'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import Button from '@/components/atoms/Button'
-import AddressPicker from '@/components/molecules/AddressPicker'
+import BrandLogo from '@/components/atoms/BrandLogo'
+import { User as UserIcon, Scale, Building2, ArrowLeft, ArrowRight, ShieldCheck } from 'lucide-react'
 
 const EyeIcon: FC<{ className?: string }> = ({ className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
@@ -17,304 +18,323 @@ const EyeOffIcon: FC<{ className?: string }> = ({ className }) => (
   </svg>
 )
 
+type RegisterRole = 'client' | 'lawyer' | 'organization'
+
+const ROLE_CARDS: {
+  id: RegisterRole
+  label: string
+  short: string
+  description: string
+  icon: FC<{ className?: string }>
+}[] = [
+  {
+    id: 'client',
+    label: 'I want to be a Client',
+    short: 'Client',
+    description: 'Find lawyers, book consultations, file & manage cases.',
+    icon: UserIcon,
+  },
+  {
+    id: 'lawyer',
+    label: 'I want to be a Lawyer',
+    short: 'Lawyer',
+    description: 'Practising advocate or mediator on the NyayaX panel.',
+    icon: Scale,
+  },
+  {
+    id: 'organization',
+    label: 'Sign up as Law Firm',
+    short: 'Law Firm',
+    description: 'A multi-lawyer organization assigning work to your team.',
+    icon: Building2,
+  },
+]
+
 const RegisterPage: FC = () => {
   const navigate = useNavigate()
-  const { register, requestOtp, isLoading, error, clearError } = useAuthStore()
+  const [searchParams] = useSearchParams()
+  const { register, isLoading, error, clearError } = useAuthStore()
   const [showPassword, setShowPassword] = useState(false)
+
+  // `?role=` from a deep-link (e.g. from the login page's "Sign up" CTA).
+  const initialRole = (() => {
+    const r = searchParams.get('role')
+    if (r === 'lawyer' || r === 'organization' || r === 'client') return r
+    return null
+  })()
+
+  // Step 1: pick a role. Step 2: fill in fields.
+  const [step, setStep] = useState<'pick' | 'form'>(initialRole ? 'form' : 'pick')
+  const [role, setRole] = useState<RegisterRole>(initialRole ?? 'client')
+
+  useEffect(() => {
+    const r = searchParams.get('role')
+    if (r === 'lawyer' || r === 'organization' || r === 'client') {
+      setRole(r)
+      setStep('form')
+    }
+  }, [searchParams])
 
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     phone: '',
-    role: 'client',
     registrationNumber: '',
     pincode: '',
   })
 
-  const [courtDetails, setCourtDetails] = useState({
-    name: '',
-    type: 'DISTRICT',
-    address: '',
-    pincode: '',
-    state: '',
-    district: '',
-    city: '',
-  })
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }))
-    if (error) clearError()
-  }
-
-  const handleCourtChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target
-    setCourtDetails(prev => ({
-      ...prev,
-      [name]: value
-    }))
+    setFormData(prev => ({ ...prev, [name]: value }))
     if (error) clearError()
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const payload: any = { ...formData };
-      if (formData.role === 'court_admin') {
-        const detailsToSubmit = { ...courtDetails };
-        if (!detailsToSubmit.city) {
-          delete (detailsToSubmit as any).city;
-        }
-        payload.courtDetails = detailsToSubmit;
-        delete payload.pincode;
-      } else if (formData.role === 'organization') {
-        // Organization keeps registrationNumber + pincode
-        if (!payload.registrationNumber) delete payload.registrationNumber;
-        if (!payload.pincode) delete payload.pincode;
+      const payload: any = { ...formData, role }
+      if (role === 'organization') {
+        if (!payload.registrationNumber) delete payload.registrationNumber
+        if (!payload.pincode) delete payload.pincode
       } else {
-        delete payload.registrationNumber;
-        delete payload.pincode;
+        delete payload.registrationNumber
+        delete payload.pincode
       }
       await register(payload)
-      // After successful registration, the backend automatically sends an OTP. Navigate directly to verification.
       navigate('/auth/otp-verify', { state: { identifier: formData.email } })
     } catch (err) {
-      // Error is handled by the store
       console.error('Registration failed:', err)
     }
   }
 
+  const activeCard = ROLE_CARDS.find(c => c.id === role) ?? ROLE_CARDS[0]
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Create your account
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-10 px-4 sm:px-6 lg:px-8">
+      <div className={`${step === 'pick' ? 'max-w-3xl' : 'max-w-xl'} w-full`}>
+        <div className="text-center mb-6">
+          <div className="flex justify-center mb-3">
+            <BrandLogo to={null} size="lg" />
+          </div>
+          <h2 className="text-3xl font-extrabold text-gray-900">
+            {step === 'pick' ? 'Create your NyayaX account' : `Sign up as ${activeCard.short}`}
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Or{' '}
-            <Link to="/auth/login" className="font-medium text-primary hover:text-primary-dark">
-              sign in to existing account
-            </Link>
+          <p className="mt-1 text-sm text-gray-500">
+            {step === 'pick' ? 'Tell us what you want to be on NyayaX' : 'Just a few details to get you started'}
           </p>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="text-sm text-red-700">{error}</div>
-            </div>
-          )}
-
-          <div className="rounded-md shadow-sm space-y-4">
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                {formData.role === 'organization' ? 'Law Firm Name' : 'Full Name'}
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-                placeholder={formData.role === 'organization' ? 'Khanna & Associates LLP' : 'John Doe'}
-                value={formData.name}
-                onChange={handleChange}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-                placeholder="john@example.com"
-                value={formData.email}
-                onChange={handleChange}
-              />
+        {step === 'pick' ? (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {ROLE_CARDS.map(card => {
+                const Icon = card.icon
+                return (
+                  <button
+                    key={card.id}
+                    type="button"
+                    onClick={() => {
+                      setRole(card.id)
+                      setStep('form')
+                    }}
+                    className="group text-left bg-white rounded-2xl border-2 border-gray-200 p-6 hover:border-primary hover:shadow-md transition-all"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-4 group-hover:bg-primary group-hover:text-white transition-colors">
+                      <Icon className="w-6 h-6" />
+                    </div>
+                    <div className="font-semibold text-gray-900 text-base mb-1">{card.label}</div>
+                    <div className="text-sm text-gray-500 leading-snug">{card.description}</div>
+                    <div className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary group-hover:gap-2 transition-all">
+                      Continue <ArrowRight className="w-4 h-4" />
+                    </div>
+                  </button>
+                )
+              })}
             </div>
 
-            <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-                Phone
-              </label>
-              <input
-                id="phone"
-                name="phone"
-                type="tel"
-                required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-                placeholder="123-456-7890"
-                value={formData.phone}
-                onChange={handleChange}
-              />
+            <div className="mt-6 text-center text-sm text-gray-600">
+              Already have an account?{' '}
+              <Link to="/auth/login" className="font-medium text-primary hover:text-primary-dark">
+                Sign in
+              </Link>
             </div>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => setStep('pick')}
+              className="mb-3 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Change role
+            </button>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
-              <div className="mt-1 relative">
+            <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
+              {/* Active role chip */}
+              <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
+                <div className="w-10 h-10 rounded-lg bg-primary text-white flex items-center justify-center">
+                  <activeCard.icon className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-900 text-sm">{activeCard.label}</div>
+                  <div className="text-xs text-gray-500">{activeCard.description}</div>
+                </div>
+              </div>
+
+              {error && (
+                <div className="rounded-md p-3 bg-red-50 border border-red-100">
+                  <div className="text-sm text-red-700">{error}</div>
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                  {role === 'organization' ? 'Law Firm Name' : 'Full Name'}
+                </label>
                 <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="new-password"
+                  id="name"
+                  name="name"
+                  type="text"
                   required
-                  className="appearance-none block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-                  placeholder="********"
-                  value={formData.password}
+                  className="block w-full px-3 py-2 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary sm:text-sm"
+                  placeholder={role === 'organization' ? 'Khanna & Associates LLP' : 'John Doe'}
+                  value={formData.name}
                   onChange={handleChange}
-                  minLength={8}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(prev => !prev)}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 focus:outline-none"
-                  tabIndex={-1}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
-                </button>
               </div>
-              <p className="mt-1 text-xs text-gray-500">
-                At least 8 characters. Mixing letters, numbers, and a special character is recommended.
-              </p>
-            </div>
 
-            <div>
-              <label htmlFor="role" className="block text-sm font-medium text-gray-700">
-                I am a
-              </label>
-              <select
-                id="role"
-                name="role"
-                required
-                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary rounded-md sm:text-sm"
-                value={formData.role}
-                onChange={handleChange}
-              >
-                <option value="client">Client</option>
-                <option value="lawyer">Lawyer</option>
-                <option value="organization">Law Firm / Organization</option>
-                <option value="court_admin">Court Admin</option>
-              </select>
-            </div>
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email address</label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  className="block w-full px-3 py-2 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary sm:text-sm"
+                  placeholder="you@example.com"
+                  value={formData.email}
+                  onChange={handleChange}
+                />
+              </div>
 
-            {formData.role === 'organization' && (
-              <div className="pt-4 border-t border-gray-200 space-y-4">
-                <h3 className="text-sm font-semibold text-gray-900">Law Firm Details</h3>
-                <p className="text-xs text-gray-500">Optional now — you can add these later in your profile.</p>
-                <div>
-                  <label htmlFor="org-registrationNumber" className="block text-sm font-medium text-gray-700">Registration Number (optional)</label>
+              <div>
+                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  required
+                  className="block w-full px-3 py-2 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary sm:text-sm"
+                  placeholder="+91 9876543210"
+                  value={formData.phone}
+                  onChange={handleChange}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <div className="relative">
                   <input
-                    id="org-registrationNumber"
-                    name="registrationNumber"
-                    type="text"
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary sm:text-sm"
-                    value={formData.registrationNumber}
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    required
+                    minLength={8}
+                    className="block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary sm:text-sm"
+                    placeholder="••••••••"
+                    value={formData.password}
                     onChange={handleChange}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(p => !p)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                    tabIndex={-1}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                  </button>
                 </div>
-                <div>
-                  <label htmlFor="org-pincode" className="block text-sm font-medium text-gray-700">Pincode (optional)</label>
-                  <input
-                    id="org-pincode"
-                    name="pincode"
-                    type="text"
-                    pattern="\d{6}"
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary sm:text-sm"
-                    placeholder="6-digit pincode"
-                    value={formData.pincode}
-                    onChange={handleChange}
-                  />
-                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  At least 8 characters. Mixing letters, numbers, and a special character is recommended.
+                </p>
               </div>
-            )}
 
-            {formData.role === 'court_admin' && (
-              <div className="pt-4 border-t border-gray-200 space-y-4">
-                <h3 className="text-sm font-semibold text-gray-900">Court Details</h3>
-                <div>
-                  <label htmlFor="registrationNumber" className="block text-sm font-medium text-gray-700">Registration Number</label>
-                  <input id="registrationNumber" name="registrationNumber" type="text" required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary sm:text-sm" value={formData.registrationNumber} onChange={handleChange} />
-                </div>
-                <div>
-                  <label htmlFor="court-name" className="block text-sm font-medium text-gray-700">Court Name</label>
-                  <input id="court-name" name="name" type="text" required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary sm:text-sm" value={courtDetails.name} onChange={handleCourtChange} />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+              {role === 'organization' && (
+                <div className="pt-4 border-t border-gray-100 space-y-4">
                   <div>
-                    <label htmlFor="court-type" className="block text-sm font-medium text-gray-700">Type</label>
-                    <select id="court-type" name="type" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary sm:text-sm" value={courtDetails.type} onChange={handleCourtChange}>
-                      <option value="DISTRICT">District</option>
-                      <option value="HIGH_COURT">High Court</option>
-                      <option value="SUPREME_COURT">Supreme Court</option>
-                    </select>
+                    <h3 className="text-sm font-semibold text-gray-900">Law Firm Details</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">Optional now — you can add these later in your profile.</p>
+                  </div>
+                  <div>
+                    <label htmlFor="org-registrationNumber" className="block text-sm font-medium text-gray-700 mb-1">Registration Number (optional)</label>
+                    <input
+                      id="org-registrationNumber"
+                      name="registrationNumber"
+                      type="text"
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary sm:text-sm"
+                      value={formData.registrationNumber}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="org-pincode" className="block text-sm font-medium text-gray-700 mb-1">Pincode (optional)</label>
+                    <input
+                      id="org-pincode"
+                      name="pincode"
+                      type="text"
+                      pattern="\d{6}"
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary sm:text-sm"
+                      placeholder="6-digit pincode"
+                      value={formData.pincode}
+                      onChange={handleChange}
+                    />
                   </div>
                 </div>
-                <div>
-                  <label htmlFor="court-address" className="block text-sm font-medium text-gray-700">Address</label>
-                  <input id="court-address" name="address" type="text" required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary sm:text-sm" value={courtDetails.address} onChange={handleCourtChange} />
-                </div>
-                {/* Pincode → state/district/city auto-fill. The court-admin
-                    self-registration server schema requires pincode + state
-                    + district + city, so the picker fills all four from the
-                    Indian pincode lookup. */}
-                <AddressPicker
-                  value={{
-                    pincode: courtDetails.pincode,
-                    state: courtDetails.state,
-                    district: courtDetails.district,
-                    city: courtDetails.city,
-                  }}
-                  onChange={(next) =>
-                    setCourtDetails((prev) => ({
-                      ...prev,
-                      pincode: next.pincode || '',
-                      state: next.state || '',
-                      district: next.district || '',
-                      city: next.city || '',
-                    }))
-                  }
-                />
+              )}
+
+              <Button type="submit" variant="primary" className="w-full" disabled={isLoading}>
+                <span className="inline-flex items-center justify-center gap-2">
+                  {isLoading ? 'Creating account…' : 'Create account'}
+                  {!isLoading && <ArrowRight className="w-4 h-4" />}
+                </span>
+              </Button>
+
+              <div className="text-xs text-center text-gray-500 leading-relaxed">
+                By registering, you agree to our{' '}
+                <Link to="/terms-of-service" className="font-medium text-primary hover:text-primary-dark">Terms of Service</Link>{' '}
+                and{' '}
+                <Link to="/privacy-policy" className="font-medium text-primary hover:text-primary-dark">Privacy Policy</Link>.
               </div>
-            )}
-          </div>
 
-          <div>
-            <Button
-              type="submit"
-              variant="primary"
-              className="w-full"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Creating account...' : 'Create account'}
-            </Button>
-          </div>
-
-          <div className="text-sm text-center text-gray-600">
-            By registering, you agree to our{' '}
-            <Link to="/terms-of-service" className="font-medium text-primary hover:text-primary-dark">
-              Terms of Service
-            </Link>{' '}
-            and{' '}
-            <Link to="/privacy-policy" className="font-medium text-primary hover:text-primary-dark">
-              Privacy Policy
-            </Link>
-          </div>
-        </form>
+              <div className="pt-2 text-center text-sm text-gray-600 border-t border-gray-100">
+                <span className="block pt-3">Already have an account?</span>
+                <Link
+                  to="/auth/login"
+                  className="mt-2 inline-flex items-center justify-center gap-1 px-4 py-2 rounded-lg border border-primary/30 text-primary font-medium hover:bg-primary/5 transition-colors"
+                >
+                  Sign in <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            </form>
+          </>
+        )}
       </div>
+
+      {/* Floating Administrators button — Court Admin + Super Admin live
+          behind this single entry point so the public surface stays focused
+          on the three user roles. */}
+      <Link
+        to="/auth/administrators"
+        className="fixed bottom-6 right-6 inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-slate-900 text-white text-sm font-medium shadow-lg hover:bg-slate-800 transition-colors"
+      >
+        <ShieldCheck className="w-4 h-4" />
+        Administrators
+      </Link>
     </div>
   )
 }

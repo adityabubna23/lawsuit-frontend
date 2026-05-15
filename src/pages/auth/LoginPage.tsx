@@ -2,7 +2,15 @@ import { FC, useEffect, useState } from 'react'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import Button from '@/components/atoms/Button'
-import { ShieldCheck } from 'lucide-react'
+import BrandLogo from '@/components/atoms/BrandLogo'
+import {
+  ShieldCheck,
+  User as UserIcon,
+  Scale,
+  Building2,
+  ArrowRight,
+  ArrowLeft,
+} from 'lucide-react'
 
 const EyeIcon: FC<{ className?: string }> = ({ className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
@@ -17,276 +25,332 @@ const EyeOffIcon: FC<{ className?: string }> = ({ className }) => (
   </svg>
 )
 
-type LoginMode = 'user' | 'admin'
+type UserRole = 'client' | 'lawyer' | 'organization'
 
+interface RoleCard {
+  id: UserRole
+  /** Backend role string returned by login() — used for strict enforcement. */
+  serverRole: 'CLIENT' | 'LAWYER' | 'ORGANIZATION'
+  label: string
+  short: string
+  description: string
+  icon: FC<{ className?: string }>
+  /** Post-login redirect path. */
+  redirectTo: string
+}
+
+const ROLE_CARDS: RoleCard[] = [
+  {
+    id: 'client',
+    serverRole: 'CLIENT',
+    label: 'Sign in as Client',
+    short: 'Client',
+    description: 'Personal legal services & consultations',
+    icon: UserIcon,
+    redirectTo: '/app/home',
+  },
+  {
+    id: 'lawyer',
+    serverRole: 'LAWYER',
+    label: 'Sign in as Lawyer',
+    short: 'Lawyer',
+    description: 'Practising advocate / mediator',
+    icon: Scale,
+    redirectTo: '/lawyer/dashboard',
+  },
+  {
+    id: 'organization',
+    serverRole: 'ORGANIZATION',
+    label: 'Sign in as Law Firm',
+    short: 'Law Firm',
+    description: 'Multi-lawyer organization',
+    icon: Building2,
+    redirectTo: '/organization/dashboard',
+  },
+]
+
+const niceServerRole = (r: string | undefined): string => {
+  switch ((r || '').toUpperCase()) {
+    case 'CLIENT':
+      return 'Client'
+    case 'LAWYER':
+      return 'Lawyer'
+    case 'ORGANIZATION':
+      return 'Law Firm'
+    case 'ADMIN':
+      return 'Platform Admin'
+    case 'COURT_ADMIN':
+      return 'Court Admin'
+    default:
+      return 'this'
+  }
+}
+
+/**
+ * User sign-in (Client / Lawyer / Law Firm).
+ *
+ * Two-step flow:
+ *   1. Pick role (3 cards)
+ *   2. Enter credentials — server role MUST match the selected role, or
+ *      we log the user back out and surface a friendly error.
+ *
+ * Court Admin and Super Admin sign-in live on `/auth/administrators` —
+ * a dedicated hub away from the public user surface.
+ */
 const LoginPage: FC = () => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { login, isLoading, error, clearError } = useAuthStore()
   const [showPassword, setShowPassword] = useState(false)
 
-  // `?mode=admin` opens the form with the Super Admin tab active. This lets
-  // /auth/admin-login redirect users here while preserving the admin path.
-  const [mode, setMode] = useState<LoginMode>(() => (searchParams.get('mode') === 'admin' ? 'admin' : 'user'))
-  // `?session=expired` is set by the axios interceptor when an in-app refresh
-  // fails — so we can show a friendly explainer instead of dropping the user
-  // at a blank form.
+  // Set by axios interceptor when an in-app refresh fails.
   const sessionExpired = searchParams.get('session') === 'expired'
 
+  // `?as=client|lawyer|organization` deep-link from the register page lets
+  // the user land directly on the credentials step.
+  const presetRole = ((): UserRole | null => {
+    const r = searchParams.get('as')
+    if (r === 'lawyer' || r === 'organization' || r === 'client') return r
+    return null
+  })()
+
+  const [step, setStep] = useState<'pick' | 'form'>(presetRole ? 'form' : 'pick')
+  const [role, setRole] = useState<UserRole>(presetRole ?? 'client')
+  const [formData, setFormData] = useState({ email: '', password: '' })
+
+  // Keep deep-link param in sync if it changes after mount (rare, but safe).
   useEffect(() => {
-    if (searchParams.get('mode') === 'admin') setMode('admin')
+    const r = searchParams.get('as')
+    if (r === 'lawyer' || r === 'organization' || r === 'client') {
+      setRole(r)
+      setStep('form')
+    }
   }, [searchParams])
 
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  })
+  const activeCard = ROLE_CARDS.find(c => c.id === role) ?? ROLE_CARDS[0]
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }))
+    setFormData(prev => ({ ...prev, [name]: value }))
+    if (error) clearError()
+  }
+
+  const pickRole = (next: UserRole) => {
+    setRole(next)
+    setStep('form')
+    if (error) clearError()
+  }
+
+  const backToPick = () => {
+    setStep('pick')
     if (error) clearError()
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      // Use the user returned from login() — reading useAuthStore.getState().user
-      // here is racy: other stores (userStore.getUser via HomePage's mount,
-      // courtAdminStore init from shared storage) can call setState({ user })
-      // synchronously between the await and the navigate, dropping the role.
-      // The returned value is the canonical post-login user.
       const loggedInUser = await login(formData.email, formData.password)
-      const role = loggedInUser?.role?.toString?.().toUpperCase?.()
+      const actualRole = loggedInUser?.role?.toString?.().toUpperCase?.()
 
-      // If the Super Admin tab was selected but the credentials belong to a
-      // non-admin account, surface a clear error rather than silently routing
-      // to the user dashboard.
-      if (mode === 'admin' && role !== 'ADMIN') {
+      // STRICT role enforcement. If the credentials don't match the chosen
+      // role, sign them right back out and tell them which role this email
+      // actually belongs to.
+      if (actualRole !== activeCard.serverRole) {
         useAuthStore.getState().logout()
-        useAuthStore.setState({ error: 'These credentials are not for a platform admin account.' })
+        const actualNice = niceServerRole(actualRole)
+        useAuthStore.setState({
+          error: `These credentials belong to a ${actualNice} account, not a ${activeCard.short} account. Pick the right role or use different credentials.`,
+        })
         return
       }
 
-      if (role === 'LAWYER') {
-        navigate('/lawyer/dashboard', { replace: true })
-      } else if (role === 'ADMIN') {
-        navigate('/admin/dashboard', { replace: true })
-      } else if (role === 'ORGANIZATION') {
-        navigate('/organization/dashboard', { replace: true })
-      } else {
-        // default to client home
-        navigate('/app/home', { replace: true })
-      }
+      navigate(activeCard.redirectTo, { replace: true })
     } catch (err) {
-      // Error is handled by the store
       console.error('Login failed:', err)
     }
   }
 
-  const isAdmin = mode === 'admin'
-
   return (
-    <div className={`min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 ${isAdmin ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900' : 'bg-gray-50'}`}>
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          {isAdmin && (
-            <div className="flex justify-center mb-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/20 border border-indigo-300/30 text-indigo-100 text-xs font-medium uppercase tracking-wider">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                Platform admin access
-              </div>
-            </div>
-          )}
-          <h2 className={`mt-2 text-center text-3xl font-extrabold ${isAdmin ? 'text-white' : 'text-gray-900'}`}>
-            {isAdmin ? 'Super Admin Sign In' : 'Sign in to your account'}
-          </h2>
-          <div className={`mt-4 inline-flex w-full rounded-lg p-1 text-sm font-medium ${isAdmin ? 'bg-white/10 backdrop-blur' : 'bg-gray-100'}`}>
-            <button
-              type="button"
-              onClick={() => setMode('user')}
-              aria-pressed={mode === 'user'}
-              className={`flex-1 px-3 py-1.5 rounded-md transition-colors ${mode === 'user'
-                ? 'bg-white text-primary shadow-sm'
-                : isAdmin ? 'text-white/70 hover:text-white' : 'text-gray-600 hover:text-primary hover:bg-white/60'
-                }`}
-              title="Clients, lawyers, and law firms all sign in here"
-            >
-              Client / Lawyer / Firm
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/auth/court-admin-login')}
-              className={`flex-1 px-3 py-1.5 rounded-md transition-colors ${isAdmin ? 'text-white/70 hover:text-white' : 'text-gray-600 hover:text-primary hover:bg-white/60'
-                }`}
-            >
-              Court Admin
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('admin')}
-              aria-pressed={mode === 'admin'}
-              className={`flex-1 px-3 py-1.5 rounded-md transition-colors inline-flex items-center justify-center gap-1 ${mode === 'admin'
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : isAdmin ? 'text-white/70 hover:text-white' : 'text-gray-600 hover:text-indigo-600 hover:bg-white/60'
-                }`}
-              title="Platform admins (SUPER_ADMIN / ADMIN) sign in here"
-            >
-              <ShieldCheck className="w-3.5 h-3.5" /> Super Admin
-            </button>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-10 px-4 sm:px-6 lg:px-8">
+      <div className={`${step === 'pick' ? 'max-w-3xl' : 'max-w-md'} w-full`}>
+        <div className="text-center mb-6">
+          <div className="flex justify-center mb-3">
+            <BrandLogo to={null} size="lg" />
           </div>
-
-          {isAdmin ? (
-            <p className="mt-3 text-center text-xs text-white/70">
-              Restricted access. Activity is audit-logged. Use your platform admin credentials.
-            </p>
-          ) : (
-            <>
-              <p className="mt-2 text-center text-xs text-gray-500">
-                Law firms: sign in with the email used while registering. New firm?{' '}
-                <Link to="/auth/register" className="text-primary hover:text-primary-dark font-medium">
-                  Register your firm
-                </Link>
-                .
-              </p>
-              <p className="mt-4 text-center text-sm text-gray-600">
-                Or{' '}
-                <Link to="/auth/register" className="font-medium text-primary hover:text-primary-dark">
-                  create a new account
-                </Link>
-              </p>
-            </>
-          )}
+          <h2 className="text-3xl font-extrabold text-gray-900">
+            {step === 'pick' ? 'Welcome back' : `Sign in as ${activeCard.short}`}
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            {step === 'pick' ? 'Pick how you want to sign in' : 'Enter your credentials'}
+          </p>
         </div>
 
-        <form
-          className={`mt-8 space-y-6 ${isAdmin ? 'bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-6' : ''}`}
-          onSubmit={handleSubmit}
-        >
-          {sessionExpired && !error && (
-            <div className={`rounded-md p-4 ${isAdmin ? 'bg-amber-500/20 border border-amber-400/30' : 'bg-amber-50 border border-amber-100'}`}>
-              <div className={`text-sm ${isAdmin ? 'text-amber-100' : 'text-amber-800'}`}>
-                Your session has expired. Please sign in again to continue.
-              </div>
-            </div>
-          )}
-          {error && (
-            <div className={`rounded-md p-4 ${isAdmin ? 'bg-red-500/20 border border-red-400/30' : 'bg-red-50'}`}>
-              <div className={`text-sm ${isAdmin ? 'text-red-100' : 'text-red-700'}`}>{error}</div>
-            </div>
-          )}
-
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="email" className="sr-only">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className={`appearance-none rounded-none relative block w-full px-3 py-2 border placeholder-gray-500 rounded-t-md focus:outline-none focus:z-10 sm:text-sm ${isAdmin
-                  ? 'border-white/20 bg-white/10 text-white placeholder-white/50 focus:ring-indigo-400 focus:border-indigo-400'
-                  : 'border-gray-300 text-gray-900 focus:ring-primary focus:border-primary'
-                  }`}
-                placeholder={isAdmin ? 'Admin email' : 'Email address'}
-                value={formData.email}
-                onChange={handleChange}
-              />
-            </div>
-            <div className="relative">
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type={showPassword ? 'text' : 'password'}
-                autoComplete="current-password"
-                required
-                className={`appearance-none rounded-none relative block w-full px-3 py-2 pr-10 border placeholder-gray-500 rounded-b-md focus:outline-none focus:z-10 sm:text-sm ${isAdmin
-                  ? 'border-white/20 bg-white/10 text-white placeholder-white/50 focus:ring-indigo-400 focus:border-indigo-400'
-                  : 'border-gray-300 text-gray-900 focus:ring-primary focus:border-primary'
-                  }`}
-                placeholder="Password"
-                value={formData.password}
-                onChange={handleChange}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(prev => !prev)}
-                className={`absolute inset-y-0 right-0 flex items-center pr-3 z-10 ${isAdmin ? 'text-white/60 hover:text-white' : 'text-gray-400 hover:text-gray-600'}`}
-                tabIndex={-1}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-              >
-                {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
-              </button>
-            </div>
+        {sessionExpired && !error && step === 'pick' && (
+          <div className="mb-4 rounded-md p-3 bg-amber-50 border border-amber-100 text-sm text-amber-800">
+            Your session has expired. Please sign in again to continue.
           </div>
+        )}
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                id="remember-me"
-                name="remember-me"
-                type="checkbox"
-                className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-              />
-              <label htmlFor="remember-me" className={`ml-2 block text-sm ${isAdmin ? 'text-white/80' : 'text-gray-900'}`}>
-                Remember me
-              </label>
+        {step === 'pick' ? (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {ROLE_CARDS.map(card => {
+                const Icon = card.icon
+                return (
+                  <button
+                    key={card.id}
+                    type="button"
+                    onClick={() => pickRole(card.id)}
+                    className="group text-left bg-white rounded-2xl border-2 border-gray-200 p-6 hover:border-primary hover:shadow-md transition-all"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-4 group-hover:bg-primary group-hover:text-white transition-colors">
+                      <Icon className="w-6 h-6" />
+                    </div>
+                    <div className="font-semibold text-gray-900 text-base mb-1">{card.label}</div>
+                    <div className="text-sm text-gray-500 leading-snug">{card.description}</div>
+                    <div className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary group-hover:gap-2 transition-all">
+                      Continue <ArrowRight className="w-4 h-4" />
+                    </div>
+                  </button>
+                )
+              })}
             </div>
 
-            {!isAdmin && (
-              <div className="text-sm">
-                <Link to="/auth/forgot-password" className="font-medium text-primary hover:text-primary-dark">
-                  Forgot your password?
+            <div className="mt-6 text-center text-sm text-gray-600">
+              Don't have an account?{' '}
+              <Link to="/auth/register" className="font-medium text-primary hover:text-primary-dark">
+                Sign up
+              </Link>
+            </div>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={backToPick}
+              className="mb-3 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Change role
+            </button>
+
+            <form
+              onSubmit={handleSubmit}
+              className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4"
+            >
+              <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
+                <div className="w-10 h-10 rounded-lg bg-primary text-white flex items-center justify-center">
+                  <activeCard.icon className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-900 text-sm">{activeCard.label}</div>
+                  <div className="text-xs text-gray-500">{activeCard.description}</div>
+                </div>
+              </div>
+
+              {sessionExpired && !error && (
+                <div className="rounded-md p-3 bg-amber-50 border border-amber-100 text-sm text-amber-800">
+                  Your session has expired. Please sign in again to continue.
+                </div>
+              )}
+              {error && (
+                <div className="rounded-md p-3 bg-red-50 border border-red-100 text-sm text-red-700">
+                  {error}
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                  Email address
+                </label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  className="block w-full px-3 py-2 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary sm:text-sm"
+                  placeholder="you@example.com"
+                  value={formData.email}
+                  onChange={handleChange}
+                />
+              </div>
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    required
+                    className="block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary sm:text-sm"
+                    placeholder="••••••••"
+                    value={formData.password}
+                    onChange={handleChange}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(p => !p)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                    tabIndex={-1}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <input
+                    id="remember-me"
+                    name="remember-me"
+                    type="checkbox"
+                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                  />
+                  <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
+                    Remember me
+                  </label>
+                </div>
+                <Link to="/auth/forgot-password" className="text-sm font-medium text-primary hover:text-primary-dark">
+                  Forgot password?
                 </Link>
               </div>
-            )}
-          </div>
 
-          <div>
-            {isAdmin ? (
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-md bg-indigo-600 text-white font-medium hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-              >
-                <ShieldCheck className="w-4 h-4" />
-                {isLoading ? 'Signing in…' : 'Sign in as Super Admin'}
-              </button>
-            ) : (
-              <Button
-                type="submit"
-                variant="primary"
-                className="w-full"
-                disabled={isLoading}
-              >
-                {isLoading ? 'Signing in...' : 'Sign in'}
+              <Button type="submit" variant="primary" className="w-full" disabled={isLoading}>
+                <span className="inline-flex items-center justify-center gap-2">
+                  {isLoading ? 'Signing in…' : `Sign in as ${activeCard.short}`}
+                  {!isLoading && <ArrowRight className="w-4 h-4" />}
+                </span>
               </Button>
-            )}
-          </div>
 
-          {isAdmin && (
-            <p className="text-center text-xs text-white/50">
-              Not a platform admin?{' '}
-              <button
-                type="button"
-                onClick={() => setMode('user')}
-                className="text-indigo-300 hover:text-indigo-200 underline"
-              >
-                Switch to user sign in
-              </button>
-            </p>
-          )}
-        </form>
+              <div className="pt-2 text-center text-sm text-gray-600 border-t border-gray-100">
+                <span className="block pt-3">Don't have an account?</span>
+                <Link
+                  to={`/auth/register?role=${role}`}
+                  className="mt-2 inline-flex items-center justify-center gap-1 px-4 py-2 rounded-lg border border-primary/30 text-primary font-medium hover:bg-primary/5 transition-colors"
+                >
+                  Sign up as {activeCard.short} <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            </form>
+          </>
+        )}
       </div>
+
+      {/* Floating Administrators button — lower right. Court Admin + Super
+          Admin live behind this single entry point so the public surface
+          stays focused on the three user roles. */}
+      <Link
+        to="/auth/administrators"
+        className="fixed bottom-6 right-6 inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-slate-900 text-white text-sm font-medium shadow-lg hover:bg-slate-800 transition-colors"
+      >
+        <ShieldCheck className="w-4 h-4" />
+        Administrators
+      </Link>
     </div>
   )
 }

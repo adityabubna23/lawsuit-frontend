@@ -4,13 +4,12 @@ import { Navigate } from 'react-router-dom'
 /**
  * Legacy admin-login route.
  *
- * The unified `/auth/login` page now hosts a "Super Admin" tab — selecting it
- * via `?mode=admin` opens the same form pre-switched to admin mode. We keep
- * this component so existing bookmarks / links to `/auth/admin-login` still
- * land users in the right place.
+ * Super Admin sign-in now lives at `/auth/super-admin-login` (reachable via
+ * the Administrators hub at `/auth/administrators`). We keep this component
+ * so existing bookmarks / links to `/auth/admin-login` still resolve.
  */
 const AdminLoginPage: FC = () => {
-  return <Navigate to="/auth/login?mode=admin" replace />
+  return <Navigate to="/auth/super-admin-login" replace />
 }
 
 export default AdminLoginPage

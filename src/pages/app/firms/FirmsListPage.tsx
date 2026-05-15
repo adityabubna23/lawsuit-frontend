@@ -1,89 +1,87 @@
-import { FC, useEffect, useState } from 'react'
+import { FC, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { ShieldCheck } from 'lucide-react'
-import Button from '@/components/atoms/Button'
+import { ShieldCheck, MapPin, AlertCircle } from 'lucide-react'
 import { useOrganizationStore } from '@/stores/organizationStore'
+import { useUserStore } from '@/stores/userStore'
 
 /**
  * Public firm-discovery page for clients.
  *
- * Behaviour matches the mobile `OrgListScreen`:
- *  - Default fetch is unfiltered (no `verified` param) so newly created firms
- *    show up immediately. The previous version hard-coded `verified: true`
- *    which left clients staring at an empty list in dev environments.
- *  - The "Verified only" toggle adds the param when the user opts in. Pincode
- *    and practice-area filters work the same.
+ * Pincode + practice-area inputs were removed at the user's request. The
+ * page now auto-fetches firms keyed off the AUTHED CLIENT'S pincode
+ * (read from `/users/me` via the user store). If the client hasn't set
+ * a pincode on their profile yet, we fall back to an unfiltered fetch
+ * and surface a small "set your pincode" hint pointing them at
+ * /app/profile.
+ *
+ * The "Verified only" toggle stays — it's a legal-relevance signal,
+ * not a location filter, so it's worth keeping accessible.
  */
 const FirmsListPage: FC = () => {
   const publicOrgs = useOrganizationStore((s) => s.publicOrgs)
   const fetchPublicOrgs = useOrganizationStore((s) => s.fetchPublicOrgs)
   const loading = useOrganizationStore((s) => s.loadingPublicOrgs)
 
-  const [pincode, setPincode] = useState('')
-  const [practiceArea, setPracticeArea] = useState('')
-  const [verifiedOnly, setVerifiedOnly] = useState(false)
+  // The client's profile pincode is the source of truth here. The user
+  // object on the store comes from `/users/me`, so it carries every
+  // schema field — `pincode` included. We type-coerce because the
+  // store stashes the raw response without a TS interface.
+  const me = useUserStore((s) => s.user) as { pincode?: string | null } | null
+  const fetchMe = useUserStore((s) => s.getUser)
+  const clientPincode = me?.pincode || ''
 
-  // Build the params shape the store accepts. `verified` is only included
-  // when the user explicitly opts in — otherwise the server-side query has
-  // no isVerified filter.
-  const buildParams = () => ({
-    pincode: pincode || undefined,
-    practiceArea: practiceArea || undefined,
-    verified: verifiedOnly ? true : undefined,
-  })
-
+  // Ensure we have the profile loaded — older logins might land here
+  // before useNotificationSocket or similar fires the fetch.
   useEffect(() => {
-    fetchPublicOrgs(buildParams()).catch(() => { })
-    // Re-run when the toggle changes so the list updates without an Apply click.
+    if (!me) {
+      fetchMe().catch(() => {})
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [verifiedOnly])
+  }, [])
 
-  const applyFilters = () => {
-    fetchPublicOrgs(buildParams()).catch(() => { })
-  }
+  // Re-fetch whenever the client's pincode changes (e.g. they update
+  // their profile in another tab — the page reflects the new locality
+  // automatically). The store dedupes identical fetches internally.
+  useEffect(() => {
+    fetchPublicOrgs({
+      pincode: clientPincode || undefined,
+    }).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientPincode])
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Law firms</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Browse firms across the platform — book a consultation and the firm assigns the right lawyer for your matter.
+          Firms in your area — book a consultation and the firm assigns the right lawyer for your matter.
         </p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-col sm:flex-row gap-3 sm:items-end">
-        <div className="flex-1">
-          <label className="block text-sm font-medium text-gray-700">Pincode</label>
-          <input
-            value={pincode}
-            onChange={(e) => setPincode(e.target.value)}
-            placeholder="6 digits"
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md sm:text-sm"
-          />
+      {/* Location chip — communicates exactly what filter is active. */}
+      {clientPincode ? (
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-sm text-blue-900">
+          <MapPin className="w-4 h-4 text-blue-600" />
+          Showing firms near pincode <strong className="font-semibold">{clientPincode}</strong>
+          <Link
+            to="/app/profile"
+            className="ml-2 text-xs text-blue-700 hover:underline"
+          >
+            Change in Profile →
+          </Link>
         </div>
-        <div className="flex-1">
-          <label className="block text-sm font-medium text-gray-700">Practice area</label>
-          <input
-            value={practiceArea}
-            onChange={(e) => setPracticeArea(e.target.value)}
-            placeholder="Civil, Criminal, …"
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md sm:text-sm"
-          />
+      ) : (
+        <div className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-600" />
+          <div>
+            Showing firms across the platform.{' '}
+            <Link to="/app/profile" className="font-medium text-amber-900 hover:underline">
+              Add your pincode in Profile
+            </Link>{' '}
+            to see firms closer to you.
+          </div>
         </div>
-        <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={verifiedOnly}
-            onChange={(e) => setVerifiedOnly(e.target.checked)}
-            className="rounded border-gray-300 text-primary focus:ring-primary"
-          />
-          <span className="text-sm text-gray-700 inline-flex items-center gap-1">
-            <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            Verified only
-          </span>
-        </label>
-        <Button onClick={applyFilters}>Apply</Button>
-      </div>
+      )}
 
       {loading ? (
         <div className="p-8 text-center text-gray-500 text-sm">Loading firms…</div>
@@ -91,9 +89,9 @@ const FirmsListPage: FC = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
           <h3 className="text-base font-medium text-gray-900">No firms found</h3>
           <p className="text-sm text-gray-500 mt-1">
-            {verifiedOnly
-              ? 'Try turning off "Verified only" to see firms still in verification, or change your filters.'
-              : 'Try a different pincode or practice area.'}
+            {clientPincode
+              ? `No firms are listed in or near pincode ${clientPincode} yet. Update your Profile pincode to broaden the search.`
+              : 'No firms have registered on the platform yet.'}
           </p>
         </div>
       ) : (

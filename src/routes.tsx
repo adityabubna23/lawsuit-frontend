@@ -9,6 +9,8 @@ import { useCourtAdminStore } from './stores/courtAdminStore'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/auth/LoginPage'
 import AdminLoginPage from './pages/auth/AdminLoginPage'
+import SuperAdminLoginPage from './pages/auth/SuperAdminLoginPage'
+import AdministratorsPage from './pages/auth/AdministratorsPage'
 import RegisterPage from './pages/auth/RegisterPage'
 import ChangePasswordPage from './pages/auth/ChangePasswordPage'
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage'
@@ -168,6 +170,11 @@ const AppRoutes = () => {
       {/* Public Routes */}
       <Route path="/" element={<LandingPage />} />
       <Route path="/auth/login" element={<LoginPage />} />
+      {/* Administrators hub — Court Admin + Super Admin entry points live
+          here, behind a single button on the user-facing sign-in / sign-up. */}
+      <Route path="/auth/administrators" element={<AdministratorsPage />} />
+      <Route path="/auth/super-admin-login" element={<SuperAdminLoginPage />} />
+      {/* Legacy paths — kept so existing bookmarks & email links still resolve. */}
       <Route path="/auth/admin-login" element={<AdminLoginPage />} />
       <Route path="/auth/court-admin-login" element={<CourtAdminLoginPage />} />
       <Route path="/auth/court-admin-register" element={<CourtAdminRegisterPage />} />
