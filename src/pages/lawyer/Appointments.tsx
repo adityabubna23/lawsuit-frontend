@@ -1,6 +1,6 @@
 import { FC, useMemo, useState } from 'react'
 import { appointmentsApi } from '@/services/api'
-import { parseISO, differenceInMinutes, isValid } from 'date-fns'
+import { parseISO, isValid } from 'date-fns'
 import { useNavigate } from 'react-router-dom'
 import CreateCaseDetail from '@/components/molecules/CreateCaseDetail'
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -77,6 +77,23 @@ const LawyerAppointments: FC = () => {
   const now = new Date()
 
   // Classify appointments
+  //
+  // Categorisation rules (must stay in sync with the client AppointmentsPage):
+  //   - "Pending":   PENDING status AND the slot end (scheduledAt + durationMins)
+  //                  is still in the future. A pending booking whose time has
+  //                  already passed falls into Missed — the lawyer never got
+  //                  around to accepting it and the slot is gone.
+  //   - "Attend now": CONFIRMED AND we're inside the meeting window (scheduled
+  //                  time has started but not ended). Surfaced separately so the
+  //                  lawyer can jump straight to the call.
+  //   - "Upcoming":  PENDING/CONFIRMED AND scheduledAt is still in the future.
+  //   - "Missed":    PENDING/CONFIRMED AND the slot end has fully passed.
+  //   - "Attended":  status COMPLETED.
+  //   - "Cancelled": status CANCELLED.
+  //
+  // Sort order: all lists are sorted descending by scheduledAt so the most
+  // recent appointment activity shows first, except `attendNow` which sorts
+  // ascending (the slot starting soonest is most urgent for the lawyer).
   const { pending, attendNow, upcoming, attended, missed, cancelled } = useMemo(() => {
     const pending: AppointmentResponse['data'] = []
     const attendNow: AppointmentResponse['data'] = []
@@ -85,57 +102,66 @@ const LawyerAppointments: FC = () => {
     const missed: AppointmentResponse['data'] = []
     const cancelled: AppointmentResponse['data'] = []
 
+    const endOf = (apt: AppointmentData): number => {
+      const start = parseISO(apt.scheduledAt).getTime()
+      return start + ((apt.durationMins || 30) * 60 * 1000)
+    }
+    const nowMs = now.getTime()
+
     appointments.forEach((a) => {
       const status = a.status
-      // Show pending appointments in their own tab
-      if (status === 'PENDING') {
-        pending.push(a)
-        return
-      }
-
       const dt = parseISO(a.scheduledAt)
       const validDate = dt && isValid(dt)
+      const slotEnd = validDate ? endOf(a) : Infinity
+      const slotPast = validDate && slotEnd <= nowMs
 
-      // Cancelled
+      // Cancelled — status check is sufficient.
       if (status === 'CANCELLED') {
         cancelled.push(a)
         return
       }
 
-      // Completed appointments -> Attended tab
+      // Completed → Attended.
       if (status === 'COMPLETED') {
         attended.push(a)
         return
       }
 
-      // Attend Now: scheduled time within a 30-minute window around now
-      if (validDate && Math.abs(differenceInMinutes(now, dt)) <= 30) {
-        attendNow.push(a)
-        return
-      }
-
-      // Future -> upcoming
-      if (!validDate || dt > now) {
-        upcoming.push(a)
-        return
-      }
-
-      // If more than 30 minutes past scheduled time and not completed -> missed
-      if (validDate && differenceInMinutes(now, dt) > 30) {
+      // Past-time guard applies BEFORE the PENDING short-circuit. A pending
+      // booking with a scheduledAt in the past must move to Missed — the
+      // lawyer can no longer accept and run a slot that's already over.
+      if (slotPast && (status === 'PENDING' || status === 'CONFIRMED')) {
         missed.push(a)
         return
       }
 
-      // Fallback: treat as missed
-      missed.push(a)
+      // Still-pending request (lawyer hasn't accepted yet) for a future slot.
+      if (status === 'PENDING') {
+        pending.push(a)
+        return
+      }
+
+      // Inside the meeting window (started, not ended) → Attend now.
+      if (validDate && nowMs >= dt.getTime() && nowMs < slotEnd) {
+        attendNow.push(a)
+        return
+      }
+
+      // Future and confirmed → upcoming.
+      upcoming.push(a)
     })
 
-    // Sort attendNow by closest time (ascending)
-    pending.sort((x, y) => parseISO(y.scheduledAt).getTime() - parseISO(x.scheduledAt).getTime())
-    attendNow.sort((x, y) => parseISO(x.scheduledAt).getTime() - parseISO(y.scheduledAt).getTime())
-    upcoming.sort((x, y) => parseISO(x.scheduledAt).getTime() - parseISO(y.scheduledAt).getTime())
-    attended.sort((x, y) => parseISO(y.scheduledAt).getTime() - parseISO(x.scheduledAt).getTime())
-    missed.sort((x, y) => parseISO(y.scheduledAt).getTime() - parseISO(x.scheduledAt).getTime())
+    // Sort: most recent first everywhere except attendNow (closest first).
+    const desc = (x: AppointmentData, y: AppointmentData) =>
+      parseISO(y.scheduledAt).getTime() - parseISO(x.scheduledAt).getTime()
+    const asc = (x: AppointmentData, y: AppointmentData) =>
+      parseISO(x.scheduledAt).getTime() - parseISO(y.scheduledAt).getTime()
+    pending.sort(desc)
+    attendNow.sort(asc)
+    upcoming.sort(desc)
+    attended.sort(desc)
+    missed.sort(desc)
+    cancelled.sort(desc)
 
     return { pending, attendNow, upcoming, attended, missed, cancelled }
   }, [appointments, now])

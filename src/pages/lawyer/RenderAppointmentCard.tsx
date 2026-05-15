@@ -253,10 +253,21 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
               accept/reject. Rejecting auto-refunds in either case. */}
           {!isPending && appointment.payment && (
             <div className="text-sm text-secondary mb-4">
-              Payment: {appointment.payment.currency} {appointment.payment.amount} -
-              <span className={`ml-1 ${appointment.payment.status === 'COMPLETED' ? 'text-green-600' : 'text-yellow-600'}`}>
-                {appointment.payment.status}
-              </span>
+              {appointment.payment.status === 'REFUNDED' ? (
+                // Missed-refund cron has credited the client back. Show a
+                // clean confirmation chip so the lawyer immediately knows
+                // the slot is settled and no manual intervention is needed.
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 border border-green-100">
+                  ✓ Consultation Fee Refunded to client — {appointment.payment.currency} {appointment.payment.amount}
+                </span>
+              ) : (
+                <>
+                  Payment: {appointment.payment.currency} {appointment.payment.amount} -
+                  <span className={`ml-1 ${appointment.payment.status === 'COMPLETED' ? 'text-green-600' : 'text-yellow-600'}`}>
+                    {appointment.payment.status}
+                  </span>
+                </>
+              )}
             </div>
           )}
         </div>

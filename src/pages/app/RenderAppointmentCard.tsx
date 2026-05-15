@@ -159,17 +159,35 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
       </div>
 
       {appointment.notes && (
-        <p className="text-sm text-secondary mb-4 line-clamp-2">
-          {appointment.notes}
-        </p>
+        // The client's problem description, persisted on Appointment.notes.
+        // Shown in full (no line-clamp) so both parties can read the context
+        // they gave / received without expanding the card. Wrapped in a
+        // labelled container so it's clearly the "issue description" and
+        // not a generic remark.
+        <div className="mb-4 rounded-md bg-blue-50/40 border border-blue-100 px-3 py-2">
+          <div className="text-xs font-semibold text-blue-900 mb-0.5">Issue description</div>
+          <p className="text-sm text-gray-800 whitespace-pre-wrap">{appointment.notes}</p>
+        </div>
       )}
 
       {appointment.payment && (
         <div className="text-sm text-secondary mb-4">
-          Payment: {appointment.payment.currency} {appointment.payment.amount} -
-          <span className={`ml-1 ${appointment.payment.status === 'COMPLETED' ? 'text-green-600' : 'text-yellow-600'}`}>
-            {appointment.payment.status}
-          </span>
+          {appointment.payment.status === 'REFUNDED' ? (
+            // Friendly refund confirmation — shown when the missed-refund
+            // cron has credited the consultation fee back to the client's
+            // wallet. Distinct copy + green chip so the client/lawyer
+            // immediately understands no money is stuck in escrow.
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 border border-green-100">
+              ✓ Consultation Fee Refunded — {appointment.payment.currency} {appointment.payment.amount} credited back to wallet
+            </span>
+          ) : (
+            <>
+              Payment: {appointment.payment.currency} {appointment.payment.amount} -
+              <span className={`ml-1 ${appointment.payment.status === 'COMPLETED' ? 'text-green-600' : 'text-yellow-600'}`}>
+                {appointment.payment.status}
+              </span>
+            </>
+          )}
         </div>
       )}
 
