@@ -43,5 +43,8 @@ Thumbs.db
 *.crt
 storybook-static/
 
+### Claude Code harness state (local-only, never commit)
+.claude/settings.local.json
+
 # Keep an example env in repo (if present) but ignore real secrets
 !.env.example

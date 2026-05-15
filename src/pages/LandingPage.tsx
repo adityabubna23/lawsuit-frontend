@@ -1,6 +1,23 @@
 import { FC, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Button from '@/components/atoms/Button'
+import { useAuthStore } from '@/stores/authStore'
+
+/**
+ * Map an authenticated user's role to the page they belong on when they
+ * tap "My Account Dashboard" from the public homepage. Mirrors the
+ * post-login routing in `LoginPage.tsx` so the experience is identical
+ * whether the user just signed in or is returning with a valid session.
+ */
+function dashboardPathForRole(role: string | undefined | null): string {
+  const r = (role || '').toString().toUpperCase()
+  if (r === 'LAWYER') return '/lawyer/dashboard'
+  if (r === 'ADMIN') return '/admin/dashboard'
+  if (r === 'ORGANIZATION') return '/organization/dashboard'
+  if (r === 'COURT_ADMIN') return '/court-admin/dashboard'
+  // CLIENT and any unknown role default to the client home.
+  return '/app/home'
+}
 
 /* ──────────────── Intersection Observer Hook ──────────────── */
 function useInView(threshold = 0.15) {
@@ -128,6 +145,14 @@ const LandingPage: FC = () => {
   /* Mobile nav toggle */
   const [mobileOpen, setMobileOpen] = useState(false)
 
+  /* Auth-aware nav: swap "Sign In / Get Started" for "My Account Dashboard"
+     when there's already a valid session. The store is hydrated from
+     localStorage on mount, so this works on first paint without an extra
+     `/auth/me` round-trip. */
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+  const authUser = useAuthStore((s) => s.user)
+  const dashboardPath = dashboardPathForRole(authUser?.role)
+
   return (
     <div className="min-h-screen bg-white font-sans antialiased text-gray-800 overflow-x-hidden">
 
@@ -157,17 +182,29 @@ const LandingPage: FC = () => {
                 </a>
               ))}
               <div className="w-px h-6 bg-gray-300/30 mx-2" />
-              <Link
-                to="/auth/login"
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${scrolled ? 'text-gray-600 hover:text-primary' : 'text-white/90 hover:text-white'}`}
-              >
-                Sign In
-              </Link>
-              <Link to="/auth/register">
-                <Button variant="primary" size="sm" className="shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-shadow">
-                  Get Started
-                </Button>
-              </Link>
+              {isAuthenticated ? (
+                // Logged-in shortcut → route to whichever dashboard
+                // matches this user's role.
+                <Link to={dashboardPath}>
+                  <Button variant="primary" size="sm" className="shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-shadow">
+                    My Account Dashboard
+                  </Button>
+                </Link>
+              ) : (
+                <>
+                  <Link
+                    to="/auth/login"
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${scrolled ? 'text-gray-600 hover:text-primary' : 'text-white/90 hover:text-white'}`}
+                  >
+                    Sign In
+                  </Link>
+                  <Link to="/auth/register">
+                    <Button variant="primary" size="sm" className="shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-shadow">
+                      Get Started
+                    </Button>
+                  </Link>
+                </>
+              )}
             </div>
 
             {/* Mobile menu button */}
@@ -196,12 +233,20 @@ const LandingPage: FC = () => {
                 </a>
               ))}
               <hr className="my-2 border-gray-100" />
-              <Link to="/auth/login" className="block px-4 py-2.5 rounded-lg text-gray-600 hover:text-primary text-sm font-medium">
-                Sign In
-              </Link>
-              <Link to="/auth/register" className="block">
-                <Button variant="primary" size="md" className="w-full mt-1">Get Started</Button>
-              </Link>
+              {isAuthenticated ? (
+                <Link to={dashboardPath} className="block">
+                  <Button variant="primary" size="md" className="w-full mt-1">My Account Dashboard</Button>
+                </Link>
+              ) : (
+                <>
+                  <Link to="/auth/login" className="block px-4 py-2.5 rounded-lg text-gray-600 hover:text-primary text-sm font-medium">
+                    Sign In
+                  </Link>
+                  <Link to="/auth/register" className="block">
+                    <Button variant="primary" size="md" className="w-full mt-1">Get Started</Button>
+                  </Link>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -244,9 +289,9 @@ const LandingPage: FC = () => {
                 Connect with verified legal experts, book consultations, manage cases, and track every milestone — all from one platform.
               </p>
               <div className="mt-8 flex flex-col sm:flex-row gap-4">
-                <Link to="/auth/register">
+                <Link to={isAuthenticated ? dashboardPath : '/auth/register'}>
                   <Button variant="secondary" size="lg" className="!bg-accent hover:!bg-accent-dark text-gray-900 font-semibold shadow-xl shadow-accent/25 hover:shadow-accent/40 transition-all w-full sm:w-auto">
-                    Start Free Consultation
+                    {isAuthenticated ? 'Go to My Dashboard' : 'Start Free Consultation'}
                   </Button>
                 </Link>
                 <Link to="/app/search">
@@ -469,9 +514,9 @@ const LandingPage: FC = () => {
             Join thousands of clients who have already found the right lawyer through NyayaX.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/auth/register">
+            <Link to={isAuthenticated ? dashboardPath : '/auth/register'}>
               <Button variant="secondary" size="lg" className="!bg-accent hover:!bg-accent-dark text-gray-900 font-semibold shadow-xl shadow-accent/25 hover:shadow-accent/40 transition-all w-full sm:w-auto">
-                Get Started for Free
+                {isAuthenticated ? 'Go to My Dashboard' : 'Get Started for Free'}
               </Button>
             </Link>
             <Link to="/app/search">
