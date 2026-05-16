@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { usersApi } from '@/services/api'
+import { uploadToCloudinary } from '@/utils/cloudinaryUpload'
 import { useAuthStore } from '@/stores/authStore'
 import AddressPicker from '@/components/molecules/AddressPicker'
 import {
@@ -116,28 +117,14 @@ const ClientInfo: React.FC = () => {
     setForm((s) => ({ ...s, [k]: v }))
   }
 
+  // Income / caste proof upload. This used to assume an S3-presigned PUT
+  // (`upload.uploadUrl` → PUT file), but the server actually returns
+  // Cloudinary signed-upload params — which have no `uploadUrl`, so it
+  // always threw "No upload url" and the whole save failed. Use the same
+  // canonical Cloudinary helper every other upload site uses.
   const uploadFileToPresigned = async (file: File): Promise<string | null> => {
-    if (!userId) throw new Error('No user id')
     try {
-      // usersApi.getPresignedUrl returns { upload: { uploadUrl, fileUrl, method } }
-      const resp = await usersApi.getPresignedUrl(userId, { fileName: file.name, mimeType: file.type, size: file.size })
-      const body = (resp as any).data ?? resp
-      const upload = body.upload || body || {}
-      const uploadUrl: string = upload.uploadUrl || upload.upload_url || upload.uploadUrl
-      const fileUrl: string = upload.fileUrl || upload.file_url || upload.fileUrl
-      if (!uploadUrl) throw new Error('No upload url')
-
-      // PUT the file to S3 presigned url
-      await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': file.type || 'application/octet-stream',
-          "x-amz-acl": "public-read"
-        },
-        body: file,
-      })
-
-      return fileUrl || null
+      return await uploadToCloudinary(file, { folder: 'documents' })
     } catch (err) {
       console.error('Upload failed', err)
       throw err
