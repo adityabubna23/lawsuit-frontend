@@ -120,11 +120,19 @@ const NotificationModal: FC<{ open: boolean; onClose: () => void }> = ({ open, o
 
     // Mediation INVITE → the public accept page. The invitee is NOT a
     // mediation participant yet, so routing them to the mediation detail
-    // page 404s (the read query gates on participant membership). The
-    // invite notification carries the JWT `token`; the accept page reads
-    // it from `?token=`. This must come BEFORE the generic mediationId
-    // branch below.
-    if ((t === 'MEDIATION_INVITED' || t === 'MEDIATION_INVITE') && anyData?.token) {
+    // page 404s (the read query gates on participant membership). This
+    // must come BEFORE the generic mediationId branch below.
+    //
+    // CRITICAL: the two flows use DIFFERENT token formats + routes:
+    //  - Legacy `MEDIATION_INVITE`  → plain-hex token → path-param page
+    //      `/mediation/invite/<token>` (MediationInviteAcceptPage)
+    //  - Phase1+2 `MEDIATION_INVITED` → signed JWT → query-param page
+    //      `/mediation/invite?token=<jwt>` (MediationFlowInvitePage)
+    // Routing a legacy hex token to the JWT page → "jwt malformed".
+    if (t === 'MEDIATION_INVITE' && anyData?.token) {
+      return `/mediation/invite/${encodeURIComponent(String(anyData.token))}`
+    }
+    if (t === 'MEDIATION_INVITED' && anyData?.token) {
       return `/mediation/invite?token=${encodeURIComponent(String(anyData.token))}`
     }
 

@@ -133,7 +133,22 @@ const ClientInfo: React.FC = () => {
 
     setSubmitting(true)
     try {
-      const payload: any = { ...form }
+      // Send only editable fields, dropping null/empty/invalid values. The
+      // server's Zod schema marks these `.optional()` (undefined ok) but not
+      // `.nullable()`, so echoing back the nulls Prisma returns for unset
+      // columns (e.g. unfilled income/caste proofs) triggers a 400.
+      const payload: Record<string, any> = {}
+      const stringKeys: (keyof ClientInfoShape | 'district')[] = [
+        'country', 'state', 'pincode', 'district', 'city',
+        'dob', 'gender', 'caste', 'incomeProofUrl', 'casteProofUrl',
+      ]
+      for (const k of stringKeys) {
+        const v = (form as any)[k]
+        if (typeof v === 'string' && v.trim() !== '') payload[k] = v
+      }
+      if (typeof form.income === 'number' && Number.isFinite(form.income)) {
+        payload.income = form.income
+      }
 
       if (incomeFile) {
         const url = await uploadFileToPresigned(incomeFile)
@@ -156,9 +171,14 @@ const ClientInfo: React.FC = () => {
       setEditing(false)
       setIncomeFile(null)
       setCasteFile(null)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to save client info', err)
-      alert('Failed to save client info')
+      const serverMsg = err?.response?.data?.error
+      alert(
+        typeof serverMsg === 'string' && serverMsg
+          ? `Failed to save client info: ${serverMsg}`
+          : 'Failed to save client info'
+      )
     } finally {
       setSubmitting(false)
     }
