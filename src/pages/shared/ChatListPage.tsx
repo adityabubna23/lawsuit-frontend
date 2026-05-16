@@ -415,7 +415,20 @@ const ChatListPage: FC = () => {
               <span className="text-sm text-gray-600">Back</span>
             </div>
             <div className="flex-1 min-h-0">
-              <ChatTab inline chatId={activeChatId} />
+              <ChatTab
+                inline
+                chatId={activeChatId}
+                groupName={(() => {
+                  // Pass the server-computed group name (e.g.
+                  // "Mediation-<id>") so the conversation header renders
+                  // the group identity + per-message sender labels
+                  // instead of treating it as a 1:1 with one participant.
+                  const c = chats.find((x) => x.id === activeChatId)
+                  return c && (c.isGroup || c.chatType === 'MEDIATION_GROUP')
+                    ? c.name || 'Mediation group'
+                    : undefined
+                })()}
+              />
             </div>
           </>
         ) : resolving ? (

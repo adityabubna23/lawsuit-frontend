@@ -1,5 +1,5 @@
 import { FC, useEffect, useState, useRef, useCallback } from 'react'
-import { Phone, Video, X, Paperclip, FileText, Image as ImageIcon, Loader2 } from 'lucide-react'
+import { Phone, Video, X, Paperclip, FileText, Image as ImageIcon, Loader2, Users } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { chatApi, casesApi, storageApi } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
@@ -92,6 +92,14 @@ interface ChatTabProps {
    * widget (legacy usage).
    */
   inline?: boolean
+  /**
+   * When this chat is a group (e.g. a mediation group), the caller passes
+   * the display name. Presence of this prop forces group-mode rendering:
+   * the header shows the group name + participant count instead of a
+   * single counterpart, and every incoming message is labelled with its
+   * sender's name (WhatsApp group style).
+   */
+  groupName?: string
 }
 
 /**
@@ -101,7 +109,7 @@ interface ChatTabProps {
  * `inline` mode strips the modal chrome so this can be embedded as the right
  * pane of a WhatsApp-style two-pane layout.
  */
-const ChatTab: FC<ChatTabProps> = ({ chatId: propChatId, onClose, caseId, inline = false }) => {
+const ChatTab: FC<ChatTabProps> = ({ chatId: propChatId, onClose, caseId, inline = false, groupName }) => {
   const [activeChatId, setActiveChatId] = useState<string | null>(propChatId || null)
   const [messages, setMessages] = useState<Message[]>([])
   const [text, setText] = useState('')
@@ -606,12 +614,38 @@ const ChatTab: FC<ChatTabProps> = ({ chatId: propChatId, onClose, caseId, inline
 
   const initial = (otherUser?.name || '?').charAt(0).toUpperCase()
 
+  // Group mode: forced when the caller passes a groupName, or inferred
+  // when there are >2 people on the roster (a mediation group has up to
+  // 5: 2 clients, 2 lawyers, the mediator). In group mode the header
+  // shows the group name + participant count, and every incoming bubble
+  // is labelled with its sender's name.
+  const isGroup = !!groupName || participants.length > 2
+  const senderNameFor = (m: Message): string => {
+    if (m.senderName && m.senderName.trim()) return m.senderName.trim()
+    const p = participants.find((x) => x.id === m.senderId)
+    return p?.name || 'Participant'
+  }
+  // Stable per-sender colour so names are easy to scan (WhatsApp-style).
+  const senderColor = (id: string): string => {
+    const palette = [
+      'text-rose-600', 'text-emerald-600', 'text-indigo-600',
+      'text-amber-600', 'text-cyan-600', 'text-fuchsia-600',
+    ]
+    let h = 0
+    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
+    return palette[h % palette.length]
+  }
+
   return (
     <div className={containerClass}>
       {/* Header with avatar, online status, and call buttons */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-white">
         <div className="flex items-center gap-3 min-w-0">
-          {otherUser?.avatarUrl ? (
+          {isGroup ? (
+            <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+              <Users className="w-5 h-5" />
+            </div>
+          ) : otherUser?.avatarUrl ? (
             <img
               src={otherUser.avatarUrl}
               alt=""
@@ -624,17 +658,29 @@ const ChatTab: FC<ChatTabProps> = ({ chatId: propChatId, onClose, caseId, inline
           )}
           <div className="min-w-0">
             <div className="font-semibold text-gray-900 truncate">
-              {otherUser?.name || 'Chat'}
+              {isGroup ? (groupName || 'Mediation group') : (otherUser?.name || 'Chat')}
             </div>
-            {otherUser && (
-              <div className="flex items-center gap-1.5 text-xs">
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    isOtherUserOnline ? 'bg-green-500' : 'bg-gray-400'
-                  }`}
-                />
-                <span className="text-gray-500">{isOtherUserOnline ? 'Online' : 'Offline'}</span>
+            {isGroup ? (
+              <div className="text-xs text-gray-500 truncate">
+                {participants.length > 0
+                  ? `${participants.length} participants · ${participants
+                      .map((p) => p.name)
+                      .filter(Boolean)
+                      .slice(0, 3)
+                      .join(', ')}${participants.length > 3 ? '…' : ''}`
+                  : 'Group chat'}
               </div>
+            ) : (
+              otherUser && (
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      isOtherUserOnline ? 'bg-green-500' : 'bg-gray-400'
+                    }`}
+                  />
+                  <span className="text-gray-500">{isOtherUserOnline ? 'Online' : 'Offline'}</span>
+                </div>
+              )
             )}
           </div>
         </div>
@@ -735,6 +781,15 @@ const ChatTab: FC<ChatTabProps> = ({ chatId: propChatId, onClose, caseId, inline
                       isMine ? 'bg-primary text-white' : 'bg-gray-100 text-gray-800'
                     } px-4 py-2 rounded-lg`}
                   >
+                    {/* WhatsApp-style sender label — only on INCOMING
+                        messages in a GROUP (your own bubbles don't need
+                        it, and 1:1 chats already show the name in the
+                        header). */}
+                    {isGroup && !isMine && (
+                      <div className={`text-xs font-semibold mb-0.5 ${senderColor(m.senderId)}`}>
+                        {senderNameFor(m)}
+                      </div>
+                    )}
                     {hasText && (
                       <div className="text-sm whitespace-pre-wrap">{m.text}</div>
                     )}
