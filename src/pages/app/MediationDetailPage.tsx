@@ -114,6 +114,27 @@ const MediationDetailPage: FC = () => {
     onError: (e: any) => setError(e?.response?.data?.error || 'Failed to cancel mediation'),
   })
 
+  // MA 2023 no-agreement escape — platform appoints a neutral mediator.
+  const neutralMut = useMutation({
+    mutationFn: () => mediationApi.requestNeutralMediator(id),
+    onSuccess: () => {
+      setError(null)
+      qc.invalidateQueries({ queryKey: ['mediation', id] })
+      qc.invalidateQueries({ queryKey: ['mediations'] })
+    },
+    onError: (e: any) => setError(e?.response?.data?.error || 'Failed to assign a neutral mediator'),
+  })
+
+  const onRequestNeutral = () => {
+    if (
+      confirm(
+        "You couldn't agree on a mediator. The platform will appoint a neutral, accredited mediator and open the session. Continue?",
+      )
+    ) {
+      neutralMut.mutate()
+    }
+  }
+
   const m = q.data
   const isInitiator = !!m && user?.id === m.initiatorClientId
   const isRespondent = !!m && user?.id === m.respondentClientId
@@ -358,19 +379,42 @@ const MediationDetailPage: FC = () => {
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="text-lg font-medium text-gray-900">Step 2 · Both parties: agree on a mediator</h2>
           <p className="text-sm text-gray-500 mt-1">
-            Each side picks a mediator. When both picks match, the caucus room opens. Otherwise, keep picking until you agree.
+            Each side picks a mediator. If both pick the same one, the session opens.
+            If you pick different mediators, agree on one by re-picking — or, if you
+            can't agree, request a platform-appointed neutral mediator (MA 2023).
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 text-sm">
             <PickStatus label="Your pick" id={myPick} />
             <PickStatus label="Other party's pick" id={otherPick} />
           </div>
           {(isInitiator || isRespondent) && (
-            <button
-              onClick={() => setShowMediators(true)}
-              className="mt-5 px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark"
-            >
-              {myPick ? 'Change My Pick' : 'Choose a Mediator'}
-            </button>
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => setShowMediators(true)}
+                className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark"
+              >
+                {myPick ? 'Change My Pick' : 'Choose a Mediator'}
+              </button>
+              {/* No-agreement escape — appears once both have picked and
+                  the picks differ. Either party can trigger it. */}
+              {myPick && otherPick && myPick !== otherPick && (
+                <button
+                  onClick={onRequestNeutral}
+                  disabled={neutralMut.isPending}
+                  className="px-4 py-2 rounded-lg border border-amber-500 text-amber-700 text-sm font-medium hover:bg-amber-50 disabled:opacity-60"
+                >
+                  {neutralMut.isPending
+                    ? 'Assigning…'
+                    : "Can't agree? Request a neutral mediator"}
+                </button>
+              )}
+            </div>
+          )}
+          {myPick && otherPick && myPick !== otherPick && (
+            <p className="mt-3 text-xs text-amber-700">
+              You and the other party picked different mediators. Re-pick to match, or
+              request a platform-appointed neutral mediator to proceed.
+            </p>
           )}
         </div>
       )}

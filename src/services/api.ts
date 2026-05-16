@@ -847,6 +847,9 @@ export const mediationApi = {
     api.post(`/mediations/${id}/initiator-lawyer`, { lawyerId }),
   pickMediator: (id: string, mediatorId: string) =>
     api.post(`/mediations/${id}/mediator-pick`, { mediatorId }),
+  /** MA 2023 escape — parties couldn't agree → platform appoints a neutral. */
+  requestNeutralMediator: (id: string) =>
+    api.post(`/mediations/${id}/mediator-neutral`, {}),
   getRoom: (id: string) => api.get(`/mediations/${id}/room`),
   conclude: (id: string, data: { outcome: 'RESOLVED' | 'ESCALATED_TO_CASE'; settlementTerms?: string; closureNotes?: string }) =>
     api.post(`/mediations/${id}/conclude`, data),
@@ -874,6 +877,11 @@ export const mediationFlowApi = {
 
   list: () => api.get('/mediations/flow'),
   getById: (id: string) => api.get(`/mediations/flow/${id}`),
+  // Initiator edits the dispute until the respondent accepts.
+  editDraft: (
+    id: string,
+    data: { disputeTitle?: string; disputeDescription?: string },
+  ) => api.patch(`/mediations/flow/${id}`, data),
 
   // Stage 1 — idempotent
   sendInvitation: (id: string, data: {

@@ -103,15 +103,14 @@ const AppointmentsPage: FC = () => {
         })
         .sort(recentFirst),
       attended: appointments
-        .filter(apt => {
-          return (
-            apt.status === 'COMPLETED' &&
-            // Sanity gate: a COMPLETED row with a future scheduledAt is a
-            // server-side data anomaly — don't show it as "attended" until the
-            // scheduled time has actually elapsed.
-            new Date(apt.scheduledAt) <= now
-          )
-        })
+        // COMPLETED is the single source of truth — the lawyer marks the
+        // consultation done and the same row is shared by both sides.
+        // Previously the client side ALSO required scheduledAt <= now;
+        // that extra gate hid lawyer-completed appointments whose slot
+        // hadn't technically elapsed (early completion / borderline clock
+        // / timezone), so the row vanished from EVERY client tab. Match
+        // the lawyer-side rule exactly: status === 'COMPLETED'.
+        .filter(apt => apt.status === 'COMPLETED')
         .sort(recentFirst),
       cancelled: appointments
         .filter(apt => apt.status === 'CANCELLED')

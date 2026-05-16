@@ -113,6 +113,11 @@ const MediationFlowDetailPage: FC = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [actionRunning, setActionRunning] = useState<'send' | 'activate' | null>(null)
+  // Initiator can edit the dispute until the respondent accepts.
+  const [editing, setEditing] = useState(false)
+  const [editTitle, setEditTitle] = useState('')
+  const [editDesc, setEditDesc] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
 
   const fetchOne = async () => {
     if (!id) return
@@ -134,6 +139,39 @@ const MediationFlowDetailPage: FC = () => {
   }, [id])
 
   const isInitiator = data?.initiatorClientId === authUserId
+  // Edit window: before the respondent accepts (DRAFT = not sent,
+  // AWAITING_RESPONDENT = sent but unaccepted). Initiator only.
+  const canEditDispute =
+    isInitiator &&
+    (data?.status === 'DRAFT' || data?.status === 'AWAITING_RESPONDENT')
+
+  const startEditing = () => {
+    if (!data) return
+    setEditTitle(data.disputeTitle)
+    setEditDesc(data.disputeDescription)
+    setEditing(true)
+  }
+
+  const saveEdit = async () => {
+    if (!id) return
+    if (editTitle.trim().length < 3 || editDesc.trim().length < 10) {
+      alert('Title must be 3+ chars and description 10+ chars.')
+      return
+    }
+    setSavingEdit(true)
+    try {
+      await mediationFlowApi.editDraft(id, {
+        disputeTitle: editTitle.trim(),
+        disputeDescription: editDesc.trim(),
+      })
+      setEditing(false)
+      await fetchOne()
+    } catch (err) {
+      alert(friendlyError(err, "Couldn't save your changes."))
+    } finally {
+      setSavingEdit(false)
+    }
+  }
   const statusInfo = data ? STATUS_LABELS[data.status] : null
 
   const sendInvitation = async () => {
@@ -222,12 +260,67 @@ const MediationFlowDetailPage: FC = () => {
       </header>
 
       <section className="rounded-xl border border-gray-200 bg-white p-4 mb-4">
-        <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">
-          Dispute description
-        </h2>
-        <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
-          {data.disputeDescription}
-        </p>
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+            Dispute description
+          </h2>
+          {canEditDispute && !editing && (
+            <button
+              onClick={startEditing}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              Edit
+            </button>
+          )}
+        </div>
+
+        {editing ? (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Title</label>
+              <input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                maxLength={200}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
+              <textarea
+                value={editDesc}
+                onChange={(e) => setEditDesc(e.target.value)}
+                rows={5}
+                maxLength={5000}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={saveEdit}
+                disabled={savingEdit}
+                className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+              >
+                {savingEdit && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                Save changes
+              </button>
+              <button
+                onClick={() => setEditing(false)}
+                disabled={savingEdit}
+                className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+            <p className="text-[11px] text-gray-400">
+              You can edit the dispute until the other party accepts. After that it's locked.
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+            {data.disputeDescription}
+          </p>
+        )}
       </section>
 
       {/* Action CTA — depends on status + role */}

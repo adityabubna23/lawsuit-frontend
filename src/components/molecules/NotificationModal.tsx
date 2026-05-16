@@ -118,6 +118,16 @@ const NotificationModal: FC<{ open: boolean; onClose: () => void }> = ({ open, o
       return data.caseId ? `${rolePrefix}/case/${data.caseId}` : `${rolePrefix}/cases`
     }
 
+    // Mediation INVITE → the public accept page. The invitee is NOT a
+    // mediation participant yet, so routing them to the mediation detail
+    // page 404s (the read query gates on participant membership). The
+    // invite notification carries the JWT `token`; the accept page reads
+    // it from `?token=`. This must come BEFORE the generic mediationId
+    // branch below.
+    if ((t === 'MEDIATION_INVITED' || t === 'MEDIATION_INVITE') && anyData?.token) {
+      return `/mediation/invite?token=${encodeURIComponent(String(anyData.token))}`
+    }
+
     // Mediation events → mediation detail. (`mediationId` is loose-typed in
     // the payload — already cast through `anyData` at the top of this fn.)
     // Phase 1+2 mediation flow notifications use the PLURAL `mediations/:id`
