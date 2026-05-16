@@ -1,6 +1,6 @@
 import { FC, useEffect, useMemo, useState, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { MessageSquare, Loader2, Search, RefreshCw, ChevronLeft } from 'lucide-react'
+import { MessageSquare, Loader2, Search, RefreshCw, ChevronLeft, Users } from 'lucide-react'
 import { chatApi } from '@/services/api'
 import { friendlyError } from '@/utils/errors'
 import { unwrapList } from '@/utils/unwrap'
@@ -30,6 +30,12 @@ interface ChatRow {
   lastMessage?: LastMessage | null
   unreadCount?: number
   updatedAt?: string
+  /** Set for mediation group chats — drives the group rendering below. */
+  chatType?: string | null
+  mediationId?: string | null
+  isGroup?: boolean
+  /** Server-computed display name for group chats, e.g. "Mediation: a1b2c3d4". */
+  name?: string | null
 }
 
 const fmtRelative = (iso?: string) => {
@@ -201,7 +207,7 @@ const ChatListPage: FC = () => {
     const q = query.trim().toLowerCase()
     if (!q) return chats
     return chats.filter((c) => {
-      const name = c.participants?.[0]?.name?.toLowerCase() || ''
+      const name = (c.name || c.participants?.[0]?.name || '').toLowerCase()
       const last = c.lastMessage?.text?.toLowerCase() || ''
       const caseTitle = c.case?.title?.toLowerCase() || ''
       return name.includes(q) || last.includes(q) || caseTitle.includes(q)
@@ -302,8 +308,14 @@ const ChatListPage: FC = () => {
           ) : (
             <ul className="divide-y divide-gray-100">
               {filtered.map((c) => {
+                const isGroup = c.isGroup || c.chatType === 'MEDIATION_GROUP'
                 const other = c.participants?.[0]
-                const initial = (other?.name || '?').charAt(0).toUpperCase()
+                // Group chats render their server-computed name + a group
+                // glyph; 1:1 chats keep the counterpart's name/avatar.
+                const displayName = isGroup
+                  ? c.name || 'Mediation group'
+                  : other?.name || 'Unknown'
+                const initial = (displayName || '?').charAt(0).toUpperCase()
                 const last = c.lastMessage
                 const isMine = last?.senderId && authUserId && last.senderId === authUserId
                 const unread = c.unreadCount ?? 0
@@ -326,7 +338,11 @@ const ChatListPage: FC = () => {
                           : 'hover:bg-gray-50 active:bg-gray-100'}
                       `}
                     >
-                      {other?.avatarUrl ? (
+                      {isGroup ? (
+                        <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                          <Users className="w-6 h-6" />
+                        </div>
+                      ) : other?.avatarUrl ? (
                         <img
                           src={other.avatarUrl}
                           alt=""
@@ -340,7 +356,7 @@ const ChatListPage: FC = () => {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
                           <span className="font-medium text-gray-900 truncate">
-                            {other?.name || 'Unknown'}
+                            {displayName}
                           </span>
                           <span className="text-[11px] text-gray-400 flex-shrink-0">
                             {fmtRelative(last?.createdAt || c.updatedAt)}
@@ -359,11 +375,15 @@ const ChatListPage: FC = () => {
                             </span>
                           )}
                         </div>
-                        {c.case?.title && (
+                        {isGroup ? (
+                          <div className="text-[11px] text-emerald-600 mt-0.5 truncate">
+                            Mediation group · all participants
+                          </div>
+                        ) : c.case?.title ? (
                           <div className="text-[11px] text-gray-400 mt-0.5 truncate">
                             Case · {c.case.title}
                           </div>
-                        )}
+                        ) : null}
                       </div>
                     </button>
                   </li>

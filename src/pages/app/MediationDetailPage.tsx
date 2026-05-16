@@ -151,6 +151,11 @@ const MediationDetailPage: FC = () => {
   const otherPick = isInitiator ? m?.respondentMediatorPick : isRespondent ? m?.initiatorMediatorPick : null
 
   const roomPath = useMemo(() => (isLawyer ? `/lawyer/mediation/${id}/room` : `/app/mediation/${id}/room`), [id, isLawyer])
+  // Role-correct chat surface. The mediation group chat is created at
+  // IN_SESSION and surfaced here via the `chats` relation on the detail
+  // payload (filtered server-side to chatType MEDIATION_GROUP).
+  const chatBasePath = isLawyer ? '/lawyer/chats' : '/app/chats'
+  const groupChatId = m?.chats?.[0]?.id ?? null
 
   if (q.isLoading) return <div className="py-16 text-center text-gray-500">Loading…</div>
   if (!m) return <div className="py-16 text-center text-gray-500">Mediation not found.</div>
@@ -373,16 +378,30 @@ const MediationDetailPage: FC = () => {
       {/* Step: In session */}
       {m.status === 'IN_SESSION' && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-lg font-medium text-gray-900">Step 3 · Caucus session</h2>
+          <h2 className="text-lg font-medium text-gray-900">Step 3 · Mediation group</h2>
           <p className="text-sm text-gray-500 mt-1">
-            The mediation session is live. All authorized participants (both clients, both lawyers, the mediator) can join the caucus room.
+            A group with every participant (both clients, both lawyers, the mediator) is open.
+            Discuss there and start the caucus video call right from the group when you're ready —
+            anyone in the group can join.
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-3">
+            {groupChatId ? (
+              <Link
+                to={`${chatBasePath}?chatId=${groupChatId}`}
+                className="px-5 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark"
+              >
+                Open mediation group chat
+              </Link>
+            ) : (
+              <span className="text-sm text-gray-500">
+                Setting up the group chat… refresh in a moment.
+              </span>
+            )}
             <Link
               to={roomPath}
-              className="px-5 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700"
+              className="px-4 py-2 rounded-lg border border-emerald-600 text-emerald-700 text-sm font-medium hover:bg-emerald-50"
             >
-              Join Caucus Room
+              Open caucus video room directly
             </Link>
             {isMediator && (
               <button

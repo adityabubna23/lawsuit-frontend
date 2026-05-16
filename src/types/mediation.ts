@@ -65,6 +65,8 @@ export interface Mediation {
   respondentLawyer?: PartyRef | null
   mediator?: PartyRef | null
   invite?: MediationInvite
+  /** MEDIATION_GROUP chat(s), created at IN_SESSION. Usually length 1. */
+  chats?: { id: string }[]
 }
 
 export interface MediatorProfile {
