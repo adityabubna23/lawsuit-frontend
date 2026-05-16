@@ -117,6 +117,8 @@ const MediationFlowDetailPage: FC = () => {
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState('')
   const [editDesc, setEditDesc] = useState('')
+  const [editRespEmail, setEditRespEmail] = useState('')
+  const [editRespName, setEditRespName] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
 
   const fetchOne = async () => {
@@ -149,6 +151,11 @@ const MediationFlowDetailPage: FC = () => {
     if (!data) return
     setEditTitle(data.disputeTitle)
     setEditDesc(data.disputeDescription)
+    // Prefill the other party's contact from the latest pending invite
+    // so the initiator can correct a wrong email / name before accept.
+    const inv = data.invites?.[0]
+    setEditRespEmail(inv?.respondentEmail || '')
+    setEditRespName(inv?.respondentName || '')
     setEditing(true)
   }
 
@@ -158,14 +165,32 @@ const MediationFlowDetailPage: FC = () => {
       alert('Title must be 3+ chars and description 10+ chars.')
       return
     }
+    if (editRespEmail && !/^\S+@\S+\.\S+$/.test(editRespEmail.trim())) {
+      alert('Enter a valid email for the other party.')
+      return
+    }
     setSavingEdit(true)
     try {
+      const inv = data?.invites?.[0]
+      const emailChanged =
+        !!editRespEmail.trim() &&
+        editRespEmail.trim().toLowerCase() !==
+          (inv?.respondentEmail || '').toLowerCase()
       await mediationFlowApi.editDraft(id, {
         disputeTitle: editTitle.trim(),
         disputeDescription: editDesc.trim(),
+        // Only send respondent fields when they actually changed, so a
+        // no-op save doesn't needlessly re-issue the invite.
+        ...(emailChanged ? { respondentEmail: editRespEmail.trim() } : {}),
+        ...(editRespName.trim() && editRespName.trim() !== (inv?.respondentName || '')
+          ? { respondentName: editRespName.trim() }
+          : {}),
       })
       setEditing(false)
       await fetchOne()
+      if (emailChanged) {
+        alert('Saved. A fresh invitation has been emailed to the new address.')
+      }
     } catch (err) {
       alert(friendlyError(err, "Couldn't save your changes."))
     } finally {
@@ -295,6 +320,44 @@ const MediationFlowDetailPage: FC = () => {
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
+
+            {/* Other party — fix a wrong email/name before they accept.
+                Changing the email cancels the old invite and emails a
+                fresh one to the corrected address. */}
+            <div className="pt-3 border-t border-gray-100">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                Other party (editable until they accept)
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Their name
+                  </label>
+                  <input
+                    value={editRespName}
+                    onChange={(e) => setEditRespName(e.target.value)}
+                    maxLength={200}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Their email
+                  </label>
+                  <input
+                    type="email"
+                    value={editRespEmail}
+                    onChange={(e) => setEditRespEmail(e.target.value)}
+                    placeholder="name@example.com"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </div>
+              </div>
+              <p className="text-[11px] text-gray-400 mt-1">
+                Changing the email re-sends the invitation to the new address and cancels the old one.
+              </p>
+            </div>
+
             <div className="flex items-center gap-2">
               <button
                 onClick={saveEdit}

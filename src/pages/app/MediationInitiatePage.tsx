@@ -62,7 +62,11 @@ const MediationInitiatePage: FC = () => {
       })
       const id = (res.data as { mediation?: { id?: string } }).mediation?.id
       if (!id) throw new Error('Server did not return a mediation id')
-      navigate(`/app/mediation/${id}`, { replace: true })
+      // Land on the Phase 1+2 detail page (PLURAL `/mediations/`). The
+      // singular `/mediation/:id` is the legacy page which has no
+      // invite-status / edit / resend UI for this flow — sending users
+      // there was why the invite looked "stuck" and uneditable.
+      navigate(`/app/mediations/${id}`, { replace: true })
     } catch (err) {
       setError(friendlyError(err, "Couldn't create the mediation. Please try again."))
     } finally {

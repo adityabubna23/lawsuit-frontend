@@ -880,7 +880,12 @@ export const mediationFlowApi = {
   // Initiator edits the dispute until the respondent accepts.
   editDraft: (
     id: string,
-    data: { disputeTitle?: string; disputeDescription?: string },
+    data: {
+      disputeTitle?: string
+      disputeDescription?: string
+      respondentEmail?: string
+      respondentName?: string
+    },
   ) => api.patch(`/mediations/flow/${id}`, data),
 
   // Stage 1 — idempotent
