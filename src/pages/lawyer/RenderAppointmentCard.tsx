@@ -346,17 +346,28 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
               <MessageSquare className="w-4 h-4" />
               Discuss
             </button>
-            {/* Escalate-to-Case — explicitly named so it matches the
-                lawyer's mental model. Clicking opens the create-case sheet
-                seeded with this client + appointment metadata so the lawyer
-                can convert the consultation into a tracked case. */}
-            <button
-              onClick={() => onOpenCaseCreation(appointment)}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-white transition-colors"
-            >
-              <Briefcase className="w-4 h-4" />
-              Escalate to Case
-            </button>
+            {/* Escalate-to-Case OR Open-the-Case — flips once the lawyer has
+                already converted this appointment into a tracked case. We
+                rely on `appointment.case` (backend includes it in the listing
+                response) so the button reflects reality without an extra
+                fetch. */}
+            {appointment.case ? (
+              <button
+                onClick={() => navigate(`/lawyer/case/${appointment.case!.id}`)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-white hover:bg-primary/90 transition-colors"
+              >
+                <Briefcase className="w-4 h-4" />
+                Open the Case
+              </button>
+            ) : (
+              <button
+                onClick={() => onOpenCaseCreation(appointment)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-white transition-colors"
+              >
+                <Briefcase className="w-4 h-4" />
+                Escalate to Case
+              </button>
+            )}
           </>
         )}
 
@@ -408,15 +419,25 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
             {/* Even when the slot was missed (lawyer never marked the
                 appointment COMPLETED so it didn't move to the attended
                 tab), the consultation may have actually happened — surface
-                Escalate-to-Case here too so the lawyer can hand off the
-                client without first juggling the status state. */}
-            <button
-              onClick={() => onOpenCaseCreation(appointment)}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-white transition-colors"
-            >
-              <Briefcase className="w-4 h-4" />
-              Escalate to Case
-            </button>
+                Escalate-to-Case (or Open-the-Case if already escalated) so
+                the lawyer can hand off the client without juggling status. */}
+            {appointment.case ? (
+              <button
+                onClick={() => navigate(`/lawyer/case/${appointment.case!.id}`)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-white hover:bg-primary/90 transition-colors"
+              >
+                <Briefcase className="w-4 h-4" />
+                Open the Case
+              </button>
+            ) : (
+              <button
+                onClick={() => onOpenCaseCreation(appointment)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-white transition-colors"
+              >
+                <Briefcase className="w-4 h-4" />
+                Escalate to Case
+              </button>
+            )}
           </>
         )}
 
@@ -448,14 +469,26 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
             </button>
             {/* Escalate-to-Case on the attended tab — the post-consultation
                 hand-off the lawyer expects to find here. Filled primary so
-                it reads as the headline action on a completed appointment. */}
-            <button
-              onClick={() => onOpenCaseCreation(appointment)}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-primary text-white hover:bg-primary/90 transition-colors"
-            >
-              <Briefcase className="w-4 h-4" />
-              Escalate to Case
-            </button>
+                it reads as the headline action. Flips to Open-the-Case once
+                the case has been created so the lawyer keeps a single
+                obvious action. */}
+            {appointment.case ? (
+              <button
+                onClick={() => navigate(`/lawyer/case/${appointment.case!.id}`)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-primary text-white hover:bg-primary/90 transition-colors"
+              >
+                <Briefcase className="w-4 h-4" />
+                Open the Case
+              </button>
+            ) : (
+              <button
+                onClick={() => onOpenCaseCreation(appointment)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-primary text-white hover:bg-primary/90 transition-colors"
+              >
+                <Briefcase className="w-4 h-4" />
+                Escalate to Case
+              </button>
+            )}
           </>
         )}
 

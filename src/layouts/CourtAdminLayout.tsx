@@ -1,166 +1,270 @@
-import { FC, useState } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { Bell } from 'lucide-react';
-import { useCourtAdminStore } from '../stores/courtAdminStore';
-import { useNotificationStore } from '../stores/notificationStore';
-import { useNotificationSocket } from '../hooks/useNotificationSocket';
-import NotificationModal from '../components/molecules/NotificationModal';
-import ErrorBoundary from '../components/organisms/ErrorBoundary';
+import { FC, useState, useRef, useEffect, useMemo } from 'react'
+import { Outlet, NavLink, useLocation, useNavigate, Link } from 'react-router-dom'
+import {
+  Bell,
+  ShieldCheck,
+  Building2,
+  Coins,
+  User as UserIcon,
+  ChevronLeft,
+  ChevronRight,
+  Menu,
+  LogOut,
+  Gavel,
+} from 'lucide-react'
+import { useCourtAdminStore } from '../stores/courtAdminStore'
+import { useNotificationStore } from '../stores/notificationStore'
+import { useNotificationSocket } from '../hooks/useNotificationSocket'
+import NotificationModal from '../components/molecules/NotificationModal'
+import ErrorBoundary from '../components/organisms/ErrorBoundary'
 
+interface NavItem {
+  to: string
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { to: '/court-admin/dashboard', label: 'Lawyer verifications', icon: ShieldCheck },
+  { to: '/court-admin/organization-verifications', label: 'Organization verifications', icon: Building2 },
+  { to: '/court-admin/salary', label: 'Salary', icon: Coins },
+  { to: '/court-admin/profile', label: 'Profile', icon: UserIcon },
+]
+
+/**
+ * Court Admin shell.
+ *
+ * Visual language: dark slate→indigo sidebar mirroring the
+ * `/auth/court-admin-login` page so the whole administrative surface
+ * reads as one platform. Content area stays light for legibility of
+ * data tables and forms.
+ */
 const CourtAdminLayout: FC = () => {
-    const [collapsed, setCollapsed] = useState(false);
-    const [showNotifications, setShowNotifications] = useState(false);
-    const { logout, user } = useCourtAdminStore();
-    const unreadCount = useNotificationStore((s) => s.unreadCount);
-    const navigate = useNavigate();
+  const [collapsed, setCollapsed] = useState(false)
+  const [showNotifications, setShowNotifications] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
+  const { logout, user } = useCourtAdminStore()
+  const unreadCount = useNotificationStore((s) => s.unreadCount)
+  const location = useLocation()
+  const navigate = useNavigate()
+  const profileRef = useRef<HTMLDivElement>(null)
 
-    // Subscribe to the notification socket so live updates land in this
-    // layout the same way they do for every other role.
-    useNotificationSocket();
+  useNotificationSocket()
 
-    const handleLogout = () => {
-        logout();
-        navigate('/auth/court-admin-login');
-    };
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [])
 
-    const navItems = [
-        {
-            to: '/court-admin/dashboard',
-            label: 'Lawyer verifications',
-            icon: (
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M3 13h8V3H3v10zM3 21h8v-6H3v6zM13 21h8V11h-8v10zM13 3v6h8V3h-8z" fill="currentColor" />
-                </svg>
-            )
-        },
-        {
-            to: '/court-admin/organization-verifications',
-            label: 'Organization verifications',
-            icon: (
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M3 21V8l9-5 9 5v13H3zm6-2h6v-7H9v7z" fill="currentColor" />
-                </svg>
-            )
-        },
-        {
-            to: '/court-admin/salary',
-            label: 'Salary',
-            icon: (
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M7 14l5-5 5 5H7z" fill="currentColor" transform="rotate(180 12 12)" />
-                </svg>
-            )
-        },
-        {
-            to: '/court-admin/profile',
-            label: 'Profile',
-            icon: (
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M16 11c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM6 11c1.657 0 3-1.343 3-3S7.657 5 6 5 3 6.343 3 8s1.343 3 3 3zM6 13c-2.33 0-7 1.17-7 3.5V19h20v-2.5C19 14.17 14.33 13 12 13H6z" fill="currentColor" />
-                </svg>
-            )
-        },
-    ];
+  const handleLogout = () => {
+    logout()
+    navigate('/auth/court-admin-login')
+  }
 
-    return (
-        <div className="min-h-screen flex bg-gray-100">
-            {/* Sidebar */}
-            <aside className={`${collapsed ? 'w-20' : 'w-64'} bg-white border-r transition-all duration-200 flex flex-col`}>
-                <div className="flex items-center justify-between p-4 border-b">
-                    <div className="flex items-center space-x-2">
-                        <div className="w-8 h-8 bg-indigo-600 text-white rounded flex items-center justify-center font-bold">CA</div>
-                        {!collapsed && <div className="font-semibold text-gray-800">Court Admin</div>}
-                    </div>
-                    <button
-                        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                        onClick={() => setCollapsed(s => !s)}
-                        className="p-1 rounded hover:bg-gray-100"
-                    >
-                        <svg className="w-5 h-5 text-gray-600" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                            <path d={collapsed ? 'M11 5l6 7-6 7' : 'M13 5l-6 7 6 7'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                    </button>
-                </div>
+  const pageTitle = useMemo(() => {
+    const match = NAV_ITEMS.find((it) => location.pathname.startsWith(it.to))
+    return match?.label ?? 'Court Admin'
+  }, [location.pathname])
 
-                <nav className="flex-1 overflow-y-auto p-2 space-y-1">
-                    {navItems.map(item => (
-                        <NavLink
-                            key={item.to}
-                            to={item.to}
-                            title={item.label}
-                            className={({ isActive }) => `flex items-center gap-3 px-3 py-2 rounded text-sm hover:bg-gray-50 ${isActive ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-700'}`}
-                        >
-                            <div className="w-6 text-center flex items-center justify-center">{item.icon}</div>
-                            {!collapsed && <span>{item.label}</span>}
-                        </NavLink>
-                    ))}
-                </nav>
+  const initials = (user?.name || user?.email || 'C').charAt(0).toUpperCase()
 
-                <div className="p-3 border-t">
-                    <button
-                        onClick={handleLogout}
-                        className="w-full text-sm text-left px-3 py-2 rounded hover:bg-red-50 text-red-600 font-medium flex items-center gap-3"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                        {!collapsed && <span>Logout</span>}
-                    </button>
-                </div>
-            </aside>
-
-            {/* Main content area */}
-            <div className="flex-1 flex flex-col overflow-hidden">
-                {/* Top bar */}
-                <header className="bg-white border-b shadow-sm z-10 relative">
-                    <div className="max-w-full mx-auto px-4 py-3 flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <button className="md:hidden p-2 rounded hover:bg-gray-100" onClick={() => setCollapsed(s => !s)}>
-                                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                            </button>
-                            <h2 className="text-xl font-semibold text-gray-800">Court Administration Portal</h2>
-                        </div>
-
-                        <div className="flex items-center gap-4">
-                            {/* Notification bell — same pattern as AdminLayout
-                                so court admins see verification, salary, and
-                                organization-event notifications surface here
-                                and tap-to-redirect routes via the COURT_ADMIN
-                                branch of resolveRoute in NotificationModal. */}
-                            <button
-                                onClick={() => setShowNotifications(true)}
-                                className="relative p-2 rounded-md text-gray-600 hover:bg-gray-100"
-                                title="Notifications"
-                                aria-label="Notifications"
-                            >
-                                <Bell className="w-5 h-5" />
-                                {unreadCount > 0 && (
-                                    <span className="absolute top-1 right-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-semibold text-white bg-red-600 rounded-full">
-                                        {unreadCount > 99 ? '99+' : unreadCount}
-                                    </span>
-                                )}
-                            </button>
-                            {/* Profile placeholder */}
-                            <div className="flex items-center gap-3">
-                                <span className="text-sm font-medium text-gray-700 hidden sm:block">{user?.name || 'Admin'}</span>
-                                <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold shadow-sm">
-                                    {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </header>
-
-                <main className="flex-1 overflow-auto bg-gray-50 p-6">
-                    <ErrorBoundary scope="court-admin page">
-                        <Outlet />
-                    </ErrorBoundary>
-                </main>
+  return (
+    <div className="min-h-screen flex bg-slate-50">
+      {/* ───── Sidebar (dark platform theme) ───── */}
+      <aside
+        className={`${collapsed ? 'w-20' : 'w-64'} bg-gradient-to-b from-slate-900 via-slate-900 to-indigo-950 border-r border-slate-800 transition-all duration-200 flex flex-col sticky top-0 h-screen`}
+      >
+        {/* Brand */}
+        <div className="flex items-center justify-between px-4 h-16 border-b border-white/10">
+          <Link
+            to="/court-admin/dashboard"
+            title="Court Admin"
+            className="flex items-center gap-2.5 rounded-md hover:opacity-90 transition-opacity"
+          >
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center font-bold shadow-lg shadow-indigo-900/30">
+              <Gavel className="w-4 h-4" />
             </div>
-            <NotificationModal open={showNotifications} onClose={() => setShowNotifications(false)} />
+            {!collapsed && (
+              <div className="flex flex-col leading-tight">
+                <span className="font-semibold text-white">
+                  Nyaya<span className="text-amber-400">X</span>
+                </span>
+                <span className="text-[10px] uppercase tracking-wider text-indigo-300 font-medium">Court Admin</span>
+              </div>
+            )}
+          </Link>
+          <button
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            onClick={() => setCollapsed((s) => !s)}
+            className="p-1 rounded-md hover:bg-white/10 text-white/60"
+          >
+            {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
         </div>
-    );
-};
 
-export default CourtAdminLayout;
+        {/* Nav */}
+        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-1">
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                title={collapsed ? item.label : undefined}
+                className={({ isActive }) =>
+                  `group relative flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+                    isActive
+                      ? 'bg-white/10 text-white font-medium'
+                      : 'text-white/70 hover:bg-white/5 hover:text-white'
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    {isActive && (
+                      <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-amber-400" />
+                    )}
+                    <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-amber-400' : 'text-white/60 group-hover:text-white'}`} />
+                    {!collapsed && <span className="truncate">{item.label}</span>}
+                  </>
+                )}
+              </NavLink>
+            )
+          })}
+        </nav>
+
+        {/* Sidebar footer / user card */}
+        <div className="border-t border-white/10 p-3">
+          {collapsed ? (
+            <button
+              onClick={() => setCollapsed(false)}
+              title={user?.name || 'Profile'}
+              className="w-full flex items-center justify-center p-1 rounded-full hover:bg-white/10 transition-colors"
+            >
+              <div className="w-9 h-9 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-semibold ring-2 ring-white/20 shadow-sm">
+                {initials}
+              </div>
+            </button>
+          ) : (
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-semibold flex-shrink-0">
+                {initials}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-medium text-white truncate">
+                  {user?.name || 'Court admin'}
+                </div>
+                <div className="text-[10px] text-white/60 truncate">{user?.email || ''}</div>
+              </div>
+              <button
+                onClick={handleLogout}
+                title="Sign out"
+                className="p-1.5 rounded-md text-white/60 hover:bg-red-500/20 hover:text-red-300 transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
+      </aside>
+
+      {/* ───── Main column ───── */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Top bar */}
+        <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
+          <div className="px-6 h-16 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                className="md:hidden p-2 rounded-md hover:bg-gray-100 text-gray-600"
+                onClick={() => setCollapsed((s) => !s)}
+                aria-label="Toggle navigation"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <div className="flex items-center gap-2 text-sm min-w-0">
+                <span className="text-gray-400">Court Admin</span>
+                <ChevronRight className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+                <span className="font-semibold text-gray-900 truncate">{pageTitle}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Notification bell */}
+              <button
+                onClick={() => setShowNotifications(true)}
+                className="relative p-2 rounded-md text-gray-600 hover:bg-gray-100"
+                title="Notifications"
+                aria-label="Notifications"
+              >
+                <Bell className="w-5 h-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-semibold text-white bg-red-600 rounded-full">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Profile menu */}
+              <div className="relative" ref={profileRef}>
+                <button
+                  onClick={() => setProfileOpen((v) => !v)}
+                  className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-gray-100"
+                >
+                  <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-semibold">
+                    {initials}
+                  </div>
+                  <span className="hidden sm:inline-block text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700">
+                    Court
+                  </span>
+                </button>
+                {profileOpen && (
+                  <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden z-40">
+                    <div className="px-4 py-3 border-b border-gray-100">
+                      <div className="text-sm font-medium text-gray-900 truncate">{user?.name || 'Court admin'}</div>
+                      <div className="text-xs text-gray-500 truncate">{user?.email || ''}</div>
+                      <span className="mt-2 inline-block text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700">
+                        Court Admin
+                      </span>
+                    </div>
+                    <div className="p-1">
+                      <button
+                        onClick={() => { setProfileOpen(false); navigate('/court-admin/profile') }}
+                        className="w-full text-left px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        My Profile
+                      </button>
+                    </div>
+                    <div className="border-t border-gray-100 p-1">
+                      <button
+                        onClick={() => { setProfileOpen(false); handleLogout() }}
+                        className="w-full text-left px-3 py-2 rounded-md text-sm text-red-600 hover:bg-red-50 inline-flex items-center gap-2"
+                      >
+                        <LogOut className="w-4 h-4" /> Sign out
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Main content */}
+        <main className="flex-1 overflow-auto p-6">
+          <ErrorBoundary scope="court-admin page">
+            <Outlet />
+          </ErrorBoundary>
+        </main>
+      </div>
+
+      <NotificationModal open={showNotifications} onClose={() => setShowNotifications(false)} />
+    </div>
+  )
+}
+
+export default CourtAdminLayout

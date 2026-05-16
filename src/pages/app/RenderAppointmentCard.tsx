@@ -1,5 +1,5 @@
 import { FC, useMemo, useState } from 'react'
-import { Calendar, Clock, FileText, MessageSquare, User, RefreshCw, XCircle, Video, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
+import { Calendar, Clock, FileText, MessageSquare, User, RefreshCw, XCircle, Video, ChevronDown, ChevronUp, Sparkles, Briefcase } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import AppointmentDocumentsPanel from '@/components/molecules/AppointmentDocumentsPanel'
 
@@ -281,6 +281,26 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
               Discuss
             </button>
           </>
+        )}
+
+        {/* Open Case — appears on ANY tab once the lawyer has escalated this
+            appointment to a tracked case. Renders for both roles using the
+            role-specific case route. The server already includes `case`
+            in the appointment listing so no extra fetch is needed. */}
+        {appointment.case && (
+          <button
+            onClick={() =>
+              navigate(
+                userRole === 'lawyer'
+                  ? `/lawyer/case/${appointment.case!.id}`
+                  : `/app/case/${appointment.case!.id}`
+              )
+            }
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium bg-primary text-white hover:bg-primary/90 rounded-md transition-colors"
+          >
+            <Briefcase className="w-4 h-4" />
+            Open the Case
+          </button>
         )}
       </div>
       {/* Open Chat — links to the unified WhatsApp-style chat page,

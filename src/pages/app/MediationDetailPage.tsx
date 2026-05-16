@@ -22,6 +22,10 @@ const MediationDetailPage: FC = () => {
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
   const [showMediators, setShowMediators] = useState(false)
+  // Which side's lawyer picker modal is open (null = closed). Opened from
+  // either the top roster card or the Step 1 panel so there's a single,
+  // reliable add-lawyer entry point regardless of where the user looks.
+  const [pickerFor, setPickerFor] = useState<null | 'initiator' | 'respondent'>(null)
   const [showConclude, setShowConclude] = useState(false)
   const [concludeForm, setConcludeForm] = useState<{ outcome: 'RESOLVED' | 'ESCALATED_TO_CASE'; settlementTerms: string; closureNotes: string }>({
     outcome: 'RESOLVED',
@@ -41,10 +45,16 @@ const MediationDetailPage: FC = () => {
     enabled: showMediators,
   })
 
+  // Lawyer directory is needed any time either side still needs to pick a
+  // lawyer — that's both AWAITING_RESPONDENT_LAWYER and
+  // AWAITING_MEDIATOR_SELECTION (the initiator can keep adding their lawyer
+  // even after the respondent has settled their representation).
   const lawyersQ = useQuery({
     queryKey: ['lawyers-all'],
     queryFn: async () => (await lawyersApi.getAll({ limit: 50 })).data,
-    enabled: q.data?.status === 'AWAITING_RESPONDENT_LAWYER',
+    enabled:
+      q.data?.status === 'AWAITING_RESPONDENT_LAWYER' ||
+      q.data?.status === 'AWAITING_MEDIATOR_SELECTION',
   })
 
   const pickMediator = useMutation({
@@ -57,12 +67,28 @@ const MediationDetailPage: FC = () => {
     onError: (e: any) => setError(e?.response?.data?.error || 'Failed to pick mediator'),
   })
 
-  const attachLawyer = useMutation({
+  // Two attach mutations — one per side. We pick whichever the current
+  // viewer needs in the UI below. Both invalidate the same caches and
+  // refresh the detail view in place (no nav away from the mediation —
+  // the original respondent flow bounced to /app/lawyers which broke
+  // continuity).
+  const attachRespondentLawyer = useMutation({
     mutationFn: (lawyerId: string) => mediationApi.attachRespondentLawyer(id, lawyerId),
-    onSuccess: (_data, lawyerId) => {
+    onSuccess: () => {
+      setPickerFor(null)
+      setError(null)
       qc.invalidateQueries({ queryKey: ['mediation', id] })
       qc.invalidateQueries({ queryKey: ['mediations'] })
-      navigate(`/app/lawyers/${lawyerId}?mediationId=${id}`)
+    },
+    onError: (e: any) => setError(e?.response?.data?.error || 'Failed to attach lawyer'),
+  })
+  const attachInitiatorLawyer = useMutation({
+    mutationFn: (lawyerId: string) => mediationApi.attachInitiatorLawyer(id, lawyerId),
+    onSuccess: () => {
+      setPickerFor(null)
+      setError(null)
+      qc.invalidateQueries({ queryKey: ['mediation', id] })
+      qc.invalidateQueries({ queryKey: ['mediations'] })
     },
     onError: (e: any) => setError(e?.response?.data?.error || 'Failed to attach lawyer'),
   })
@@ -77,11 +103,49 @@ const MediationDetailPage: FC = () => {
     onError: (e: any) => setError(e?.response?.data?.error || 'Failed to conclude'),
   })
 
+  // GAP A — cancel a pre-session mediation (either disputing party).
+  const cancelMut = useMutation({
+    mutationFn: (reason?: string) => mediationApi.cancelMediation(id, reason),
+    onSuccess: () => {
+      setError(null)
+      qc.invalidateQueries({ queryKey: ['mediation', id] })
+      qc.invalidateQueries({ queryKey: ['mediations'] })
+    },
+    onError: (e: any) => setError(e?.response?.data?.error || 'Failed to cancel mediation'),
+  })
+
   const m = q.data
   const isInitiator = !!m && user?.id === m.initiatorClientId
   const isRespondent = !!m && user?.id === m.respondentClientId
   const isMediator = !!m && user?.id === m.mediatorId
   const isLawyer = user?.role === 'LAWYER'
+
+  // Who can add/change their lawyer right now.
+  //  - Initiator: any pre-session state (their step doesn't gate the flow,
+  //    so they can settle representation before OR after the respondent).
+  //  - Respondent: only AWAITING_RESPONDENT_LAWYER (their pick advances
+  //    the mediation to mediator selection — matches the backend guard).
+  const canInitiatorAdd =
+    isInitiator &&
+    !m?.initiatorLawyerId &&
+    (m?.status === 'AWAITING_RESPONDENT_LAWYER' || m?.status === 'AWAITING_MEDIATOR_SELECTION')
+  const canRespondentAdd =
+    isRespondent && !m?.respondentLawyerId && m?.status === 'AWAITING_RESPONDENT_LAWYER'
+
+  // GAP A — either disputing party can cancel while the mediation hasn't
+  // started (matches the backend CANCELLABLE guard).
+  const canCancel =
+    (isInitiator || isRespondent) &&
+    (m?.status === 'AWAITING_RESPONDENT_LAWYER' || m?.status === 'AWAITING_MEDIATOR_SELECTION')
+
+  const onCancelMediation = () => {
+    const reason = prompt(
+      'Cancel this mediation?\n\nThis closes it for everyone. Optional reason (shown to the other party):',
+    )
+    // prompt() → null on Cancel (abort), '' on blank submit (proceed without reason).
+    if (reason === null) return
+    cancelMut.mutate(reason || undefined)
+  }
 
   const myPick = isInitiator ? m?.initiatorMediatorPick : isRespondent ? m?.respondentMediatorPick : null
   const otherPick = isInitiator ? m?.respondentMediatorPick : isRespondent ? m?.initiatorMediatorPick : null
@@ -110,9 +174,19 @@ const MediationDetailPage: FC = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6 text-sm">
           <Party title="Initiator (Client)" party={m.initiatorClient} />
-          <Party title="Initiator Lawyer" party={m.initiatorLawyer} />
+          <LawyerSlot
+            title="Initiator Lawyer"
+            lawyer={m.initiatorLawyer}
+            canAdd={!!canInitiatorAdd}
+            onAdd={() => setPickerFor('initiator')}
+          />
           <Party title="Respondent (Client)" party={m.respondentClient} />
-          <Party title="Respondent Lawyer" party={m.respondentLawyer} />
+          <LawyerSlot
+            title="Respondent Lawyer"
+            lawyer={m.respondentLawyer}
+            canAdd={!!canRespondentAdd}
+            onAdd={() => setPickerFor('respondent')}
+          />
         </div>
 
         {m.mediator && (
@@ -120,47 +194,158 @@ const MediationDetailPage: FC = () => {
             <strong>Mediator:</strong> {m.mediator.name} ({m.mediator.email})
           </div>
         )}
+
+        {/* GAP A — pre-session exit. Without this an abandoned mediation
+            (e.g. respondent never adds a lawyer) is a permanent zombie row.
+            Only the disputing parties, only before the session is live. */}
+        {canCancel && (
+          <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-xs text-gray-500">
+              Not moving forward? Either party can close this mediation before the session starts.
+            </p>
+            <button
+              onClick={onCancelMediation}
+              disabled={cancelMut.isPending}
+              className="text-sm font-medium text-red-600 hover:text-white hover:bg-red-600 border border-red-600 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60"
+            >
+              {cancelMut.isPending ? 'Cancelling…' : 'Cancel mediation'}
+            </button>
+          </div>
+        )}
       </div>
 
       {error && <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded p-3">{error}</div>}
 
-      {/* Step: Attach respondent lawyer */}
-      {m.status === 'AWAITING_RESPONDENT_LAWYER' && (
+      {/* Step 1 · Add your lawyer
+          Symmetric flow — each side adds their own lawyer independently.
+          The "Add my lawyer" button opens the SAME modal picker the top
+          roster card uses, so there's one reliable entry point. The
+          respondent picking advances the mediation (legacy gate); the
+          initiator can add/change right up to the session start. */}
+      {(m.status === 'AWAITING_RESPONDENT_LAWYER' ||
+        (m.status === 'AWAITING_MEDIATOR_SELECTION' && (isInitiator || isRespondent))) && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-lg font-medium text-gray-900">Step 1 · Respondent: add your lawyer</h2>
+          <h2 className="text-lg font-medium text-gray-900">Step 1 · Each side adds their lawyer</h2>
           <p className="text-sm text-gray-500 mt-1">
-            {isRespondent
-              ? 'Select a lawyer to represent you in this mediation. You can proceed without one, but representation is recommended.'
-              : 'Waiting for the respondent to add their lawyer.'}
+            Mediation works best with both sides represented. You can proceed without one,
+            but it's recommended for legally enforceable outcomes.
           </p>
-          {isRespondent && (
-            <div className="mt-4 space-y-3">
-              {lawyersQ.isLoading ? (
-                <p className="text-sm text-gray-500">Loading lawyers…</p>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
-                  {(lawyersQ.data?.data || lawyersQ.data?.lawyers || []).slice(0, 20).map((l: any) => (
-                    <button
-                      key={l.id}
-                      onClick={() => attachLawyer.mutate(l.id)}
-                      disabled={attachLawyer.isPending}
-                      className="text-left p-3 rounded-lg border border-gray-200 hover:border-primary hover:bg-gray-50 disabled:opacity-60"
-                    >
-                      <p className="font-medium text-gray-900">{l.name}</p>
-                      <p className="text-xs text-gray-500">{(l.specializations || []).join(', ') || 'General practice'}</p>
-                    </button>
-                  ))}
-                </div>
-              )}
+
+          {/* Status strip — at-a-glance view of both sides */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+            <LawyerStatus
+              label="Initiator's lawyer"
+              party={m.initiatorClient}
+              lawyer={m.initiatorLawyer}
+              isYours={isInitiator}
+            />
+            <LawyerStatus
+              label="Respondent's lawyer"
+              party={m.respondentClient}
+              lawyer={m.respondentLawyer}
+              isYours={isRespondent}
+            />
+          </div>
+
+          {/* Your-turn CTA — opens the shared modal picker */}
+          {(canInitiatorAdd || canRespondentAdd) && (
+            <div className="mt-5 pt-5 border-t border-gray-100">
+              <button
+                onClick={() => setPickerFor(canInitiatorAdd ? 'initiator' : 'respondent')}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark"
+              >
+                + Add my lawyer ({canInitiatorAdd ? 'initiator' : 'respondent'} side)
+              </button>
               <button
                 onClick={() => navigate('/app/search')}
-                className="text-sm text-primary hover:underline"
+                className="ml-3 text-sm text-primary hover:underline"
               >
-                Search lawyers →
+                Browse all lawyers →
               </button>
             </div>
           )}
+
+          {/* Done / status messages */}
+          {isInitiator && m.initiatorLawyerId && (
+            <p className="mt-3 text-xs text-emerald-700">Your lawyer is attached. ✓</p>
+          )}
+          {isRespondent && m.respondentLawyerId && m.status === 'AWAITING_RESPONDENT_LAWYER' && (
+            <p className="mt-3 text-xs text-emerald-700">Your lawyer is locked in. Moving to mediator selection…</p>
+          )}
+          {!isInitiator && !isRespondent && (
+            <p className="mt-3 text-xs text-gray-500">
+              You're not a party to this mediation. Only the initiator and respondent can change representation.
+            </p>
+          )}
         </div>
+      )}
+
+      {/* Shared lawyer-picker modal — used by both the top roster cards and
+          the Step 1 CTA. One source of truth so the add-lawyer flow can't
+          silently disappear behind a status-condition edge case. */}
+      {pickerFor && (
+        <Modal
+          title={`Add ${pickerFor === 'initiator' ? 'initiator' : 'respondent'}-side lawyer`}
+          onClose={() => setPickerFor(null)}
+        >
+          {lawyersQ.isLoading ? (
+            <p className="text-sm text-gray-500 py-6 text-center">Loading lawyers…</p>
+          ) : lawyersQ.isError ? (
+            <p className="text-sm text-red-600 py-6 text-center">
+              Couldn't load the lawyer directory. Try “Browse all lawyers”.
+            </p>
+          ) : (() => {
+            // Lawyer search API returns `{ items, total, page, limit }`.
+            const list =
+              lawyersQ.data?.items ||
+              lawyersQ.data?.data ||
+              lawyersQ.data?.lawyers ||
+              []
+            const mutation = pickerFor === 'initiator' ? attachInitiatorLawyer : attachRespondentLawyer
+            if (list.length === 0) {
+              return (
+                <div className="py-6 text-center">
+                  <p className="text-sm text-gray-500">No lawyers in the directory right now.</p>
+                  <button
+                    onClick={() => {
+                      setPickerFor(null)
+                      navigate('/app/search')
+                    }}
+                    className="mt-2 text-sm text-primary hover:underline"
+                  >
+                    Browse all lawyers →
+                  </button>
+                </div>
+              )
+            }
+            return (
+              <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+                {list.slice(0, 30).map((l: any) => (
+                  <button
+                    key={l.id}
+                    onClick={() => mutation.mutate(l.id)}
+                    disabled={mutation.isPending}
+                    className="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-primary hover:bg-gray-50 disabled:opacity-60"
+                  >
+                    <p className="font-medium text-gray-900">{l.name}</p>
+                    <p className="text-xs text-gray-500">
+                      {(l.specializations || []).join(', ') || 'General practice'}
+                    </p>
+                  </button>
+                ))}
+                <button
+                  onClick={() => {
+                    setPickerFor(null)
+                    navigate('/app/search')
+                  }}
+                  className="text-sm text-primary hover:underline mt-2"
+                >
+                  Browse all lawyers →
+                </button>
+              </div>
+            )
+          })()}
+        </Modal>
       )}
 
       {/* Step: Mediator selection */}
@@ -237,6 +422,30 @@ const MediationDetailPage: FC = () => {
               View Case →
             </Link>
           )}
+        </div>
+      )}
+
+      {/* Cancelled terminal state — GAP A. Without this a cancelled
+          mediation renders as just the header card with no explanation. */}
+      {m.status === 'CANCELLED' && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="text-lg font-medium text-gray-900">Mediation Cancelled</h2>
+          <p className="text-sm text-gray-600 mt-1">
+            This mediation was closed before the session started. No settlement was reached and
+            nothing here can be used as evidence in a later proceeding.
+          </p>
+          {m.closureNotes && (
+            <div className="mt-3">
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Reason</p>
+              <p className="text-sm text-gray-800 mt-1 whitespace-pre-wrap">{m.closureNotes}</p>
+            </div>
+          )}
+          <Link
+            to={isLawyer ? '/lawyer/mediations' : '/app/mediations'}
+            className="inline-block mt-4 text-sm text-primary hover:underline"
+          >
+            ← Back to mediations
+          </Link>
         </div>
       )}
 
@@ -366,6 +575,71 @@ const PickStatus: FC<{ label: string; id?: string | null }> = ({ label, id }) =>
   <div className={`p-3 rounded-lg border ${id ? 'border-emerald-200 bg-emerald-50' : 'border-gray-200 bg-gray-50'}`}>
     <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
     <p className="text-sm font-medium text-gray-900 mt-1">{id ? 'Pick submitted' : 'Not yet picked'}</p>
+  </div>
+)
+
+/**
+ * Top-roster lawyer card. Shows the attached lawyer, OR an actionable
+ * "+ Add my lawyer" button when it's the viewer's side and they haven't
+ * picked one yet. This guarantees the add affordance is visible right
+ * where the empty "—" used to be — independent of the Step 1 section.
+ */
+const LawyerSlot: FC<{
+  title: string
+  lawyer?: { name?: string; email?: string } | null
+  canAdd: boolean
+  onAdd: () => void
+}> = ({ title, lawyer, canAdd, onAdd }) => (
+  <div className="bg-gray-50 rounded-lg p-3">
+    <p className="text-xs text-gray-500 uppercase tracking-wide">{title}</p>
+    {lawyer?.name ? (
+      <>
+        <p className="font-medium text-gray-900 truncate">{lawyer.name}</p>
+        {lawyer.email && <p className="text-xs text-gray-500 truncate">{lawyer.email}</p>}
+      </>
+    ) : canAdd ? (
+      <button
+        onClick={onAdd}
+        className="mt-1 inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-primary text-white text-xs font-medium hover:bg-primary-dark"
+      >
+        + Add my lawyer
+      </button>
+    ) : (
+      <p className="text-sm text-gray-400">—</p>
+    )}
+  </div>
+)
+
+/** Compact "this side's lawyer" status chip — shared between initiator and respondent. */
+const LawyerStatus: FC<{
+  label: string
+  party?: { name?: string } | null
+  lawyer?: { name?: string; email?: string } | null
+  isYours?: boolean
+}> = ({ label, party, lawyer, isYours }) => (
+  <div
+    className={`p-3 rounded-lg border ${lawyer ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}
+  >
+    <div className="flex items-center justify-between gap-2">
+      <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
+      {isYours && (
+        <span className="text-[10px] font-semibold text-primary bg-white border border-primary/30 px-1.5 py-0.5 rounded">
+          You
+        </span>
+      )}
+    </div>
+    {lawyer?.name ? (
+      <>
+        <p className="font-medium text-gray-900 mt-1 truncate">{lawyer.name}</p>
+        {lawyer.email && <p className="text-xs text-gray-500 truncate">{lawyer.email}</p>}
+      </>
+    ) : (
+      <p className="text-sm font-medium text-amber-800 mt-1">
+        {isYours
+          ? 'Pick a lawyer below ↓'
+          : `Waiting on ${party?.name || 'the other side'}`}
+      </p>
+    )}
   </div>
 )
 

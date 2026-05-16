@@ -109,35 +109,33 @@ const AdminLayout: FC = () => {
 
   return (
     <div className="min-h-screen flex bg-slate-50">
-      {/* ───── Sidebar ───── */}
+      {/* ───── Sidebar (dark platform theme — mirrors /auth admin pages) ───── */}
       <aside
-        className={`${collapsed ? 'w-20' : 'w-64'} bg-white border-r border-gray-200 transition-all duration-200 flex flex-col sticky top-0 h-screen`}
+        className={`${collapsed ? 'w-20' : 'w-64'} bg-gradient-to-b from-slate-900 via-slate-900 to-indigo-950 border-r border-slate-800 transition-all duration-200 flex flex-col sticky top-0 h-screen`}
       >
         {/* Brand */}
-        <div className="flex items-center justify-between px-4 h-16 border-b border-gray-200">
+        <div className="flex items-center justify-between px-4 h-16 border-b border-white/10">
           <Link
             to="/admin/dashboard"
             title="Go to dashboard"
             className="flex items-center gap-2.5 rounded-md hover:opacity-90 transition-opacity"
           >
-            {/* Glyph block — kept compact for the collapsed sidebar mode.
-                Letter is "N" for NyayaX. */}
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-600 to-indigo-800 text-white flex items-center justify-center font-bold shadow-sm">
-              N
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center font-bold shadow-lg shadow-indigo-900/30">
+              <ShieldCheck className="w-4 h-4" />
             </div>
             {!collapsed && (
               <div className="flex flex-col leading-tight">
-                <span className="font-semibold text-gray-900">
-                  Nyaya<span className="text-amber-500">X</span>
+                <span className="font-semibold text-white">
+                  Nyaya<span className="text-amber-400">X</span>
                 </span>
-                <span className="text-[10px] uppercase tracking-wider text-indigo-600 font-medium">Admin</span>
+                <span className="text-[10px] uppercase tracking-wider text-indigo-300 font-medium">Super Admin</span>
               </div>
             )}
           </Link>
           <button
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             onClick={() => setCollapsed((s) => !s)}
-            className="p-1 rounded-md hover:bg-gray-100 text-gray-500"
+            className="p-1 rounded-md hover:bg-white/10 text-white/60"
           >
             {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
@@ -148,12 +146,12 @@ const AdminLayout: FC = () => {
           {SECTIONS.map((section) => (
             <div key={section.heading} className="mb-3">
               {!collapsed && (
-                <div className="px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                <div className="px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-white/40">
                   {section.heading}
                 </div>
               )}
               {collapsed && (
-                <div className="mx-3 my-2 border-t border-gray-100" />
+                <div className="mx-3 my-2 border-t border-white/10" />
               )}
               <div className="px-2 space-y-0.5">
                 {section.items.map((item) => {
@@ -165,17 +163,17 @@ const AdminLayout: FC = () => {
                       title={collapsed ? item.label : undefined}
                       className={({ isActive }) =>
                         `group relative flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${isActive
-                          ? 'bg-indigo-50 text-indigo-700 font-medium'
-                          : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                          ? 'bg-white/10 text-white font-medium'
+                          : 'text-white/70 hover:bg-white/5 hover:text-white'
                         }`
                       }
                     >
                       {({ isActive }) => (
                         <>
                           {isActive && (
-                            <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-indigo-600" />
+                            <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-amber-400" />
                           )}
-                          <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-indigo-600' : 'text-gray-500 group-hover:text-gray-700'}`} />
+                          <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-amber-400' : 'text-white/60 group-hover:text-white'}`} />
                           {!collapsed && <span className="truncate">{item.label}</span>}
                         </>
                       )}
@@ -188,14 +186,14 @@ const AdminLayout: FC = () => {
         </nav>
 
         {/* Sidebar footer / user card */}
-        <div className="border-t border-gray-200 p-3">
+        <div className="border-t border-white/10 p-3">
           {collapsed ? (
             <button
               onClick={() => setCollapsed(false)}
               title={user?.name || 'Profile'}
-              className="w-full flex items-center justify-center p-1 rounded-full hover:bg-gray-100 transition-colors"
+              className="w-full flex items-center justify-center p-1 rounded-full hover:bg-white/10 transition-colors"
             >
-              <div className="w-9 h-9 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-semibold ring-2 ring-white shadow-sm">
+              <div className="w-9 h-9 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-semibold ring-2 ring-white/20 shadow-sm">
                 {initials}
               </div>
             </button>
@@ -205,15 +203,15 @@ const AdminLayout: FC = () => {
                 {initials}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-medium text-gray-900 truncate">
+                <div className="text-xs font-medium text-white truncate">
                   {user?.name || 'Admin user'}
                 </div>
-                <div className="text-[10px] text-gray-500 truncate">{user?.email || ''}</div>
+                <div className="text-[10px] text-white/60 truncate">{user?.email || ''}</div>
               </div>
               <button
                 onClick={handleLogout}
                 title="Sign out"
-                className="p-1.5 rounded-md text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                className="p-1.5 rounded-md text-white/60 hover:bg-red-500/20 hover:text-red-300 transition-colors"
               >
                 <LogOut className="w-4 h-4" />
               </button>

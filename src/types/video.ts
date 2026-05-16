@@ -182,27 +182,52 @@ export interface CallRoomLeftPayload {
 // ───────────────────────────────────────────────────────────
 // Call history (HTTP)
 // ───────────────────────────────────────────────────────────
+//
+// Server contract (see lawsuit-server/src/services/video.service.ts
+// `getCallHistory`): the backend transforms raw CallHistory rows into a
+// "viewer-relative" shape — `isOutgoing` and `participant` are computed
+// against the authed user so the FE doesn't have to do the comparison.
+// Status + callType are Prisma enums, returned UPPERCASE.
+
+/** Prisma enum on the server. */
+export type CallHistoryStatus =
+  | 'COMPLETED'
+  | 'MISSED'
+  | 'DECLINED'
+  | 'FAILED'
+  | 'CANCELLED'
+
+/** Prisma enum on the server. */
+export type CallHistoryType = 'CHAT' | 'APPOINTMENT'
 
 export interface CallHistory {
   id: string
-  callType: CallType
+  callType: CallHistoryType
+  /** chatId for CHAT calls, appointmentId for APPOINTMENT calls. */
   referenceId: string
-  callerId: string
-  callerName: string
-  callerAvatar?: string
-  calleeId: string
-  calleeName: string
-  calleeAvatar?: string
-  status: 'completed' | 'missed' | 'declined' | 'failed' | 'cancelled'
+  status: CallHistoryStatus
   duration: number
-  startedAt: string
-  endedAt: string
+  roomName?: string | null
+  startedAt: string | null
+  endedAt: string | null
   createdAt: string
+  /** Computed by the server against the authed user. */
+  isOutgoing: boolean
+  /** The OTHER party in the call (always the one that isn't the viewer). */
+  participant: {
+    id: string
+    name: string
+    avatar?: string | null
+  }
 }
 
 export interface CallHistoryResponse {
-  items: CallHistory[]
-  total: number
-  page: number
-  limit: number
+  calls: CallHistory[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+    hasMore: boolean
+  }
 }

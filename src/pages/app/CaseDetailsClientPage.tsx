@@ -63,6 +63,10 @@ interface getCaseDetailsResponse {
         durationMins: number;
         meetingLink: string | null;
     } | null;
+    /** Surfaced by the backend when disputeResolutionMethod === 'MEDIATION'
+     *  and a Mediation row already exists for this case. Used to flip the
+     *  resolution-method badge into a button. */
+    mediation?: { id: string; status: string } | null;
 }[]
 };
 
@@ -287,10 +291,37 @@ export default function CaseDetailsClientPage() {
                         </div>
                         
                         {caseData.disputeResolutionMethod && (
-                            <div className="bg-accent/10 text-accent px-4 py-2 rounded-lg">
-                                <div className="text-xs font-medium">Resolution Method</div>
-                                <div className="text-sm font-semibold">{caseData.disputeResolutionMethod}</div>
-                            </div>
+                            caseData.disputeResolutionMethod === 'MEDIATION' ? (
+                                // Clickable when the resolution method is mediation — jumps
+                                // straight into the mediation room (or initiates one when no
+                                // row exists yet). Backend includes `mediation: { id, status }`
+                                // on the case payload so we don't need an extra round-trip.
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (caseData.mediation?.id) {
+                                            navigate(`/app/mediation/${caseData.mediation.id}`);
+                                        } else {
+                                            navigate(`/app/mediations/new?caseId=${caseData.id}`);
+                                        }
+                                    }}
+                                    className="bg-accent/10 text-accent px-4 py-2 rounded-lg hover:bg-accent/20 transition-colors text-left flex items-center gap-3 group"
+                                    aria-label={caseData.mediation?.id ? 'Open mediation' : 'Start mediation'}
+                                >
+                                    <div>
+                                        <div className="text-xs font-medium">Resolution Method</div>
+                                        <div className="text-sm font-semibold">MEDIATION</div>
+                                    </div>
+                                    <span className="text-xs font-medium border border-accent/40 px-2 py-1 rounded group-hover:bg-accent group-hover:text-white transition-colors">
+                                        {caseData.mediation?.id ? 'Open →' : 'Start →'}
+                                    </span>
+                                </button>
+                            ) : (
+                                <div className="bg-accent/10 text-accent px-4 py-2 rounded-lg">
+                                    <div className="text-xs font-medium">Resolution Method</div>
+                                    <div className="text-sm font-semibold">{caseData.disputeResolutionMethod}</div>
+                                </div>
+                            )
                         )}
                     </div>
                 </header>

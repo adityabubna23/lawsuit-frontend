@@ -843,11 +843,16 @@ export const mediationApi = {
   getById: (id: string) => api.get(`/mediations/${id}`),
   attachRespondentLawyer: (id: string, lawyerId: string) =>
     api.post(`/mediations/${id}/respondent-lawyer`, { lawyerId }),
+  attachInitiatorLawyer: (id: string, lawyerId: string) =>
+    api.post(`/mediations/${id}/initiator-lawyer`, { lawyerId }),
   pickMediator: (id: string, mediatorId: string) =>
     api.post(`/mediations/${id}/mediator-pick`, { mediatorId }),
   getRoom: (id: string) => api.get(`/mediations/${id}/room`),
   conclude: (id: string, data: { outcome: 'RESOLVED' | 'ESCALATED_TO_CASE'; settlementTerms?: string; closureNotes?: string }) =>
     api.post(`/mediations/${id}/conclude`, data),
+  /** Cancel a pre-session mediation (either disputing party). */
+  cancelMediation: (id: string, reason?: string) =>
+    api.post(`/mediations/${id}/cancel`, reason ? { reason } : {}),
 }
 
 /**

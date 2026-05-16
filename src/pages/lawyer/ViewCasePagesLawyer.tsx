@@ -75,12 +75,19 @@ const ViewCasePagesLawyer: FC = () => {
 
     const cases = getAllCasesQuery.data?.data || []
 
+    // Latest case at top, regardless of tab. `createdAt` is the canonical
+    // "when did this case land on my desk" timestamp. We sort once and let
+    // the filters preserve order — Array.prototype.filter is stable.
+    const recentFirst = (a: getAllCasesResponse['data'][0], b: getAllCasesResponse['data'][0]) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+
     const categorizedCases = useMemo(() => {
+        const sorted = [...cases].sort(recentFirst)
         return {
-            all: cases,
-            trial: cases.filter(c => c.disputeResolutionMethod === 'TRIAL'),
-            mediation: cases.filter(c => c.disputeResolutionMethod === 'MEDIATION'),
-            arbitration: cases.filter(c => c.disputeResolutionMethod === 'ARBITRATION')
+            all: sorted,
+            trial: sorted.filter(c => c.disputeResolutionMethod === 'TRIAL'),
+            mediation: sorted.filter(c => c.disputeResolutionMethod === 'MEDIATION'),
+            arbitration: sorted.filter(c => c.disputeResolutionMethod === 'ARBITRATION')
         }
     }, [cases])
 

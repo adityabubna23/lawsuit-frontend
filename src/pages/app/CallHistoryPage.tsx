@@ -13,15 +13,23 @@ import {
   ArrowLeft,
   Loader2,
   RefreshCw,
-  Filter,
   Search,
 } from 'lucide-react'
 import { videoApi } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
-import type { CallHistory } from '@/types/video'
+import type { CallHistory, CallHistoryResponse } from '@/types/video'
 
 type FilterType = 'all' | 'completed' | 'missed' | 'outgoing' | 'incoming'
 
+/**
+ * Call history list.
+ *
+ * Server response (see lawsuit-server/src/services/video.service.ts
+ * `getCallHistory`) is already viewer-relative: each row carries
+ * `isOutgoing` and `participant` (the other party). Status and callType
+ * come back as Prisma enum strings (UPPERCASE) — we lowercase for
+ * display + filter comparisons.
+ */
 const CallHistoryPage: FC = () => {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
@@ -33,15 +41,15 @@ const CallHistoryPage: FC = () => {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
 
-  // Fetch call history
   const fetchCallHistory = async () => {
     try {
       setLoading(true)
       setError(null)
       const res = await videoApi.getCallHistory({ page, limit: 20 })
-      const data = res.data as any
-      setCalls(data.items || [])
-      setTotalPages(Math.ceil((data.total || 0) / 20))
+      // Server returns { calls, pagination: { page, limit, total, totalPages, hasMore } }.
+      const data = res.data as CallHistoryResponse
+      setCalls(data.calls || [])
+      setTotalPages(data.pagination?.totalPages || 1)
     } catch (err: any) {
       console.error('Failed to fetch call history:', err)
       setError(err.response?.data?.error || 'Failed to load call history')
@@ -52,18 +60,19 @@ const CallHistoryPage: FC = () => {
 
   useEffect(() => {
     fetchCallHistory()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page])
 
-  // Format duration
   const formatDuration = (seconds: number) => {
+    if (!seconds || seconds <= 0) return '0s'
     if (seconds < 60) return `${seconds}s`
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
-    return `${mins}m ${secs}s`
+    return secs ? `${mins}m ${secs}s` : `${mins}m`
   }
 
-  // Format date
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return '—'
     const date = new Date(dateStr)
     const today = new Date()
     const yesterday = new Date(today)
@@ -83,34 +92,34 @@ const CallHistoryPage: FC = () => {
     })
   }
 
-  // Get call icon based on status and direction
+  /**
+   * Icon driven by status (terminal failures first) then direction.
+   * Server-side `status` is UPPERCASE; we compare via toLowerCase().
+   */
   const getCallIcon = (call: CallHistory) => {
-    const isOutgoing = call.callerId === user?.id
-
-    if (call.status === 'missed') {
-      return <PhoneMissed className="w-5 h-5 text-red-500" />
-    }
-    if (call.status === 'declined') {
-      return <PhoneOff className="w-5 h-5 text-orange-500" />
-    }
-    if (call.status === 'failed') {
+    const status = (call.status || '').toLowerCase()
+    if (status === 'missed') return <PhoneMissed className="w-5 h-5 text-red-500" />
+    if (status === 'declined') return <PhoneOff className="w-5 h-5 text-orange-500" />
+    if (status === 'failed' || status === 'cancelled') {
       return <PhoneOff className="w-5 h-5 text-gray-500" />
     }
-    if (isOutgoing) {
-      return <PhoneOutgoing className="w-5 h-5 text-green-500" />
-    }
-    return <PhoneIncoming className="w-5 h-5 text-blue-500" />
+    return call.isOutgoing ? (
+      <PhoneOutgoing className="w-5 h-5 text-green-500" />
+    ) : (
+      <PhoneIncoming className="w-5 h-5 text-blue-500" />
+    )
   }
 
-  // Get status badge
   const getStatusBadge = (status: string) => {
+    const key = (status || '').toLowerCase()
     const badges: Record<string, { bg: string; text: string; label: string }> = {
       completed: { bg: 'bg-green-100', text: 'text-green-700', label: 'Completed' },
       missed: { bg: 'bg-red-100', text: 'text-red-700', label: 'Missed' },
       declined: { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Declined' },
       failed: { bg: 'bg-gray-100', text: 'text-gray-700', label: 'Failed' },
+      cancelled: { bg: 'bg-gray-100', text: 'text-gray-700', label: 'Cancelled' },
     }
-    const badge = badges[status] || badges.failed
+    const badge = badges[key] || badges.failed
     return (
       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}>
         {badge.label}
@@ -118,36 +127,24 @@ const CallHistoryPage: FC = () => {
     )
   }
 
-  // Get other participant
-  const getOtherParticipant = (call: CallHistory) => {
-    const isOutgoing = call.callerId === user?.id
-    return {
-      name: isOutgoing ? call.calleeName : call.callerName,
-      avatar: isOutgoing ? call.calleeAvatar : call.callerAvatar,
-      direction: isOutgoing ? 'outgoing' : 'incoming',
-    }
-  }
-
-  // Filter calls
+  // Filter + search. Server fields are UPPERCASE — normalise before comparing.
   const filteredCalls = calls.filter((call) => {
-    const other = getOtherParticipant(call)
-    const matchesSearch = other.name.toLowerCase().includes(searchQuery.toLowerCase())
-    
-    if (!matchesSearch) return false
+    const otherName = (call.participant?.name || '').toLowerCase()
+    if (searchQuery && !otherName.includes(searchQuery.toLowerCase())) return false
+
     if (filter === 'all') return true
-    if (filter === 'completed') return call.status === 'completed'
-    if (filter === 'missed') return call.status === 'missed'
-    if (filter === 'outgoing') return call.callerId === user?.id
-    if (filter === 'incoming') return call.calleeId === user?.id
+    const status = (call.status || '').toLowerCase()
+    if (filter === 'completed') return status === 'completed'
+    if (filter === 'missed') return status === 'missed'
+    if (filter === 'outgoing') return call.isOutgoing
+    if (filter === 'incoming') return !call.isOutgoing
     return true
   })
 
-  // Group calls by date
+  // Group by date.
   const groupedCalls = filteredCalls.reduce((groups, call) => {
     const date = new Date(call.createdAt).toDateString()
-    if (!groups[date]) {
-      groups[date] = []
-    }
+    if (!groups[date]) groups[date] = []
     groups[date].push(call)
     return groups
   }, {} as Record<string, CallHistory[]>)
@@ -183,7 +180,6 @@ const CallHistoryPage: FC = () => {
 
       {/* Filters */}
       <div className="max-w-4xl mx-auto px-4 py-4">
-        {/* Search */}
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
@@ -195,7 +191,6 @@ const CallHistoryPage: FC = () => {
           />
         </div>
 
-        {/* Filter tabs */}
         <div className="flex gap-2 overflow-x-auto pb-2">
           {(['all', 'completed', 'missed', 'outgoing', 'incoming'] as FilterType[]).map((f) => (
             <button
@@ -245,7 +240,6 @@ const CallHistoryPage: FC = () => {
           <div className="space-y-6">
             {Object.entries(groupedCalls).map(([date, dateCalls]) => (
               <div key={date}>
-                {/* Date header */}
                 <div className="flex items-center gap-2 mb-3">
                   <Calendar className="w-4 h-4 text-gray-400" />
                   <span className="text-sm font-medium text-gray-500">
@@ -257,10 +251,9 @@ const CallHistoryPage: FC = () => {
                   </span>
                 </div>
 
-                {/* Call cards */}
                 <div className="space-y-3">
                   {dateCalls.map((call) => {
-                    const other = getOtherParticipant(call)
+                    const callTypeLower = (call.callType || '').toLowerCase()
                     return (
                       <div
                         key={call.id}
@@ -269,10 +262,10 @@ const CallHistoryPage: FC = () => {
                         <div className="flex items-start gap-4">
                           {/* Avatar */}
                           <div className="relative">
-                            {other.avatar ? (
+                            {call.participant?.avatar ? (
                               <img
-                                src={other.avatar}
-                                alt={other.name}
+                                src={call.participant.avatar}
+                                alt={call.participant.name}
                                 className="w-14 h-14 rounded-full object-cover"
                               />
                             ) : (
@@ -280,7 +273,6 @@ const CallHistoryPage: FC = () => {
                                 <User className="w-7 h-7 text-gray-400" />
                               </div>
                             )}
-                            {/* Call direction icon */}
                             <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-1 shadow-sm">
                               {getCallIcon(call)}
                             </div>
@@ -291,30 +283,29 @@ const CallHistoryPage: FC = () => {
                             <div className="flex items-start justify-between gap-2">
                               <div>
                                 <h3 className="font-semibold text-gray-900 truncate">
-                                  {other.name}
+                                  {call.participant?.name || 'Unknown'}
                                 </h3>
                                 <p className="text-sm text-gray-500 capitalize">
-                                  {other.direction} • {call.callType === 'chat' ? 'Chat' : 'Appointment'} call
+                                  {call.isOutgoing ? 'Outgoing' : 'Incoming'} •{' '}
+                                  {callTypeLower === 'chat' ? 'Chat' : 'Appointment'} call
                                 </p>
                               </div>
                               {getStatusBadge(call.status)}
                             </div>
 
-                            {/* Meta info */}
                             <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-gray-500">
-                              {/* Time */}
                               <div className="flex items-center gap-1">
                                 <Clock className="w-4 h-4" />
                                 <span>{formatDate(call.startedAt || call.createdAt)}</span>
                               </div>
 
-                              {/* Duration (only for completed calls) */}
-                              {call.status === 'completed' && call.duration > 0 && (
-                                <div className="flex items-center gap-1">
-                                  <Video className="w-4 h-4" />
-                                  <span>{formatDuration(call.duration)}</span>
-                                </div>
-                              )}
+                              {String(call.status).toLowerCase() === 'completed' &&
+                                call.duration > 0 && (
+                                  <div className="flex items-center gap-1">
+                                    <Video className="w-4 h-4" />
+                                    <span>{formatDuration(call.duration)}</span>
+                                  </div>
+                                )}
                             </div>
                           </div>
                         </div>
@@ -323,11 +314,17 @@ const CallHistoryPage: FC = () => {
                         <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-end gap-2">
                           <button
                             onClick={() => {
-                              // Navigate to chat or initiate new call
-                              if (call.callType === 'chat') {
-                                navigate(`/app/case/${call.referenceId}`)
+                              const role = (user as any)?.role?.toString?.().toUpperCase?.()
+                              if (callTypeLower === 'appointment') {
+                                navigate(
+                                  role === 'LAWYER'
+                                    ? `/lawyer/consultation/${call.referenceId}`
+                                    : `/app/consultation/${call.referenceId}`
+                                )
                               } else {
-                                navigate(`/app/consultation/${call.referenceId}`)
+                                navigate(
+                                  role === 'LAWYER' ? '/lawyer/chats' : '/app/chats'
+                                )
                               }
                             }}
                             className="px-4 py-2 text-sm font-medium text-primary hover:bg-primary/5 rounded-lg transition"
