@@ -85,10 +85,19 @@ const OrganizationVerificationsPage: FC = () => {
                     {v.status === 'PENDING' ? (
                       <Button size="sm" onClick={() => setActive(v)}>Review</Button>
                     ) : (
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${v.status === 'APPROVED' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                        {v.status}
-                      </span>
+                      <>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${v.status === 'APPROVED' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}>
+                          {v.status}
+                        </span>
+                        {/* History items were a dead end before — only the
+                            badge showed. Court admins need to re-open the
+                            full org details + documents + their decision
+                            after approving/rejecting. */}
+                        <Button size="sm" variant="ghost" onClick={() => setActive(v)}>
+                          View details
+                        </Button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -120,6 +129,11 @@ const ReviewModal: FC<{
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Already-decided requests open in read-only mode: same org details +
+  // documents, plus the recorded decision — but no action buttons or
+  // remarks input (the decision is final).
+  const readOnly = request.status !== 'PENDING'
+
   const submit = async (status: 'APPROVED' | 'REJECTED') => {
     setBusy(true)
     setError(null)
@@ -139,10 +153,34 @@ const ReviewModal: FC<{
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-auto">
         <div className="px-5 py-4 border-b flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900">Review {org.name}</h3>
+          <h3 className="text-lg font-semibold text-gray-900">
+            {readOnly ? `${org.name} — verification details` : `Review ${org.name}`}
+          </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
         <div className="p-5 space-y-4">
+          {readOnly && (
+            <div
+              className={`rounded-md border p-3 text-sm ${
+                request.status === 'APPROVED'
+                  ? 'bg-green-50 border-green-100 text-green-800'
+                  : 'bg-red-50 border-red-100 text-red-800'
+              }`}
+            >
+              <div className="font-semibold">
+                {request.status === 'APPROVED' ? 'Approved' : 'Rejected'}
+                {request.verifiedAt
+                  ? ` · ${format(new Date(request.verifiedAt), 'PPp')}`
+                  : ''}
+              </div>
+              {request.remarks ? (
+                <div className="mt-1 whitespace-pre-wrap">{request.remarks}</div>
+              ) : (
+                <div className="mt-1 text-xs opacity-75">No remarks were recorded.</div>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4 text-sm">
             <Detail label="Email" value={org.email} />
             <Detail label="Phone" value={org.phone} />
@@ -157,34 +195,44 @@ const ReviewModal: FC<{
             <DocPreview label="GST proof" url={org.gstProofUrl} />
           </div>
 
-          <div className="rounded-md bg-blue-50 border border-blue-100 p-3 text-sm text-blue-800">
-            Approving will auto-verify all lawyers currently in this firm.
-          </div>
+          {!readOnly && (
+            <>
+              <div className="rounded-md bg-blue-50 border border-blue-100 p-3 text-sm text-blue-800">
+                Approving will auto-verify all lawyers currently in this firm.
+              </div>
 
-          {error && <div className="rounded-md bg-red-50 p-2 text-sm text-red-700">{error}</div>}
+              {error && <div className="rounded-md bg-red-50 p-2 text-sm text-red-700">{error}</div>}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Remarks (optional)</label>
-            <textarea
-              rows={3}
-              value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md sm:text-sm"
-            />
-          </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Remarks (optional)</label>
+                <textarea
+                  rows={3}
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md sm:text-sm"
+                />
+              </div>
+            </>
+          )}
         </div>
         <div className="px-5 py-4 border-t flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button
-            onClick={() => submit('REJECTED')}
-            disabled={busy}
-            className="bg-red-600 hover:bg-red-700 focus:ring-red-500"
-          >
-            Reject
-          </Button>
-          <Button onClick={() => submit('APPROVED')} disabled={busy}>
-            Approve
-          </Button>
+          {readOnly ? (
+            <Button onClick={onClose}>Close</Button>
+          ) : (
+            <>
+              <Button variant="ghost" onClick={onClose}>Cancel</Button>
+              <Button
+                onClick={() => submit('REJECTED')}
+                disabled={busy}
+                className="bg-red-600 hover:bg-red-700 focus:ring-red-500"
+              >
+                Reject
+              </Button>
+              <Button onClick={() => submit('APPROVED')} disabled={busy}>
+                Approve
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>

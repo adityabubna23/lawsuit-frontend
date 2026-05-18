@@ -126,7 +126,7 @@ const LawyerLayout: FC = () => {
             <div className="flex items-center min-w-0 flex-1">
               {/* Brand — animated NyayaX wordmark links to dashboard. */}
               <div className="flex-shrink-0 flex items-center">
-                <BrandLogo to="/lawyer/dashboard" />
+                <BrandLogo to="/lawyer/dashboard" subtitle="Lawyer" />
               </div>
 
               {/* Desktop Navigation — 5 primary + grouped More dropdown */}
