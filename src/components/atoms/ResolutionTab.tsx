@@ -1,13 +1,19 @@
 import { FC, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/services/api'
-import { Scale, CheckCircle, Loader2, Edit3 } from 'lucide-react'
+import { Scale, CheckCircle, Loader2, Edit3, Lock } from 'lucide-react'
 
 type ResolutionMethod = 'TRIAL' | 'MEDIATION' | 'ARBITRATION'
+
+// Terminal case states — once a case reaches any of these, it's settled
+// and nothing about it (including the resolution method) may change.
+const CLOSED_STATUSES = ['CLOSED', 'WON', 'LOST', 'SETTLED']
 
 interface ResolutionTabProps {
   caseId: string
   disputeResolutionMethod: ResolutionMethod | null
+  /** Current case status — used to lock edits on closed/terminal cases. */
+  caseStatus?: string | null
 }
 
 const resolutionOptions: { value: ResolutionMethod; label: string; description: string }[] = [
@@ -28,9 +34,12 @@ const resolutionOptions: { value: ResolutionMethod; label: string; description: 
   },
 ]
 
-const ResolutionTab: FC<ResolutionTabProps> = ({ caseId, disputeResolutionMethod }) => {
+const ResolutionTab: FC<ResolutionTabProps> = ({ caseId, disputeResolutionMethod, caseStatus }) => {
+  const isClosed = CLOSED_STATUSES.includes(String(caseStatus || '').toUpperCase())
   const [selectedMethod, setSelectedMethod] = useState<ResolutionMethod | null>(disputeResolutionMethod)
-  const [isEditing, setIsEditing] = useState(!disputeResolutionMethod)
+  // A closed case is never editable — even if no method was ever set,
+  // don't drop into the selection form.
+  const [isEditing, setIsEditing] = useState(!disputeResolutionMethod && !isClosed)
   const queryClient = useQueryClient()
 
   const updateResolutionMutation = useMutation({
@@ -51,6 +60,56 @@ const ResolutionTab: FC<ResolutionTabProps> = ({ caseId, disputeResolutionMethod
   }
 
   const currentMethod = resolutionOptions.find((opt) => opt.value === disputeResolutionMethod)
+
+  // Closed / terminal case → fully read-only. No "Change Method", no
+  // selection form — the case is settled and cannot be edited.
+  if (isClosed) {
+    return (
+      <div className="p-6 h-full">
+        <div className="max-w-3xl mx-auto">
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+              <Scale className="w-6 h-6 text-primary" />
+              Dispute Resolution Method
+            </h3>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg">
+              <Lock className="w-3.5 h-3.5" />
+              Case closed — locked
+            </span>
+          </div>
+
+          {currentMethod ? (
+            <div className="bg-gradient-to-br from-primary to-midnight rounded-xl p-6 text-white shadow-lg">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                  <CheckCircle className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-sm text-white/70">Resolution Method</p>
+                  <h4 className="text-2xl font-bold">{currentMethod.label}</h4>
+                </div>
+              </div>
+              <p className="text-white/90 text-sm leading-relaxed mt-4">
+                {currentMethod.description}
+              </p>
+            </div>
+          ) : (
+            <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 text-gray-600 text-sm">
+              No resolution method was set for this case.
+            </div>
+          )}
+
+          <div className="mt-6 bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+            <h5 className="font-medium text-gray-900 mb-2">This case is closed</h5>
+            <p className="text-sm text-gray-600 leading-relaxed">
+              The case has been concluded, so its resolution method can no longer be
+              changed. This record is read-only.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   // If there's a method set and not editing, show the current method
   if (disputeResolutionMethod && !isEditing) {

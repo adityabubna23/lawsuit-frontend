@@ -148,7 +148,7 @@ export default function CaseDetailsClientPage() {
             case 'tasks':
                 return <TasksTab caseId={caseData.id} />;
             case 'resolution':
-                return <ResolutionTab caseId={caseData.id} disputeResolutionMethod={caseData.disputeResolutionMethod} />;
+                return <ResolutionTab caseId={caseData.id} disputeResolutionMethod={caseData.disputeResolutionMethod} caseStatus={caseData.status} />;
             case 'closure':
                 return (
                     <CaseClosureInfo
