@@ -864,6 +864,30 @@ export const mediationApi = {
   /** MA 2023 escape — parties couldn't agree → platform appoints a neutral. */
   requestNeutralMediator: (id: string) =>
     api.post(`/mediations/${id}/mediator-neutral`, {}),
+
+  // ─── Canonical flow ───
+  /** Respondent submits their own side of the dispute. */
+  submitRespondentSide: (id: string, data: { statement: string; documentUrls?: string[] }) =>
+    api.post(`/mediations/${id}/respondent-side`, data),
+  /** Respondent attaches their lawyer via an accepted appointment. */
+  attachRespondentLawyerFromAppointment: (id: string, appointmentId: string) =>
+    api.post(`/mediations/${id}/respondent-lawyer-from-appointment`, { appointmentId }),
+  /** A side shortlists 1–3 mediators. */
+  submitMediatorShortlist: (id: string, mediatorIds: string[]) =>
+    api.post(`/mediations/${id}/mediator-shortlist`, { mediatorIds }),
+  /** A side picks one final mediator from the union. */
+  submitFinalMediator: (id: string, mediatorId: string) =>
+    api.post(`/mediations/${id}/mediator-final`, { mediatorId }),
+  /** Start a client's 50% fee share — returns a Razorpay order. */
+  startMediationFee: (id: string) => api.post(`/mediations/${id}/fee/start`, {}),
+  /** Confirm a client's fee half with the Razorpay proof. */
+  confirmMediationFee: (
+    id: string,
+    proof: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string },
+  ) => api.post(`/mediations/${id}/fee/confirm`, proof),
+  /** Selected mediator accepts/declines the offer. */
+  respondToMediatorOffer: (id: string, accept: boolean) =>
+    api.post(`/mediations/${id}/mediator-offer-response`, { accept }),
   getRoom: (id: string) => api.get(`/mediations/${id}/room`),
   conclude: (id: string, data: { outcome: 'RESOLVED' | 'ESCALATED_TO_CASE'; settlementTerms?: string; closureNotes?: string }) =>
     api.post(`/mediations/${id}/conclude`, data),

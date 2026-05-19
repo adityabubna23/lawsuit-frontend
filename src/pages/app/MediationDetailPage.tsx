@@ -1,19 +1,52 @@
 import { FC, useMemo, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { mediationApi, lawyersApi } from '@/services/api'
+import { mediationApi, lawyersApi, appointmentsApi } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
 import type { Mediation, MediatorProfile } from '@/types/mediation'
+import { uploadToCloudinary } from '@/utils/cloudinaryUpload'
 
 const statusBadge: Record<string, string> = {
+  // Legacy
   AWAITING_RESPONDENT_LAWYER: 'bg-amber-100 text-amber-800',
   AWAITING_MEDIATOR_SELECTION: 'bg-sky-100 text-sky-800',
   IN_SESSION: 'bg-emerald-100 text-emerald-800',
   RESOLVED: 'bg-green-100 text-green-800',
   ESCALATED_TO_CASE: 'bg-red-100 text-red-800',
   CANCELLED: 'bg-gray-100 text-gray-700',
+  // Canonical
+  RESPONDENT_ACCEPTED: 'bg-amber-100 text-amber-800',
+  RESPONDENT_SIDE_SUBMITTED: 'bg-amber-100 text-amber-800',
+  MEDIATOR_SHORTLIST: 'bg-sky-100 text-sky-800',
+  MEDIATOR_CONVERGE: 'bg-sky-100 text-sky-800',
+  AWAITING_MEDIATION_FEE: 'bg-violet-100 text-violet-800',
+  MEDIATOR_OFFERED: 'bg-indigo-100 text-indigo-800',
+  ACTIVE: 'bg-emerald-100 text-emerald-800',
+  SETTLED: 'bg-green-100 text-green-800',
+  NON_SETTLEMENT: 'bg-red-100 text-red-800',
 }
 const pretty = (s: string) => s.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase())
+
+// Canonical flow order — drives the progress strip. Legacy rows simply
+// won't match any of these and skip the strip.
+const CANONICAL_STEPS: { key: string; label: string }[] = [
+  { key: 'RESPONDENT_ACCEPTED', label: "Respondent's side" },
+  { key: 'RESPONDENT_SIDE_SUBMITTED', label: "Respondent's lawyer" },
+  { key: 'MEDIATOR_SHORTLIST', label: 'Shortlist mediators' },
+  { key: 'MEDIATOR_CONVERGE', label: 'Agree on mediator' },
+  { key: 'AWAITING_MEDIATION_FEE', label: 'Pay mediation fee' },
+  { key: 'MEDIATOR_OFFERED', label: 'Mediator accepts' },
+  { key: 'ACTIVE', label: 'In session' },
+]
+const TERMINAL = ['RESOLVED', 'ESCALATED_TO_CASE', 'SETTLED', 'NON_SETTLEMENT', 'CANCELLED']
+
+interface ApptLite {
+  id: string
+  status: string
+  scheduledAt: string
+  mediationId?: string | null
+  lawyer?: { id: string; name?: string; email?: string } | null
+}
 
 const MediationDetailPage: FC = () => {
   const { id = '' } = useParams<{ id: string }>()
@@ -22,9 +55,6 @@ const MediationDetailPage: FC = () => {
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
   const [showMediators, setShowMediators] = useState(false)
-  // Which side's lawyer picker modal is open (null = closed). Opened from
-  // either the top roster card or the Step 1 panel so there's a single,
-  // reliable add-lawyer entry point regardless of where the user looks.
   const [pickerFor, setPickerFor] = useState<null | 'initiator' | 'respondent'>(null)
   const [showConclude, setShowConclude] = useState(false)
   const [concludeForm, setConcludeForm] = useState<{ outcome: 'RESOLVED' | 'ESCALATED_TO_CASE'; settlementTerms: string; closureNotes: string }>({
@@ -33,22 +63,35 @@ const MediationDetailPage: FC = () => {
     closureNotes: '',
   })
 
+  // Canonical — respondent side-submission form state.
+  const [statement, setStatement] = useState('')
+  const [docUrls, setDocUrls] = useState<string[]>([])
+  const [uploading, setUploading] = useState(false)
+
+  // Canonical — shortlist multi-select (1–3).
+  const [shortlistPick, setShortlistPick] = useState<string[]>([])
+  const [payingFee, setPayingFee] = useState(false)
+
   const q = useQuery({
     queryKey: ['mediation', id],
     queryFn: async () => (await mediationApi.getById(id)).data.data as Mediation,
     enabled: !!id,
   })
 
+  const m = q.data
+
+  // Mediator directory — needed for the legacy picker AND the canonical
+  // shortlist/converge stages.
+  const needsMediators =
+    showMediators ||
+    m?.status === 'MEDIATOR_SHORTLIST' ||
+    m?.status === 'MEDIATOR_CONVERGE'
   const mediatorsQ = useQuery({
     queryKey: ['mediators'],
     queryFn: async () => (await mediationApi.listMediators()).data.data as MediatorProfile[],
-    enabled: showMediators,
+    enabled: needsMediators,
   })
 
-  // Lawyer directory is needed any time either side still needs to pick a
-  // lawyer — that's both AWAITING_RESPONDENT_LAWYER and
-  // AWAITING_MEDIATOR_SELECTION (the initiator can keep adding their lawyer
-  // even after the respondent has settled their representation).
   const lawyersQ = useQuery({
     queryKey: ['lawyers-all'],
     queryFn: async () => (await lawyersApi.getAll({ limit: 50 })).data,
@@ -57,129 +100,223 @@ const MediationDetailPage: FC = () => {
       q.data?.status === 'AWAITING_MEDIATOR_SELECTION',
   })
 
+  // Canonical — respondent's appointments, to attach a lawyer who has
+  // already accepted (CONFIRMED/COMPLETED).
+  const apptsQ = useQuery({
+    queryKey: ['appointments', 'for-mediation'],
+    queryFn: async () => (await appointmentsApi.getAll()).data.data as ApptLite[],
+    enabled: m?.status === 'RESPONDENT_SIDE_SUBMITTED',
+  })
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['mediation', id] })
+    qc.invalidateQueries({ queryKey: ['mediations'] })
+  }
+
   const pickMediator = useMutation({
     mutationFn: (mediatorId: string) => mediationApi.pickMediator(id, mediatorId),
-    onSuccess: () => {
-      setShowMediators(false)
-      qc.invalidateQueries({ queryKey: ['mediation', id] })
-      qc.invalidateQueries({ queryKey: ['mediations'] })
-    },
+    onSuccess: () => { setShowMediators(false); invalidate() },
     onError: (e: any) => setError(e?.response?.data?.error || 'Failed to pick mediator'),
   })
 
-  // Two attach mutations — one per side. We pick whichever the current
-  // viewer needs in the UI below. Both invalidate the same caches and
-  // refresh the detail view in place (no nav away from the mediation —
-  // the original respondent flow bounced to /app/lawyers which broke
-  // continuity).
   const attachRespondentLawyer = useMutation({
     mutationFn: (lawyerId: string) => mediationApi.attachRespondentLawyer(id, lawyerId),
-    onSuccess: () => {
-      setPickerFor(null)
-      setError(null)
-      qc.invalidateQueries({ queryKey: ['mediation', id] })
-      qc.invalidateQueries({ queryKey: ['mediations'] })
-    },
+    onSuccess: () => { setPickerFor(null); setError(null); invalidate() },
     onError: (e: any) => setError(e?.response?.data?.error || 'Failed to attach lawyer'),
   })
   const attachInitiatorLawyer = useMutation({
     mutationFn: (lawyerId: string) => mediationApi.attachInitiatorLawyer(id, lawyerId),
-    onSuccess: () => {
-      setPickerFor(null)
-      setError(null)
-      qc.invalidateQueries({ queryKey: ['mediation', id] })
-      qc.invalidateQueries({ queryKey: ['mediations'] })
-    },
+    onSuccess: () => { setPickerFor(null); setError(null); invalidate() },
     onError: (e: any) => setError(e?.response?.data?.error || 'Failed to attach lawyer'),
   })
 
   const conclude = useMutation({
     mutationFn: () => mediationApi.conclude(id, concludeForm),
-    onSuccess: () => {
-      setShowConclude(false)
-      qc.invalidateQueries({ queryKey: ['mediation', id] })
-      qc.invalidateQueries({ queryKey: ['mediations'] })
-    },
+    onSuccess: () => { setShowConclude(false); invalidate() },
     onError: (e: any) => setError(e?.response?.data?.error || 'Failed to conclude'),
   })
 
-  // GAP A — cancel a pre-session mediation (either disputing party).
   const cancelMut = useMutation({
     mutationFn: (reason?: string) => mediationApi.cancelMediation(id, reason),
-    onSuccess: () => {
-      setError(null)
-      qc.invalidateQueries({ queryKey: ['mediation', id] })
-      qc.invalidateQueries({ queryKey: ['mediations'] })
-    },
+    onSuccess: () => { setError(null); invalidate() },
     onError: (e: any) => setError(e?.response?.data?.error || 'Failed to cancel mediation'),
   })
 
-  // MA 2023 no-agreement escape — platform appoints a neutral mediator.
   const neutralMut = useMutation({
     mutationFn: () => mediationApi.requestNeutralMediator(id),
-    onSuccess: () => {
-      setError(null)
-      qc.invalidateQueries({ queryKey: ['mediation', id] })
-      qc.invalidateQueries({ queryKey: ['mediations'] })
-    },
+    onSuccess: () => { setError(null); invalidate() },
     onError: (e: any) => setError(e?.response?.data?.error || 'Failed to assign a neutral mediator'),
   })
 
+  // ─── Canonical mutations ───
+  const submitSide = useMutation({
+    mutationFn: () => mediationApi.submitRespondentSide(id, { statement: statement.trim(), documentUrls: docUrls }),
+    onSuccess: () => { setError(null); setStatement(''); setDocUrls([]); invalidate() },
+    onError: (e: any) => setError(e?.response?.data?.error || 'Failed to submit your side'),
+  })
+  const attachFromAppt = useMutation({
+    mutationFn: (appointmentId: string) => mediationApi.attachRespondentLawyerFromAppointment(id, appointmentId),
+    onSuccess: () => { setError(null); invalidate() },
+    onError: (e: any) => setError(e?.response?.data?.error || 'Failed to attach lawyer from appointment'),
+  })
+  const submitShortlist = useMutation({
+    mutationFn: () => mediationApi.submitMediatorShortlist(id, shortlistPick),
+    onSuccess: () => { setError(null); setShortlistPick([]); invalidate() },
+    onError: (e: any) => setError(e?.response?.data?.error || 'Failed to submit shortlist'),
+  })
+  const submitFinal = useMutation({
+    mutationFn: (mediatorId: string) => mediationApi.submitFinalMediator(id, mediatorId),
+    onSuccess: () => { setError(null); invalidate() },
+    onError: (e: any) => setError(e?.response?.data?.error || 'Failed to submit your final mediator'),
+  })
+  const mediatorOffer = useMutation({
+    mutationFn: (accept: boolean) => mediationApi.respondToMediatorOffer(id, accept),
+    onSuccess: () => { setError(null); invalidate() },
+    onError: (e: any) => setError(e?.response?.data?.error || 'Failed to respond to the offer'),
+  })
+
   const onRequestNeutral = () => {
-    if (
-      confirm(
-        "You couldn't agree on a mediator. The platform will appoint a neutral, accredited mediator and open the session. Continue?",
-      )
-    ) {
+    if (confirm("You couldn't agree on a mediator. The platform will appoint a neutral, accredited mediator and open the session. Continue?")) {
       neutralMut.mutate()
     }
   }
 
-  const m = q.data
-  const isInitiator = !!m && user?.id === m.initiatorClientId
-  const isRespondent = !!m && user?.id === m.respondentClientId
+  const isInitiatorClient = !!m && user?.id === m.initiatorClientId
+  const isRespondentClient = !!m && user?.id === m.respondentClientId
+  const isInitiatorLawyer = !!m && !!m.initiatorLawyerId && user?.id === m.initiatorLawyerId
+  const isRespondentLawyer = !!m && !!m.respondentLawyerId && user?.id === m.respondentLawyerId
   const isMediator = !!m && user?.id === m.mediatorId
   const isLawyer = user?.role === 'LAWYER'
 
-  // Who can add/change their lawyer right now.
-  //  - Initiator: any pre-session state (their step doesn't gate the flow,
-  //    so they can settle representation before OR after the respondent).
-  //  - Respondent: only AWAITING_RESPONDENT_LAWYER (their pick advances
-  //    the mediation to mediator selection — matches the backend guard).
+  // Who acts for each side: the side's lawyer if represented, else the
+  // side's client. Mirrors the server's resolveActingSide.
+  const canActInitiator = isInitiatorLawyer || (isInitiatorClient && !m?.initiatorLawyerId)
+  const canActRespondent = isRespondentLawyer || (isRespondentClient && !m?.respondentLawyerId)
+  const actingSide: 'INITIATOR' | 'RESPONDENT' | null =
+    canActInitiator ? 'INITIATOR' : canActRespondent ? 'RESPONDENT' : null
+
+  // Legacy lawyer-attach affordances.
   const canInitiatorAdd =
-    isInitiator &&
-    !m?.initiatorLawyerId &&
+    isInitiatorClient && !m?.initiatorLawyerId &&
     (m?.status === 'AWAITING_RESPONDENT_LAWYER' || m?.status === 'AWAITING_MEDIATOR_SELECTION')
   const canRespondentAdd =
-    isRespondent && !m?.respondentLawyerId && m?.status === 'AWAITING_RESPONDENT_LAWYER'
+    isRespondentClient && !m?.respondentLawyerId && m?.status === 'AWAITING_RESPONDENT_LAWYER'
 
-  // GAP A — either disputing party can cancel while the mediation hasn't
-  // started (matches the backend CANCELLABLE guard).
-  const canCancel =
-    (isInitiator || isRespondent) &&
-    (m?.status === 'AWAITING_RESPONDENT_LAWYER' || m?.status === 'AWAITING_MEDIATOR_SELECTION')
+  // Cancel — pre-session only. Server CANCELLABLE now spans the canonical
+  // pre-session states too (refunds any escrowed half).
+  const CANCELLABLE_FE = [
+    'AWAITING_RESPONDENT_LAWYER', 'AWAITING_MEDIATOR_SELECTION',
+    'RESPONDENT_ACCEPTED', 'RESPONDENT_SIDE_SUBMITTED',
+    'MEDIATOR_SHORTLIST', 'MEDIATOR_CONVERGE', 'AWAITING_MEDIATION_FEE',
+  ]
+  const canCancel = (isInitiatorClient || isRespondentClient) && CANCELLABLE_FE.includes(m?.status || '')
 
   const onCancelMediation = () => {
-    const reason = prompt(
-      'Cancel this mediation?\n\nThis closes it for everyone. Optional reason (shown to the other party):',
-    )
-    // prompt() → null on Cancel (abort), '' on blank submit (proceed without reason).
+    const reason = prompt('Cancel this mediation?\n\nThis closes it for everyone. Optional reason (shown to the other party):')
     if (reason === null) return
     cancelMut.mutate(reason || undefined)
   }
 
-  const myPick = isInitiator ? m?.initiatorMediatorPick : isRespondent ? m?.respondentMediatorPick : null
-  const otherPick = isInitiator ? m?.respondentMediatorPick : isRespondent ? m?.initiatorMediatorPick : null
+  const myPick = isInitiatorClient ? m?.initiatorMediatorPick : isRespondentClient ? m?.respondentMediatorPick : null
+  const otherPick = isInitiatorClient ? m?.respondentMediatorPick : isRespondentClient ? m?.initiatorMediatorPick : null
+
+  // Canonical shortlist / final, resolved to the viewer's acting side.
+  const myShortlist = actingSide === 'INITIATOR' ? m?.initiatorMediatorShortlist : actingSide === 'RESPONDENT' ? m?.respondentMediatorShortlist : []
+  const initiatorShortlistDone = (m?.initiatorMediatorShortlist?.length ?? 0) > 0
+  const respondentShortlistDone = (m?.respondentMediatorShortlist?.length ?? 0) > 0
+  const myShortlistDone = (myShortlist?.length ?? 0) > 0
+  const myFinal = actingSide === 'INITIATOR' ? m?.initiatorFinalMediatorId : actingSide === 'RESPONDENT' ? m?.respondentFinalMediatorId : null
+  const otherFinal = actingSide === 'INITIATOR' ? m?.respondentFinalMediatorId : actingSide === 'RESPONDENT' ? m?.initiatorFinalMediatorId : null
+
+  // Fee — only the two CLIENTS pay, 50/50.
+  const myFeeSide: 'INITIATOR' | 'RESPONDENT' | null =
+    isInitiatorClient ? 'INITIATOR' : isRespondentClient ? 'RESPONDENT' : null
+  const myFeePaid = myFeeSide === 'INITIATOR' ? !!m?.initiatorFeePaidAt : myFeeSide === 'RESPONDENT' ? !!m?.respondentFeePaidAt : false
+  const otherFeePaid = myFeeSide === 'INITIATOR' ? !!m?.respondentFeePaidAt : myFeeSide === 'RESPONDENT' ? !!m?.initiatorFeePaidAt : false
+  const feeTotal = m?.mediationFeeTotal ?? 3000
+  const feeHalf = Math.round(feeTotal / 2)
 
   const roomPath = useMemo(() => (isLawyer ? `/lawyer/mediation/${id}/room` : `/app/mediation/${id}/room`), [id, isLawyer])
-  // Role-correct chat surface. The mediation group chat is created at
-  // IN_SESSION and surfaced here via the `chats` relation on the detail
-  // payload (filtered server-side to chatType MEDIATION_GROUP).
   const chatBasePath = isLawyer ? '/lawyer/chats' : '/app/chats'
   const groupChatId = m?.chats?.[0]?.id ?? null
 
+  // Resolve a mediator id to a readable label using the directory.
+  const mediatorName = (mid?: string | null) => {
+    if (!mid) return null
+    const found = mediatorsQ.data?.find((x) => x.id === mid)
+    return found?.name || mid
+  }
+
+  const onUploadDocs = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    setUploading(true)
+    setError(null)
+    try {
+      const urls: string[] = []
+      for (const f of Array.from(files)) {
+        urls.push(await uploadToCloudinary(f, { folder: 'documents' }))
+      }
+      setDocUrls((prev) => [...prev, ...urls])
+    } catch (e: any) {
+      setError(e?.message || 'Upload failed')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const payFeeHalf = async () => {
+    setError(null)
+    setPayingFee(true)
+    try {
+      const startRes = await mediationApi.startMediationFee(id)
+      const { payment } = (startRes.data?.data || {}) as any
+      const orderId = payment?.providerOrderId
+      const rzpKey = (import.meta.env.VITE_RAZORPAY_KEY as string) || ''
+      if (!(window as any).Razorpay) throw new Error('Payment gateway not loaded. Please refresh the page.')
+      if (!orderId) throw new Error('Payment order could not be created. Please try again later.')
+      const options: any = {
+        key: rzpKey,
+        amount: (payment.amount ?? feeHalf) * 100,
+        currency: payment.currency ?? 'INR',
+        name: 'NyayaX',
+        description: `Mediation fee (your half) — ${m?.disputeTitle ?? ''}`,
+        order_id: orderId,
+        handler: async (resp: any) => {
+          try {
+            await mediationApi.confirmMediationFee(id, {
+              razorpay_order_id: resp.razorpay_order_id,
+              razorpay_payment_id: resp.razorpay_payment_id,
+              razorpay_signature: resp.razorpay_signature,
+            })
+            setPayingFee(false)
+            invalidate()
+          } catch (err: any) {
+            setPayingFee(false)
+            setError(err?.response?.data?.error || 'Payment captured but confirmation failed. Contact support.')
+          }
+        },
+        modal: { ondismiss: () => setPayingFee(false) },
+      }
+      const rzp = new (window as any).Razorpay(options)
+      rzp.on('payment.failed', () => {
+        setPayingFee(false)
+        setError('Payment failed. Your fee share has NOT been charged — you can try again.')
+      })
+      rzp.open()
+    } catch (e: any) {
+      setPayingFee(false)
+      setError(e?.response?.data?.error || e?.message || 'Could not start the fee payment')
+    }
+  }
+
   if (q.isLoading) return <div className="py-16 text-center text-gray-500">Loading…</div>
   if (!m) return <div className="py-16 text-center text-gray-500">Mediation not found.</div>
+
+  const stepIdx = CANONICAL_STEPS.findIndex((s) => s.key === m.status)
+  const showStepper = stepIdx >= 0 || (TERMINAL.includes(m.status) && m.status !== 'CANCELLED')
+  const attachableAppts = (apptsQ.data || []).filter(
+    (a) => a.lawyer && (a.status === 'CONFIRMED' || a.status === 'COMPLETED'),
+  )
 
   return (
     <div className="space-y-6">
@@ -197,6 +334,27 @@ const MediationDetailPage: FC = () => {
             {pretty(m.status)}
           </span>
         </div>
+
+        {showStepper && (
+          <div className="mt-6 flex items-center gap-1 overflow-x-auto pb-1">
+            {CANONICAL_STEPS.map((s, i) => {
+              const done = TERMINAL.includes(m.status) ? true : i < stepIdx
+              const current = i === stepIdx
+              return (
+                <div key={s.key} className="flex items-center">
+                  <div
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap ${
+                      current ? 'bg-primary text-white' : done ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-500'
+                    }`}
+                  >
+                    {s.label}
+                  </div>
+                  {i < CANONICAL_STEPS.length - 1 && <span className="mx-1 text-gray-300">→</span>}
+                </div>
+              )
+            })}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6 text-sm">
           <Party title="Initiator (Client)" party={m.initiatorClient} />
@@ -221,13 +379,11 @@ const MediationDetailPage: FC = () => {
           </div>
         )}
 
-        {/* GAP A — pre-session exit. Without this an abandoned mediation
-            (e.g. respondent never adds a lawyer) is a permanent zombie row.
-            Only the disputing parties, only before the session is live. */}
         {canCancel && (
           <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between gap-3 flex-wrap">
             <p className="text-xs text-gray-500">
               Not moving forward? Either party can close this mediation before the session starts.
+              Any fee already paid is refunded.
             </p>
             <button
               onClick={onCancelMediation}
@@ -242,38 +398,365 @@ const MediationDetailPage: FC = () => {
 
       {error && <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded p-3">{error}</div>}
 
-      {/* Step 1 · Add your lawyer
-          Symmetric flow — each side adds their own lawyer independently.
-          The "Add my lawyer" button opens the SAME modal picker the top
-          roster card uses, so there's one reliable entry point. The
-          respondent picking advances the mediation (legacy gate); the
-          initiator can add/change right up to the session start. */}
+      {/* ─── Canonical Stage 1 · Respondent submits their side ─── */}
+      {m.status === 'RESPONDENT_ACCEPTED' && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="text-lg font-medium text-gray-900">Step 1 · Respondent's side of the dispute</h2>
+          {isRespondentClient ? (
+            <>
+              <p className="text-sm text-gray-500 mt-1">
+                Before mediators are selected, share your account of the dispute and any
+                supporting documents. The mediator sees both sides only after the fee is secured.
+              </p>
+              <textarea
+                rows={6}
+                value={statement}
+                onChange={(e) => setStatement(e.target.value)}
+                placeholder="Describe the dispute from your perspective…"
+                className="w-full mt-4 px-3 py-2 rounded-lg border border-gray-300 text-sm"
+              />
+              <div className="mt-3">
+                <label className="inline-flex items-center gap-2 text-sm text-primary cursor-pointer">
+                  <input type="file" multiple className="hidden" onChange={(e) => onUploadDocs(e.target.files)} />
+                  <span className="px-3 py-1.5 rounded-lg border border-primary hover:bg-primary hover:text-white transition-colors">
+                    {uploading ? 'Uploading…' : '+ Attach documents'}
+                  </span>
+                </label>
+                {docUrls.length > 0 && (
+                  <ul className="mt-2 space-y-1">
+                    {docUrls.map((u, i) => (
+                      <li key={u} className="flex items-center justify-between text-xs text-gray-600 bg-gray-50 rounded px-2 py-1">
+                        <span className="truncate">Document {i + 1}</span>
+                        <button onClick={() => setDocUrls((p) => p.filter((x) => x !== u))} className="text-red-500 hover:text-red-700">remove</button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <button
+                onClick={() => submitSide.mutate()}
+                disabled={submitSide.isPending || uploading || statement.trim().length < 10}
+                className="mt-4 px-5 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark disabled:opacity-60"
+              >
+                {submitSide.isPending ? 'Submitting…' : 'Submit my side'}
+              </button>
+              {statement.trim().length > 0 && statement.trim().length < 10 && (
+                <p className="mt-2 text-xs text-amber-700">Please write at least a sentence (10+ characters).</p>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-gray-500 mt-1">
+              Waiting for {m.respondentClient?.name || 'the respondent'} to submit their side of the dispute.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ─── Canonical Stage 2 · Respondent appoints a lawyer ─── */}
+      {m.status === 'RESPONDENT_SIDE_SUBMITTED' && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="text-lg font-medium text-gray-900">Step 2 · Respondent appoints a lawyer</h2>
+          {isRespondentClient ? (
+            <>
+              <p className="text-sm text-gray-500 mt-1">
+                Book an appointment with a lawyer of your choice. Once that lawyer
+                <strong> accepts</strong> the appointment, attach them here as your
+                mediation lawyer to move forward.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  onClick={() => navigate('/app/search')}
+                  className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark"
+                >
+                  Find a lawyer & book →
+                </button>
+              </div>
+              <div className="mt-5 pt-5 border-t border-gray-100">
+                <p className="text-sm font-medium text-gray-700 mb-2">Attach an accepted appointment</p>
+                {apptsQ.isLoading ? (
+                  <p className="text-sm text-gray-500">Loading your appointments…</p>
+                ) : attachableAppts.length === 0 ? (
+                  <p className="text-sm text-gray-500">
+                    No accepted appointments yet. After a lawyer confirms your booking, it shows up here.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {attachableAppts.map((a) => (
+                      <div key={a.id} className="flex items-center justify-between gap-3 p-3 rounded-lg border border-gray-200">
+                        <div>
+                          <p className="font-medium text-gray-900">{a.lawyer?.name || 'Lawyer'}</p>
+                          <p className="text-xs text-gray-500">
+                            {a.lawyer?.email} · {new Date(a.scheduledAt).toLocaleString()} · {a.status}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => attachFromAppt.mutate(a.id)}
+                          disabled={attachFromAppt.isPending}
+                          className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary-dark disabled:opacity-60"
+                        >
+                          Attach as my lawyer
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-gray-500 mt-1">
+              Waiting for {m.respondentClient?.name || 'the respondent'} to appoint their lawyer.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ─── Canonical Stage 3 · Shortlist 1–3 mediators ─── */}
+      {m.status === 'MEDIATOR_SHORTLIST' && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="text-lg font-medium text-gray-900">Step 3 · Shortlist mediators (1–3)</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Each side shortlists 1 to 3 mediators. Once both sides submit, you'll
+            converge on a single mutually-agreed mediator from the combined list.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 text-sm">
+            <PickStatus label="Initiator's shortlist" id={initiatorShortlistDone ? 'done' : null} />
+            <PickStatus label="Respondent's shortlist" id={respondentShortlistDone ? 'done' : null} />
+          </div>
+
+          {actingSide && !myShortlistDone && (
+            <div className="mt-5">
+              {mediatorsQ.isLoading ? (
+                <p className="text-sm text-gray-500">Loading mediators…</p>
+              ) : !mediatorsQ.data || mediatorsQ.data.length === 0 ? (
+                <p className="text-sm text-gray-500">No mediators available right now.</p>
+              ) : (
+                <>
+                  <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+                    {mediatorsQ.data.map((med) => {
+                      const sel = shortlistPick.includes(med.id)
+                      const disabled = !sel && shortlistPick.length >= 3
+                      return (
+                        <button
+                          key={med.id}
+                          onClick={() =>
+                            setShortlistPick((p) => (sel ? p.filter((x) => x !== med.id) : [...p, med.id]))
+                          }
+                          disabled={disabled}
+                          className={`w-full text-left p-3 rounded-lg border ${
+                            sel ? 'border-primary bg-blue-50' : 'border-gray-200 hover:border-primary'
+                          } disabled:opacity-50`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-gray-900">{med.name}</p>
+                              <p className="text-xs text-gray-500">
+                                {(med.mediationSpecializations?.length ? med.mediationSpecializations : med.specializations || []).join(', ') || 'General mediation'}
+                              </p>
+                              <div className="text-xs text-gray-600 mt-1 flex gap-3 flex-wrap">
+                                {typeof med.experienceYears === 'number' && <span>{med.experienceYears}y exp</span>}
+                                {typeof med.rating === 'number' && <span>★ {med.rating.toFixed(1)}</span>}
+                                {med.city && <span>{med.city}</span>}
+                              </div>
+                            </div>
+                            <span className={`text-xs font-medium ${sel ? 'text-primary' : 'text-gray-400'}`}>
+                              {sel ? '✓ Selected' : 'Select'}
+                            </span>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <button
+                    onClick={() => submitShortlist.mutate()}
+                    disabled={submitShortlist.isPending || shortlistPick.length < 1 || shortlistPick.length > 3}
+                    className="mt-4 px-5 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark disabled:opacity-60"
+                  >
+                    {submitShortlist.isPending ? 'Submitting…' : `Submit shortlist (${shortlistPick.length}/3)`}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+          {actingSide && myShortlistDone && (
+            <p className="mt-4 text-xs text-emerald-700">Your shortlist is submitted. Waiting for the other side. ✓</p>
+          )}
+          {!actingSide && (
+            <p className="mt-4 text-xs text-gray-500">
+              Your side's lawyer is handling mediator selection. You'll be able to review the choice.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ─── Canonical Stage 4 · Converge on ONE mediator ─── */}
+      {m.status === 'MEDIATOR_CONVERGE' && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="text-lg font-medium text-gray-900">Step 4 · Agree on a single mediator</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            From the combined shortlist, each side picks exactly one mediator. The
+            mediation proceeds only when <strong>both sides pick the same one</strong>.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 text-sm">
+            <div className="p-3 rounded-lg border border-gray-200 bg-gray-50">
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Your final pick</p>
+              <p className="text-sm font-medium text-gray-900 mt-1">{myFinal ? mediatorName(myFinal) : 'Not yet'}</p>
+            </div>
+            <div className="p-3 rounded-lg border border-gray-200 bg-gray-50">
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Other side's final pick</p>
+              <p className="text-sm font-medium text-gray-900 mt-1">{otherFinal ? mediatorName(otherFinal) : 'Not yet'}</p>
+            </div>
+          </div>
+
+          {myFinal && otherFinal && myFinal !== otherFinal && (
+            <p className="mt-4 text-sm text-red-700 bg-red-50 border border-red-100 rounded p-3">
+              To start the mediation, both parties must choose the same single mediator from the list.
+            </p>
+          )}
+
+          {actingSide && (
+            <div className="mt-5">
+              {mediatorsQ.isLoading ? (
+                <p className="text-sm text-gray-500">Loading mediators…</p>
+              ) : (
+                <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+                  {Array.from(new Set([...(m.initiatorMediatorShortlist || []), ...(m.respondentMediatorShortlist || [])])).map((mid) => {
+                    const med = mediatorsQ.data?.find((x) => x.id === mid)
+                    const selected = myFinal === mid
+                    const otherWants = otherFinal === mid
+                    return (
+                      <div key={mid} className={`p-3 rounded-lg border ${selected ? 'border-primary bg-blue-50' : 'border-gray-200'}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-semibold text-gray-900">{med?.name || mid}</p>
+                            <p className="text-xs text-gray-500">
+                              {(med?.mediationSpecializations?.length ? med?.mediationSpecializations : med?.specializations || [])?.join(', ') || 'General mediation'}
+                            </p>
+                            {otherWants && !selected && (
+                              <p className="text-xs text-emerald-700 mt-1">Other side picked this mediator.</p>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => submitFinal.mutate(mid)}
+                            disabled={submitFinal.isPending || selected}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
+                              selected ? 'bg-gray-200 text-gray-700' : 'bg-primary text-white hover:bg-primary-dark'
+                            } disabled:opacity-60`}
+                          >
+                            {selected ? 'Your pick' : 'Pick'}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+          {!actingSide && (
+            <p className="mt-4 text-xs text-gray-500">Your side's lawyer is converging on the mediator.</p>
+          )}
+        </div>
+      )}
+
+      {/* ─── Canonical Stage 5 · Pay the mediation fee (50/50) ─── */}
+      {m.status === 'AWAITING_MEDIATION_FEE' && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="text-lg font-medium text-gray-900">Step 5 · Mediation fee</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Both sides agreed on a mediator. The flat mediation fee is
+            <strong> ₹{feeTotal}</strong>, split 50/50 between the two clients
+            (<strong>₹{feeHalf} each</strong>). The mediator is contacted only after
+            both halves are secured in escrow.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 text-sm">
+            <div className={`p-3 rounded-lg border ${(myFeeSide === 'INITIATOR' ? m.initiatorFeePaidAt : m.respondentFeePaidAt) ? 'border-emerald-200 bg-emerald-50' : 'border-gray-200 bg-gray-50'}`}>
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Your half</p>
+              <p className="text-sm font-medium text-gray-900 mt-1">{myFeePaid ? 'Paid ✓' : `₹${feeHalf} due`}</p>
+            </div>
+            <div className={`p-3 rounded-lg border ${otherFeePaid ? 'border-emerald-200 bg-emerald-50' : 'border-gray-200 bg-gray-50'}`}>
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Other party's half</p>
+              <p className="text-sm font-medium text-gray-900 mt-1">{otherFeePaid ? 'Paid ✓' : 'Pending'}</p>
+            </div>
+          </div>
+          {myFeeSide && !myFeePaid && (
+            <button
+              onClick={payFeeHalf}
+              disabled={payingFee}
+              className="mt-5 px-5 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark disabled:opacity-60"
+            >
+              {payingFee ? 'Opening payment…' : `Pay my half (₹${feeHalf})`}
+            </button>
+          )}
+          {myFeeSide && myFeePaid && !otherFeePaid && (
+            <p className="mt-4 text-xs text-emerald-700">Your half is secured. Waiting for the other party to pay theirs.</p>
+          )}
+          {!myFeeSide && (
+            <p className="mt-4 text-xs text-gray-500">Only the disputing clients pay the mediation fee.</p>
+          )}
+        </div>
+      )}
+
+      {/* ─── Canonical Stage 6 · Mediator accepts / declines ─── */}
+      {m.status === 'MEDIATOR_OFFERED' && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="text-lg font-medium text-gray-900">Step 6 · Mediator's decision</h2>
+          {isMediator ? (
+            <>
+              <p className="text-sm text-gray-500 mt-1">
+                Both parties agreed to appoint you and the fee is secured in escrow.
+                Review both sides, then accept or decline.
+              </p>
+              <div className="mt-4 space-y-3 text-sm">
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">Initiator's side</p>
+                  <p className="font-medium text-gray-900 mt-1">{m.disputeTitle}</p>
+                  <p className="text-gray-700 mt-1 whitespace-pre-wrap">{m.disputeDescription}</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">Respondent's side</p>
+                  <p className="text-gray-700 mt-1 whitespace-pre-wrap">{m.respondentStatement || '(no statement provided)'}</p>
+                </div>
+              </div>
+              <div className="mt-5 flex gap-3">
+                <button
+                  onClick={() => mediatorOffer.mutate(true)}
+                  disabled={mediatorOffer.isPending}
+                  className="px-5 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark disabled:opacity-60"
+                >
+                  Accept assignment
+                </button>
+                <button
+                  onClick={() => { if (confirm('Decline this mediation? Both clients will be refunded and the parties must agree on another mediator.')) mediatorOffer.mutate(false) }}
+                  disabled={mediatorOffer.isPending}
+                  className="px-5 py-2 rounded-lg border border-red-600 text-red-600 text-sm font-medium hover:bg-red-600 hover:text-white disabled:opacity-60"
+                >
+                  Decline
+                </button>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-gray-500 mt-1">
+              The fee is secured. {m.mediator?.name || 'The chosen mediator'} has been asked to
+              accept the assignment. If they decline, both halves are refunded and you'll
+              re-converge on another mediator.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ─── Legacy Step 1 · Add your lawyer ─── */}
       {(m.status === 'AWAITING_RESPONDENT_LAWYER' ||
-        (m.status === 'AWAITING_MEDIATOR_SELECTION' && (isInitiator || isRespondent))) && (
+        (m.status === 'AWAITING_MEDIATOR_SELECTION' && (isInitiatorClient || isRespondentClient))) && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="text-lg font-medium text-gray-900">Step 1 · Each side adds their lawyer</h2>
           <p className="text-sm text-gray-500 mt-1">
             Mediation works best with both sides represented. You can proceed without one,
             but it's recommended for legally enforceable outcomes.
           </p>
-
-          {/* Status strip — at-a-glance view of both sides */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-            <LawyerStatus
-              label="Initiator's lawyer"
-              party={m.initiatorClient}
-              lawyer={m.initiatorLawyer}
-              isYours={isInitiator}
-            />
-            <LawyerStatus
-              label="Respondent's lawyer"
-              party={m.respondentClient}
-              lawyer={m.respondentLawyer}
-              isYours={isRespondent}
-            />
+            <LawyerStatus label="Initiator's lawyer" party={m.initiatorClient} lawyer={m.initiatorLawyer} isYours={isInitiatorClient} />
+            <LawyerStatus label="Respondent's lawyer" party={m.respondentClient} lawyer={m.respondentLawyer} isYours={isRespondentClient} />
           </div>
-
-          {/* Your-turn CTA — opens the shared modal picker */}
           {(canInitiatorAdd || canRespondentAdd) && (
             <div className="mt-5 pt-5 border-t border-gray-100">
               <button
@@ -282,63 +765,33 @@ const MediationDetailPage: FC = () => {
               >
                 + Add my lawyer ({canInitiatorAdd ? 'initiator' : 'respondent'} side)
               </button>
-              <button
-                onClick={() => navigate('/app/search')}
-                className="ml-3 text-sm text-primary hover:underline"
-              >
+              <button onClick={() => navigate('/app/search')} className="ml-3 text-sm text-primary hover:underline">
                 Browse all lawyers →
               </button>
             </div>
           )}
-
-          {/* Done / status messages */}
-          {isInitiator && m.initiatorLawyerId && (
-            <p className="mt-3 text-xs text-emerald-700">Your lawyer is attached. ✓</p>
-          )}
-          {isRespondent && m.respondentLawyerId && m.status === 'AWAITING_RESPONDENT_LAWYER' && (
+          {isInitiatorClient && m.initiatorLawyerId && <p className="mt-3 text-xs text-emerald-700">Your lawyer is attached. ✓</p>}
+          {isRespondentClient && m.respondentLawyerId && m.status === 'AWAITING_RESPONDENT_LAWYER' && (
             <p className="mt-3 text-xs text-emerald-700">Your lawyer is locked in. Moving to mediator selection…</p>
-          )}
-          {!isInitiator && !isRespondent && (
-            <p className="mt-3 text-xs text-gray-500">
-              You're not a party to this mediation. Only the initiator and respondent can change representation.
-            </p>
           )}
         </div>
       )}
 
-      {/* Shared lawyer-picker modal — used by both the top roster cards and
-          the Step 1 CTA. One source of truth so the add-lawyer flow can't
-          silently disappear behind a status-condition edge case. */}
+      {/* Shared lawyer-picker modal (legacy) */}
       {pickerFor && (
-        <Modal
-          title={`Add ${pickerFor === 'initiator' ? 'initiator' : 'respondent'}-side lawyer`}
-          onClose={() => setPickerFor(null)}
-        >
+        <Modal title={`Add ${pickerFor === 'initiator' ? 'initiator' : 'respondent'}-side lawyer`} onClose={() => setPickerFor(null)}>
           {lawyersQ.isLoading ? (
             <p className="text-sm text-gray-500 py-6 text-center">Loading lawyers…</p>
           ) : lawyersQ.isError ? (
-            <p className="text-sm text-red-600 py-6 text-center">
-              Couldn't load the lawyer directory. Try “Browse all lawyers”.
-            </p>
+            <p className="text-sm text-red-600 py-6 text-center">Couldn't load the lawyer directory. Try “Browse all lawyers”.</p>
           ) : (() => {
-            // Lawyer search API returns `{ items, total, page, limit }`.
-            const list =
-              lawyersQ.data?.items ||
-              lawyersQ.data?.data ||
-              lawyersQ.data?.lawyers ||
-              []
+            const list = lawyersQ.data?.items || lawyersQ.data?.data || lawyersQ.data?.lawyers || []
             const mutation = pickerFor === 'initiator' ? attachInitiatorLawyer : attachRespondentLawyer
             if (list.length === 0) {
               return (
                 <div className="py-6 text-center">
                   <p className="text-sm text-gray-500">No lawyers in the directory right now.</p>
-                  <button
-                    onClick={() => {
-                      setPickerFor(null)
-                      navigate('/app/search')
-                    }}
-                    className="mt-2 text-sm text-primary hover:underline"
-                  >
+                  <button onClick={() => { setPickerFor(null); navigate('/app/search') }} className="mt-2 text-sm text-primary hover:underline">
                     Browse all lawyers →
                   </button>
                 </div>
@@ -354,18 +807,10 @@ const MediationDetailPage: FC = () => {
                     className="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-primary hover:bg-gray-50 disabled:opacity-60"
                   >
                     <p className="font-medium text-gray-900">{l.name}</p>
-                    <p className="text-xs text-gray-500">
-                      {(l.specializations || []).join(', ') || 'General practice'}
-                    </p>
+                    <p className="text-xs text-gray-500">{(l.specializations || []).join(', ') || 'General practice'}</p>
                   </button>
                 ))}
-                <button
-                  onClick={() => {
-                    setPickerFor(null)
-                    navigate('/app/search')
-                  }}
-                  className="text-sm text-primary hover:underline mt-2"
-                >
+                <button onClick={() => { setPickerFor(null); navigate('/app/search') }} className="text-sm text-primary hover:underline mt-2">
                   Browse all lawyers →
                 </button>
               </div>
@@ -374,38 +819,29 @@ const MediationDetailPage: FC = () => {
         </Modal>
       )}
 
-      {/* Step: Mediator selection */}
+      {/* Legacy Step 2 · Mediator selection */}
       {m.status === 'AWAITING_MEDIATOR_SELECTION' && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="text-lg font-medium text-gray-900">Step 2 · Both parties: agree on a mediator</h2>
           <p className="text-sm text-gray-500 mt-1">
             Each side picks a mediator. If both pick the same one, the session opens.
-            If you pick different mediators, agree on one by re-picking — or, if you
-            can't agree, request a platform-appointed neutral mediator (MA 2023).
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 text-sm">
             <PickStatus label="Your pick" id={myPick} />
             <PickStatus label="Other party's pick" id={otherPick} />
           </div>
-          {(isInitiator || isRespondent) && (
+          {(isInitiatorClient || isRespondentClient) && (
             <div className="mt-5 flex flex-wrap items-center gap-3">
-              <button
-                onClick={() => setShowMediators(true)}
-                className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark"
-              >
+              <button onClick={() => setShowMediators(true)} className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark">
                 {myPick ? 'Change My Pick' : 'Choose a Mediator'}
               </button>
-              {/* No-agreement escape — appears once both have picked and
-                  the picks differ. Either party can trigger it. */}
               {myPick && otherPick && myPick !== otherPick && (
                 <button
                   onClick={onRequestNeutral}
                   disabled={neutralMut.isPending}
                   className="px-4 py-2 rounded-lg border border-amber-500 text-amber-700 text-sm font-medium hover:bg-amber-50 disabled:opacity-60"
                 >
-                  {neutralMut.isPending
-                    ? 'Assigning…'
-                    : "Can't agree? Request a neutral mediator"}
+                  {neutralMut.isPending ? 'Assigning…' : "Can't agree? Request a neutral mediator"}
                 </button>
               )}
             </div>
@@ -419,39 +855,27 @@ const MediationDetailPage: FC = () => {
         </div>
       )}
 
-      {/* Step: In session */}
-      {m.status === 'IN_SESSION' && (
+      {/* Active session (canonical ACTIVE + legacy IN_SESSION) */}
+      {(m.status === 'IN_SESSION' || m.status === 'ACTIVE') && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-lg font-medium text-gray-900">Step 3 · Mediation group</h2>
+          <h2 className="text-lg font-medium text-gray-900">Mediation in session</h2>
           <p className="text-sm text-gray-500 mt-1">
             A group with every participant (both clients, both lawyers, the mediator) is open.
-            Discuss there and start the caucus video call right from the group when you're ready —
-            anyone in the group can join.
+            Discuss there and start the caucus video call right from the group when you're ready.
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             {groupChatId ? (
-              <Link
-                to={`${chatBasePath}?chatId=${groupChatId}`}
-                className="px-5 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark"
-              >
+              <Link to={`${chatBasePath}?chatId=${groupChatId}`} className="px-5 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark">
                 Open mediation group chat
               </Link>
             ) : (
-              <span className="text-sm text-gray-500">
-                Setting up the group chat… refresh in a moment.
-              </span>
+              <span className="text-sm text-gray-500">Setting up the group chat… refresh in a moment.</span>
             )}
-            <Link
-              to={roomPath}
-              className="px-4 py-2 rounded-lg border border-emerald-600 text-emerald-700 text-sm font-medium hover:bg-emerald-50"
-            >
+            <Link to={roomPath} className="px-4 py-2 rounded-lg border border-emerald-600 text-emerald-700 text-sm font-medium hover:bg-emerald-50">
               Open caucus video room directly
             </Link>
             {isMediator && (
-              <button
-                onClick={() => setShowConclude(true)}
-                className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50"
-              >
+              <button onClick={() => setShowConclude(true)} className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">
                 Conclude Mediation
               </button>
             )}
@@ -459,11 +883,11 @@ const MediationDetailPage: FC = () => {
         </div>
       )}
 
-      {/* Concluded states */}
-      {(m.status === 'RESOLVED' || m.status === 'ESCALATED_TO_CASE') && (
+      {/* Concluded states (legacy + canonical) */}
+      {(m.status === 'RESOLVED' || m.status === 'ESCALATED_TO_CASE' || m.status === 'SETTLED' || m.status === 'NON_SETTLEMENT') && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="text-lg font-medium text-gray-900">
-            {m.status === 'RESOLVED' ? 'Mediation Resolved' : 'Mediation Escalated to Case'}
+            {m.status === 'RESOLVED' || m.status === 'SETTLED' ? 'Mediation Resolved' : 'Mediation Escalated to Case'}
           </h2>
           {m.settlementTerms && (
             <div className="mt-3">
@@ -488,14 +912,13 @@ const MediationDetailPage: FC = () => {
         </div>
       )}
 
-      {/* Cancelled terminal state — GAP A. Without this a cancelled
-          mediation renders as just the header card with no explanation. */}
+      {/* Cancelled terminal state */}
       {m.status === 'CANCELLED' && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="text-lg font-medium text-gray-900">Mediation Cancelled</h2>
           <p className="text-sm text-gray-600 mt-1">
             This mediation was closed before the session started. No settlement was reached and
-            nothing here can be used as evidence in a later proceeding.
+            nothing here can be used as evidence in a later proceeding. Any fee paid was refunded.
           </p>
           {m.closureNotes && (
             <div className="mt-3">
@@ -503,16 +926,13 @@ const MediationDetailPage: FC = () => {
               <p className="text-sm text-gray-800 mt-1 whitespace-pre-wrap">{m.closureNotes}</p>
             </div>
           )}
-          <Link
-            to={isLawyer ? '/lawyer/mediations' : '/app/mediations'}
-            className="inline-block mt-4 text-sm text-primary hover:underline"
-          >
+          <Link to={isLawyer ? '/lawyer/mediations' : '/app/mediations'} className="inline-block mt-4 text-sm text-primary hover:underline">
             ← Back to mediations
           </Link>
         </div>
       )}
 
-      {/* Mediator picker modal */}
+      {/* Mediator picker modal (legacy) */}
       {showMediators && (
         <Modal title="Choose a Mediator" onClose={() => setShowMediators(false)}>
           {mediatorsQ.isLoading ? (
@@ -525,10 +945,7 @@ const MediationDetailPage: FC = () => {
                 const selected = myPick === med.id
                 const bothWant = otherPick === med.id
                 return (
-                  <div
-                    key={med.id}
-                    className={`p-4 rounded-lg border ${selected ? 'border-primary bg-blue-50' : 'border-gray-200'} `}
-                  >
+                  <div key={med.id} className={`p-4 rounded-lg border ${selected ? 'border-primary bg-blue-50' : 'border-gray-200'} `}>
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="font-semibold text-gray-900">{med.name}</p>
@@ -551,9 +968,7 @@ const MediationDetailPage: FC = () => {
                         {selected ? 'Picked' : 'Pick'}
                       </button>
                     </div>
-                    {bothWant && !selected && (
-                      <p className="text-xs text-emerald-700 mt-2">Other party picked this mediator.</p>
-                    )}
+                    {bothWant && !selected && <p className="text-xs text-emerald-700 mt-2">Other party picked this mediator.</p>}
                   </div>
                 )
               })}
@@ -637,16 +1052,10 @@ const Party: FC<{ title: string; party?: { name: string; email?: string } | null
 const PickStatus: FC<{ label: string; id?: string | null }> = ({ label, id }) => (
   <div className={`p-3 rounded-lg border ${id ? 'border-emerald-200 bg-emerald-50' : 'border-gray-200 bg-gray-50'}`}>
     <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
-    <p className="text-sm font-medium text-gray-900 mt-1">{id ? 'Pick submitted' : 'Not yet picked'}</p>
+    <p className="text-sm font-medium text-gray-900 mt-1">{id ? 'Submitted' : 'Not yet'}</p>
   </div>
 )
 
-/**
- * Top-roster lawyer card. Shows the attached lawyer, OR an actionable
- * "+ Add my lawyer" button when it's the viewer's side and they haven't
- * picked one yet. This guarantees the add affordance is visible right
- * where the empty "—" used to be — independent of the Step 1 section.
- */
 const LawyerSlot: FC<{
   title: string
   lawyer?: { name?: string; email?: string } | null
@@ -673,22 +1082,17 @@ const LawyerSlot: FC<{
   </div>
 )
 
-/** Compact "this side's lawyer" status chip — shared between initiator and respondent. */
 const LawyerStatus: FC<{
   label: string
   party?: { name?: string } | null
   lawyer?: { name?: string; email?: string } | null
   isYours?: boolean
 }> = ({ label, party, lawyer, isYours }) => (
-  <div
-    className={`p-3 rounded-lg border ${lawyer ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}
-  >
+  <div className={`p-3 rounded-lg border ${lawyer ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
     <div className="flex items-center justify-between gap-2">
       <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
       {isYours && (
-        <span className="text-[10px] font-semibold text-primary bg-white border border-primary/30 px-1.5 py-0.5 rounded">
-          You
-        </span>
+        <span className="text-[10px] font-semibold text-primary bg-white border border-primary/30 px-1.5 py-0.5 rounded">You</span>
       )}
     </div>
     {lawyer?.name ? (
@@ -698,9 +1102,7 @@ const LawyerStatus: FC<{
       </>
     ) : (
       <p className="text-sm font-medium text-amber-800 mt-1">
-        {isYours
-          ? 'Pick a lawyer below ↓'
-          : `Waiting on ${party?.name || 'the other side'}`}
+        {isYours ? 'Pick a lawyer below ↓' : `Waiting on ${party?.name || 'the other side'}`}
       </p>
     )}
   </div>

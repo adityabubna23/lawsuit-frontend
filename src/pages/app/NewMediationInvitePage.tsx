@@ -1,5 +1,5 @@
 import { FC, useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import api, { apiEndpoints, mediationApi } from '@/services/api'
 
@@ -17,8 +17,13 @@ import api, { apiEndpoints, mediationApi } from '@/services/api'
  */
 const NewMediationInvitePage: FC = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const caseId = searchParams.get('caseId') || undefined
+  // This page is mounted under both /app (client) and /lawyer (lawyer-
+  // initiated from the Case). Keep post-submit navigation on the same
+  // role surface — a lawyer bounced to /app/* gets redirected away.
+  const mediationsList = location.pathname.startsWith('/lawyer') ? '/lawyer/mediations' : '/app/mediations'
 
   const [form, setForm] = useState({
     respondentName: '',
@@ -58,13 +63,13 @@ const NewMediationInvitePage: FC = () => {
 
   const mutation = useMutation({
     mutationFn: () => mediationApi.createInvite({ ...form, caseId }),
-    onSuccess: () => navigate('/app/mediations'),
+    onSuccess: () => navigate(mediationsList),
     onError: (err: any) => setError(err?.response?.data?.error || 'Failed to send invite'),
   })
 
   const resend = useMutation({
     mutationFn: () => mediationApi.resendInvite(form.respondentEmail),
-    onSuccess: () => navigate('/app/mediations'),
+    onSuccess: () => navigate(mediationsList),
     onError: (err: any) =>
       setError(err?.response?.data?.error || 'Failed to resend invitation'),
   })

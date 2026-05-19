@@ -1,7 +1,8 @@
 import { FC, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/services/api'
-import { Scale, CheckCircle, Loader2, Edit3, Lock } from 'lucide-react'
+import { Scale, CheckCircle, Loader2, Edit3, Lock, Send } from 'lucide-react'
 
 type ResolutionMethod = 'TRIAL' | 'MEDIATION' | 'ARBITRATION'
 
@@ -35,6 +36,7 @@ const resolutionOptions: { value: ResolutionMethod; label: string; description: 
 ]
 
 const ResolutionTab: FC<ResolutionTabProps> = ({ caseId, disputeResolutionMethod, caseStatus }) => {
+  const navigate = useNavigate()
   const isClosed = CLOSED_STATUSES.includes(String(caseStatus || '').toUpperCase())
   const [selectedMethod, setSelectedMethod] = useState<ResolutionMethod | null>(disputeResolutionMethod)
   // A closed case is never editable — even if no method was ever set,
@@ -145,6 +147,28 @@ const ResolutionTab: FC<ResolutionTabProps> = ({ caseId, disputeResolutionMethod
               {currentMethod?.description}
             </p>
           </div>
+
+          {/* Lawyer-initiated mediation — canonical flow step 1. The
+              lawyer sends the invitation from the Case; the server
+              records initiator client = case client, initiator lawyer =
+              this lawyer, and links Mediation.caseId on accept. */}
+          {disputeResolutionMethod === 'MEDIATION' && (
+            <div className="mt-6 bg-white rounded-xl border border-primary/30 p-5 shadow-sm">
+              <h5 className="font-medium text-gray-900 mb-1">Start the mediation</h5>
+              <p className="text-sm text-gray-600 leading-relaxed mb-4">
+                Send a mediation invitation to the other party on your client's behalf.
+                They'll get an email (and an in-app notification if they're on NyayaX) and,
+                once they accept, the mediation flow begins.
+              </p>
+              <button
+                onClick={() => navigate(`/lawyer/mediation/new?caseId=${caseId}`)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors"
+              >
+                <Send className="w-4 h-4" />
+                Send mediation invitation
+              </button>
+            </div>
+          )}
 
           {/* Info Card */}
           <div className="mt-6 bg-white rounded-xl border border-gray-200 p-5 shadow-sm">

@@ -1,11 +1,22 @@
 export type MediationInviteStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'EXPIRED' | 'CANCELLED'
 export type MediationStatus =
+  // Legacy values (still emitted for old rows)
   | 'AWAITING_RESPONDENT_LAWYER'
   | 'AWAITING_MEDIATOR_SELECTION'
   | 'IN_SESSION'
   | 'RESOLVED'
   | 'ESCALATED_TO_CASE'
   | 'CANCELLED'
+  // Canonical flow
+  | 'RESPONDENT_ACCEPTED'
+  | 'RESPONDENT_SIDE_SUBMITTED'
+  | 'MEDIATOR_SHORTLIST'
+  | 'MEDIATOR_CONVERGE'
+  | 'AWAITING_MEDIATION_FEE'
+  | 'MEDIATOR_OFFERED'
+  | 'ACTIVE'
+  | 'SETTLED'
+  | 'NON_SETTLEMENT'
 export type MediationOutcome = 'RESOLVED' | 'ESCALATED_TO_CASE'
 
 export interface PartyRef {
@@ -45,6 +56,21 @@ export interface Mediation {
   mediatorId?: string | null
   initiatorMediatorPick?: string | null
   respondentMediatorPick?: string | null
+  // Canonical flow fields
+  initiatorDocumentUrls?: string[]
+  respondentStatement?: string | null
+  respondentDocumentUrls?: string[]
+  initiatorMediatorShortlist?: string[]
+  respondentMediatorShortlist?: string[]
+  initiatorFinalMediatorId?: string | null
+  respondentFinalMediatorId?: string | null
+  mediationFeeTotal?: number | null
+  initiatorFeePaidAt?: string | null
+  respondentFeePaidAt?: string | null
+  mediatorOfferedAt?: string | null
+  mediatorAcceptedAt?: string | null
+  mediatorDeclinedAt?: string | null
+  caseId?: string | null
   disputeTitle: string
   disputeDescription: string
   status: MediationStatus

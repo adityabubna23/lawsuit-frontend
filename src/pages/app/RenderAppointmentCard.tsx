@@ -1,5 +1,5 @@
 import { FC, useMemo, useState } from 'react'
-import { Calendar, Clock, FileText, MessageSquare, User, RefreshCw, XCircle, Video, ChevronDown, ChevronUp, Sparkles, Briefcase } from 'lucide-react'
+import { Calendar, Clock, FileText, MessageSquare, User, RefreshCw, XCircle, Video, ChevronDown, ChevronUp, Sparkles, Briefcase, Scale } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import AppointmentDocumentsPanel from '@/components/molecules/AppointmentDocumentsPanel'
 
@@ -35,6 +35,12 @@ interface AppointmentData {
   case?: {
     id: string;
     status: string;
+  } | null;
+  mediationId?: string | null;
+  mediation?: {
+    id: string;
+    status: string;
+    disputeTitle: string;
   } | null;
 }
 
@@ -300,6 +306,23 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
           >
             <Briefcase className="w-4 h-4" />
             Open the Case
+          </button>
+        )}
+
+        {/* Open Mediation — appears once this appointment is linked to a
+            mediation (the respondent booked & attached their lawyer from
+            it). Distinct from "Open the Case": this lands on the canonical
+            mediation flow, not the case file. */}
+        {(appointment.mediation?.id || appointment.mediationId) && (
+          <button
+            onClick={() => {
+              const mid = appointment.mediation?.id || appointment.mediationId!
+              navigate(userRole === 'lawyer' ? `/lawyer/mediation/${mid}` : `/app/mediation/${mid}`)
+            }}
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium bg-primary text-white hover:bg-primary/90 rounded-md transition-colors"
+          >
+            <Scale className="w-4 h-4" />
+            Open Mediation
           </button>
         )}
       </div>

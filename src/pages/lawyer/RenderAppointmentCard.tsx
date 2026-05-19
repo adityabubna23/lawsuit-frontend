@@ -1,6 +1,6 @@
 import { FC, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Calendar, Clock, FileText, MessageSquare, User, Video, Upload, RefreshCw, XCircle, ChevronDown, ChevronUp, Check, X, CheckCircle2, Sparkles, Briefcase } from 'lucide-react'
+import { Calendar, Clock, FileText, MessageSquare, User, Video, Upload, RefreshCw, XCircle, ChevronDown, ChevronUp, Check, X, CheckCircle2, Sparkles, Briefcase, Scale } from 'lucide-react'
 import AppointmentDocumentsPanel from '@/components/molecules/AppointmentDocumentsPanel'
 import EkycVerifiedBadge from '@/components/atoms/EkycVerifiedBadge'
 import { appointmentsExtApi } from '@/services/api'
@@ -39,6 +39,12 @@ interface AppointmentData {
   case?: {
     id: string;
     status: string;
+  } | null;
+  mediationId?: string | null;
+  mediation?: {
+    id: string;
+    status: string;
+    disputeTitle: string;
   } | null;
 }
 
@@ -494,6 +500,21 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
 
         {/* Cancelled Tab - No buttons */}
       </div>
+
+      {/* Open Mediation — shared across tabs. Appears once this appointment
+          is linked to a mediation (the respondent attached this lawyer from
+          it). Lands on the canonical mediation flow, not the case file. */}
+      {(appointment.mediation?.id || appointment.mediationId) && (
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <button
+            onClick={() => navigate(`/lawyer/mediation/${appointment.mediation?.id || appointment.mediationId}`)}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-white hover:bg-primary/90 rounded-md transition-colors"
+          >
+            <Scale className="w-4 h-4" />
+            Open Mediation
+          </button>
+        </div>
+      )}
 
       {/* Open Chat — navigates to the unified /lawyer/chats page with this
           appointment's conversation pre-opened. Replaces the previous inline
