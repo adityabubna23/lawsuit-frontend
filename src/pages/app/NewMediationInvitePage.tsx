@@ -37,6 +37,41 @@ const NewMediationInvitePage: FC = () => {
     disputeDescription: '',
   })
   const [error, setError] = useState<string | null>(null)
+  // A still-PENDING invite already exists for this case → the lawyer
+  // can RESEND the email (e.g. the other party never received it / it
+  // hit spam) without creating a new invite. Fetched proactively so
+  // Resend is ALWAYS available, not gated behind a failed re-send.
+  const [pendingInvite, setPendingInvite] = useState<
+    { respondentEmail: string; respondentName?: string | null; status: string; createdAt: string } | null
+  >(null)
+  const [resentAt, setResentAt] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (blocked || !caseId) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await mediationApi.getInviteForCase(caseId)
+        const inv = (res.data?.data ?? res.data) as
+          | { respondentEmail: string; respondentName?: string | null; status: string; createdAt: string }
+          | null
+        if (!cancelled && inv && inv.status === 'PENDING') {
+          setPendingInvite(inv)
+          // Make sure Resend targets the address the invite went to.
+          setForm((f) => ({
+            ...f,
+            respondentEmail: f.respondentEmail || inv.respondentEmail,
+            respondentName: f.respondentName || inv.respondentName || '',
+          }))
+        }
+      } catch {
+        /* no pending invite / not authorized — just show the form */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [blocked, caseId])
 
   // Prefill the dispute from the source case so the initiator doesn't
   // retype it. Best-effort — a fetch failure just leaves the fields blank.
@@ -73,7 +108,10 @@ const NewMediationInvitePage: FC = () => {
 
   const resend = useMutation({
     mutationFn: () => mediationApi.resendInvite(form.respondentEmail),
-    onSuccess: () => navigate(mediationsList),
+    onSuccess: () => {
+      setError(null)
+      setResentAt(new Date().toISOString())
+    },
     onError: (err: any) =>
       setError(err?.response?.data?.error || 'Failed to resend invitation'),
   })
@@ -121,6 +159,40 @@ const NewMediationInvitePage: FC = () => {
           invitation goes out on the first click. A mediation record is created when they accept.
         </p>
       </div>
+
+      {/* Always-available Resend — shown whenever an invite for this case
+          is still PENDING (the other party hasn't accepted). If they
+          never got the email / it hit spam, the lawyer resends here
+          without creating a new invite. */}
+      {pendingInvite && (
+        <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <p className="text-sm font-semibold text-amber-900">
+                Invitation already sent — awaiting response
+              </p>
+              <p className="text-sm text-amber-800 mt-1">
+                Sent to <strong>{pendingInvite.respondentEmail}</strong> on{' '}
+                {new Date(pendingInvite.createdAt).toLocaleDateString()}. They haven't accepted
+                yet. Didn't they get it (check spam too)? Resend the same invitation email.
+              </p>
+              {resentAt && (
+                <p className="text-sm text-emerald-700 mt-2">
+                  ✓ Invitation re-sent at {new Date(resentAt).toLocaleTimeString()}.
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => resend.mutate()}
+              disabled={resend.isPending}
+              className="px-5 py-2 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-700 disabled:opacity-60 whitespace-nowrap"
+            >
+              {resend.isPending ? 'Resending…' : 'Resend invitation'}
+            </button>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={submit} className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
         <div className="bg-blue-50 border border-blue-100 text-blue-800 text-sm rounded-md p-3">

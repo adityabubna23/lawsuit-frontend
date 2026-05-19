@@ -826,9 +826,13 @@ export const mediationApi = {
     initiatorLawyerId?: string
     caseId?: string
   }) => api.post('/mediations/invites', data),
-  /** Resend the existing pending invite email to the same recipient. */
+  /** Resend the existing pending invite email to the same recipient (lawyer). */
   resendInvite: (respondentEmail: string) =>
     api.post('/mediations/invites/resend', { respondentEmail }),
+  /** Latest mediation invite for a case (lawyer) — null if none sent yet.
+   *  Used to surface a Resend action when an invite is still PENDING. */
+  getInviteForCase: (caseId: string) =>
+    api.get(`/mediations/invites/for-case/${caseId}`),
   /** Initiator edits a still-PENDING invite (dispute / respondent email+name). */
   editInvite: (
     inviteId: string,
