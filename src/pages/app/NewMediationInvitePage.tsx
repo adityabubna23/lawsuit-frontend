@@ -2,27 +2,31 @@ import { FC, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import api, { apiEndpoints, mediationApi } from '@/services/api'
+import { useAuthStore } from '@/stores/authStore'
 
 /**
- * Start a mediation (draft-free legacy flow).
+ * Send a mediation invitation — lawyer-initiated, from a Case ONLY.
  *
- * `mediationApi.createInvite` emails the other party immediately and, if
- * they're already on the platform, also fires an in-app notification — no
- * DRAFT limbo. A Mediation row is created only when they accept.
- *
- * When opened with `?caseId=…` (from the case page's "Resolution Method:
- * MEDIATION" badge) we prefill the dispute from the case and pass the
- * caseId through so the server auto-attaches the case's lawyer as the
- * initiator lawyer and links Mediation.caseId on accept.
+ * There is NO draft step and clients can never reach this. The case
+ * lawyer opens this from the Case (Resolution = Mediation); on the FIRST
+ * "Send" click `mediationApi.createInvite` emails the other party
+ * immediately and fires an in-app notification if they already have a
+ * NyayaX account. A Mediation row is created when they accept. The
+ * caseId auto-attaches the case lawyer as the initiator lawyer and links
+ * Mediation.caseId on accept.
  */
 const NewMediationInvitePage: FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const caseId = searchParams.get('caseId') || undefined
-  // This page is mounted under both /app (client) and /lawyer (lawyer-
-  // initiated from the Case). Keep post-submit navigation on the same
-  // role surface — a lawyer bounced to /app/* gets redirected away.
+  const user = useAuthStore((s) => s.user) as { role?: string } | null
+  const isLawyer = String(user?.role || '').toUpperCase() === 'LAWYER'
+  // Lawyer-from-case is the ONLY way in. A client (or any entry without a
+  // case) is blocked — clients can never send a mediation invitation.
+  const blocked = !isLawyer || !caseId
+  // This page is mounted under both /app and /lawyer. Keep post-submit
+  // navigation on the same role surface.
   const mediationsList = location.pathname.startsWith('/lawyer') ? '/lawyer/mediations' : '/app/mediations'
 
   const [form, setForm] = useState({
@@ -87,27 +91,43 @@ const NewMediationInvitePage: FC = () => {
   const input =
     'w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary text-sm'
 
+  if (blocked) {
+    return (
+      <div className="max-w-2xl mx-auto py-16 text-center">
+        <h1 className="text-2xl font-semibold text-gray-900">Started by your lawyer</h1>
+        <p className="text-sm text-gray-600 mt-3 max-w-md mx-auto">
+          A mediation is initiated by the lawyer assigned to the case — from the case
+          itself (set Resolution&nbsp;=&nbsp;Mediation, then “Send mediation invitation”).
+          You can't start one here. Once it's sent and the other party accepts, you'll
+          see it and can act on it from your Mediations.
+        </p>
+        <button
+          onClick={() => navigate(-1)}
+          className="mt-6 px-5 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark"
+        >
+          ← Go back
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Start a Mediation</h1>
+        <h1 className="text-2xl font-semibold text-gray-900">Send Mediation Invitation</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Send an invitation to the other party. They'll get an email (and an in-app
-          notification if they're already on NyayaX). A mediation record is created when they
-          accept — you can edit this invitation any time before then.
+          Tapping “Send” emails the other party <strong>immediately</strong> and notifies
+          them in-app if they already have a NyayaX account. There is no draft step — the
+          invitation goes out on the first click. A mediation record is created when they accept.
         </p>
       </div>
 
       <form onSubmit={submit} className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
         <div className="bg-blue-50 border border-blue-100 text-blue-800 text-sm rounded-md p-3">
-          <strong>How it works:</strong> We email the person below an invitation link. If they
-          don't have a NyayaX account they can sign up with the invited email and respond.
-          {caseId && (
-            <>
-              {' '}
-              The lawyer on this case is automatically added as your (initiator) lawyer.
-            </>
-          )}
+          <strong>How it works:</strong> On “Send”, we email the person below an invitation
+          link <strong>right away</strong> (and notify them in-app if they're on NyayaX). If
+          they don't have an account they can sign up with the invited email and respond.
+          This case's lawyer (you) is automatically attached as the initiator lawyer.
         </div>
 
         <div>
@@ -185,9 +205,8 @@ const NewMediationInvitePage: FC = () => {
             <p>{error}</p>
             {pendingExists && (
               <p className="mt-1 text-amber-700">
-                You already invited <strong>{form.respondentEmail}</strong>. You can resend the
-                same invitation email to them, or edit the pending invite from your Mediations
-                list.
+                You already invited <strong>{form.respondentEmail}</strong>. You can resend
+                the same invitation email to them now.
               </p>
             )}
           </div>
@@ -216,7 +235,7 @@ const NewMediationInvitePage: FC = () => {
               disabled={mutation.isPending}
               className="px-5 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark disabled:opacity-60"
             >
-              {mutation.isPending ? 'Sending…' : 'Send Invite'}
+              {mutation.isPending ? 'Sending…' : 'Send invitation now'}
             </button>
           )}
         </div>

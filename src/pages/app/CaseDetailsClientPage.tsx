@@ -292,34 +292,36 @@ export default function CaseDetailsClientPage() {
                         
                         {caseData.disputeResolutionMethod && (
                             caseData.disputeResolutionMethod === 'MEDIATION' ? (
-                                // Clickable when the resolution method is mediation — jumps
-                                // straight into the mediation room (or initiates one when no
-                                // row exists yet). Backend includes `mediation: { id, status }`
-                                // on the case payload so we don't need an extra round-trip.
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        if (caseData.mediation?.id) {
-                                            navigate(`/app/mediation/${caseData.mediation.id}`);
-                                        } else {
-                                            // Draft-free legacy flow: emails the other party
-                                            // immediately on send (no DRAFT limbo). caseId
-                                            // auto-attaches this case's lawyer as the
-                                            // initiator lawyer.
-                                            navigate(`/app/mediation/new?caseId=${caseData.id}`);
-                                        }
-                                    }}
-                                    className="bg-accent/10 text-accent px-4 py-2 rounded-lg hover:bg-accent/20 transition-colors text-left flex items-center gap-3 group"
-                                    aria-label={caseData.mediation?.id ? 'Open mediation' : 'Start mediation'}
-                                >
-                                    <div>
+                                caseData.mediation?.id ? (
+                                    // A mediation already exists — clients can OPEN it to
+                                    // view status and take their actions, but they can
+                                    // never start one. Initiation is lawyer-only.
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate(`/app/mediation/${caseData.mediation!.id}`)}
+                                        className="bg-accent/10 text-accent px-4 py-2 rounded-lg hover:bg-accent/20 transition-colors text-left flex items-center gap-3 group"
+                                        aria-label="Open mediation"
+                                    >
+                                        <div>
+                                            <div className="text-xs font-medium">Resolution Method</div>
+                                            <div className="text-sm font-semibold">MEDIATION</div>
+                                        </div>
+                                        <span className="text-xs font-medium border border-accent/40 px-2 py-1 rounded group-hover:bg-accent group-hover:text-white transition-colors">
+                                            Open →
+                                        </span>
+                                    </button>
+                                ) : (
+                                    // No mediation yet — passive, NOT clickable. The
+                                    // client cannot send an invitation; the lawyer
+                                    // assigned to the case starts it from their side.
+                                    <div className="bg-accent/10 text-accent px-4 py-2 rounded-lg">
                                         <div className="text-xs font-medium">Resolution Method</div>
                                         <div className="text-sm font-semibold">MEDIATION</div>
+                                        <div className="text-[11px] mt-1 text-accent/80">
+                                            Your lawyer will start the mediation and invite the other party.
+                                        </div>
                                     </div>
-                                    <span className="text-xs font-medium border border-accent/40 px-2 py-1 rounded group-hover:bg-accent group-hover:text-white transition-colors">
-                                        {caseData.mediation?.id ? 'Open →' : 'Start →'}
-                                    </span>
-                                </button>
+                                )
                             ) : (
                                 <div className="bg-accent/10 text-accent px-4 py-2 rounded-lg">
                                     <div className="text-xs font-medium">Resolution Method</div>

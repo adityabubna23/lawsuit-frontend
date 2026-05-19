@@ -89,11 +89,11 @@ import MediationDetailPage from './pages/app/MediationDetailPage'
 import NewMediationInvitePage from './pages/app/NewMediationInvitePage'
 import MediationRoomPage from './pages/app/MediationRoomPage'
 import MediationInviteAcceptPage from './pages/mediation/MediationInviteAcceptPage'
-// Legacy Phase-1 mediation invite (token via ?token= query string).
-// The old MediationInitiatePage / MediationFlowListPage /
-// MediationFlowDetailPage are retired — there is now ONE canonical
-// mediation flow on the singular `/mediation/*` paths.
-import MediationFlowInvitePage from './pages/mediation/MediationFlowInvitePage'
+// The Phase-1 DRAFT mediation flow is fully retired. There is ONE
+// canonical flow: the case lawyer sends the invite (immediate email +
+// notification, no draft) and the respondent accepts at
+// `/mediation/invite/:token`. MediationInitiatePage / MediationFlowList
+// / MediationFlowDetail / MediationFlowInvite are no longer routed.
 import MediatorProfilePage from './pages/lawyer/MediatorProfilePage'
 // Court Admin Pages
 import CourtAdminLayout from './layouts/CourtAdminLayout'
@@ -199,12 +199,10 @@ const AppRoutes = () => {
       <Route path="/about" element={<AboutPage />} />
       <Route path="/help" element={<HelpCenterPage />} />
 
-      {/* Mediation invite link (public; acts based on auth) */}
+      {/* Canonical mediation invite link (public; acts based on auth).
+          The lawyer-initiated invite email links here with a path token.
+          The retired Phase-1 query-param draft accept page is gone. */}
       <Route path="/mediation/invite/:token" element={<MediationInviteAcceptPage />} />
-      {/* Phase 1 mediation invite — token comes via ?token=... query string
-          rather than path param. Routed to a separate component so the
-          legacy `/mediation/invite/:token` path stays unchanged. */}
-      <Route path="/mediation/invite" element={<MediationFlowInvitePage />} />
 
       {/* Universal document preview. Renders any uploaded asset URL using
           <embed type="application/pdf"> for PDFs (so Cloudinary `raw`

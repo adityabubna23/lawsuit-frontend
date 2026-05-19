@@ -123,17 +123,11 @@ const NotificationModal: FC<{ open: boolean; onClose: () => void }> = ({ open, o
     // page 404s (the read query gates on participant membership). This
     // must come BEFORE the generic mediationId branch below.
     //
-    // CRITICAL: the two flows use DIFFERENT token formats + routes:
-    //  - Legacy `MEDIATION_INVITE`  → plain-hex token → path-param page
-    //      `/mediation/invite/<token>` (MediationInviteAcceptPage)
-    //  - Phase1+2 `MEDIATION_INVITED` → signed JWT → query-param page
-    //      `/mediation/invite?token=<jwt>` (MediationFlowInvitePage)
-    // Routing a legacy hex token to the JWT page → "jwt malformed".
+    // The canonical lawyer-initiated invite emits `MEDIATION_INVITE`
+    // with a path token → the public accept page. The Phase-1 DRAFT
+    // flow (`MEDIATION_INVITED` + JWT query token) is fully retired.
     if (t === 'MEDIATION_INVITE' && anyData?.token) {
       return `/mediation/invite/${encodeURIComponent(String(anyData.token))}`
-    }
-    if (t === 'MEDIATION_INVITED' && anyData?.token) {
-      return `/mediation/invite?token=${encodeURIComponent(String(anyData.token))}`
     }
 
     // Mediation events → mediation detail. (`mediationId` is loose-typed in
