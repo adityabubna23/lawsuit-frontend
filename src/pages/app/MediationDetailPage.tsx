@@ -94,6 +94,18 @@ const MediationDetailPage: FC = () => {
     enabled: needsMediators,
   })
 
+  // Conflict-of-interest filter: the case's own lawyers (initiator +
+  // respondent) cannot be shortlisted as mediators for THIS mediation,
+  // even if they're on the panel. Spec sanity — a lawyer representing a
+  // party can't also be the neutral mediator.
+  const eligibleMediators = useMemo<MediatorProfile[]>(() => {
+    const list = mediatorsQ.data || []
+    const excluded = new Set(
+      [m?.initiatorLawyerId, m?.respondentLawyerId].filter(Boolean) as string[],
+    )
+    return list.filter((med) => !excluded.has(med.id))
+  }, [mediatorsQ.data, m?.initiatorLawyerId, m?.respondentLawyerId])
+
   const lawyersQ = useQuery({
     queryKey: ['lawyers-all'],
     queryFn: async () => (await lawyersApi.getAll({ limit: 50 })).data,
@@ -540,12 +552,12 @@ const MediationDetailPage: FC = () => {
             <div className="mt-5">
               {mediatorsQ.isLoading ? (
                 <p className="text-sm text-gray-500">Loading mediators…</p>
-              ) : !mediatorsQ.data || mediatorsQ.data.length === 0 ? (
+              ) : eligibleMediators.length === 0 ? (
                 <p className="text-sm text-gray-500">No mediators available right now.</p>
               ) : (
                 <>
                   <div className="space-y-2 max-h-[50vh] overflow-y-auto">
-                    {mediatorsQ.data.map((med) => {
+                    {eligibleMediators.map((med) => {
                       const sel = shortlistPick.includes(med.id)
                       const disabled = !sel && shortlistPick.length >= 3
                       return (
@@ -994,11 +1006,11 @@ const MediationDetailPage: FC = () => {
         <Modal title="Choose a Mediator" onClose={() => setShowMediators(false)}>
           {mediatorsQ.isLoading ? (
             <p className="text-sm text-gray-500 py-6 text-center">Loading mediators…</p>
-          ) : !mediatorsQ.data || mediatorsQ.data.length === 0 ? (
+          ) : eligibleMediators.length === 0 ? (
             <p className="text-sm text-gray-500 py-6 text-center">No mediators available right now.</p>
           ) : (
             <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-              {mediatorsQ.data.map((med) => {
+              {eligibleMediators.map((med) => {
                 const selected = myPick === med.id
                 const bothWant = otherPick === med.id
                 return (

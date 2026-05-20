@@ -70,7 +70,7 @@ const LawyerOnboardingPage: FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [doneToast, setDoneToast] = useState<string | null>(null)
 
-  // Step 5 — court admins by pincode
+  // Step 5 — court admins by district (matches server-side lookup)
   const [adminOptions, setAdminOptions] = useState<CourtAdminOption[]>([])
   const [pickedAdminId, setPickedAdminId] = useState('')
   const [submittingVerification, setSubmittingVerification] = useState(false)
@@ -92,36 +92,27 @@ const LawyerOnboardingPage: FC = () => {
     load()
   }, [])
 
-  // Pull eligible court admins when entering Step 5. We try the pincode
-  // first (most-specific) and fall back to the district-wide list when
-  // the pincode returns nothing — a single pincode covers a tiny slice of
-  // a district, so without this fallback most lawyers see an empty list
-  // and can't pick anyone to send their verification to. Mirrors the
-  // mobile `LawyerVerificationRequestScreen` discovery pattern.
+  // Pull eligible court admins when entering Step 5. Server lookup is
+  // now DISTRICT-based (a single pincode covers a tiny slice of a district
+  // so most lawyers saw an empty list — district yields the full set of
+  // court admins they can reasonably approach). District + optional state
+  // arrive from the AddressPicker on step 4.
   useEffect(() => {
     if (step !== 5) return
-    if (!info.pincode && !info.district) return
+    if (!info.district) return
     let cancelled = false
     ;(async () => {
       try {
-        let data: CourtAdminOption[] = []
-        if (info.pincode) {
-          const res = await courtAdminApi.getAdminsByPincode(info.pincode)
-          const list = ((res as any).data?.data ?? (res as any).data ?? []) as CourtAdminOption[]
-          data = Array.isArray(list) ? list : []
-        }
-        if (data.length === 0 && info.district) {
-          const res = await courtAdminApi.getAdminsByDistrict(info.district, info.state)
-          const list = ((res as any).data?.data ?? (res as any).data ?? []) as CourtAdminOption[]
-          data = Array.isArray(list) ? list : []
-        }
+        const res = await courtAdminApi.getAdminsByDistrict(info.district!, info.state)
+        const list = ((res as any).data?.data ?? (res as any).data ?? []) as CourtAdminOption[]
+        const data = Array.isArray(list) ? list : []
         if (!cancelled) setAdminOptions(data)
       } catch {
         if (!cancelled) setAdminOptions([])
       }
     })()
     return () => { cancelled = true }
-  }, [step, info.pincode, info.district, info.state])
+  }, [step, info.district, info.state])
 
   const update = (patch: Partial<LawyerInfoShape>) => setInfo((s) => ({ ...s, ...patch }))
 
@@ -479,16 +470,16 @@ const LawyerOnboardingPage: FC = () => {
           <div className="space-y-4">
             <h2 className="text-lg font-semibold text-gray-900">Submit for verification</h2>
             <p className="text-sm text-gray-500">
-              Pick a court admin in your pincode. They'll review your license and bar council proofs.
+              Pick a court admin in your district. They'll review your license and bar council proofs.
             </p>
-            {!info.pincode && (
+            {!info.district && (
               <div className="bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 rounded-lg text-sm">
-                Set your pincode in step 4 first.
+                Set your district in step 4 first.
               </div>
             )}
-            {info.pincode && adminOptions.length === 0 && (
+            {info.district && adminOptions.length === 0 && (
               <div className="bg-blue-50 border border-blue-100 text-blue-800 px-3 py-2 rounded-lg text-sm">
-                No court admins are mapped to pincode {info.pincode} yet. Try a nearby pincode or contact platform support.
+                No court admins are mapped to <strong>{info.district}{info.state ? `, ${info.state}` : ''}</strong> yet. Try later or contact platform support.
               </div>
             )}
             {adminOptions.length > 0 && (
