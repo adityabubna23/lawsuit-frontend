@@ -357,7 +357,7 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
                 rely on `appointment.case` (backend includes it in the listing
                 response) so the button reflects reality without an extra
                 fetch. */}
-            {appointment.case ? (
+            {appointment.mediationId ? null : appointment.case ? (
               <button
                 onClick={() => navigate(`/lawyer/case/${appointment.case!.id}`)}
                 className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-white hover:bg-primary/90 transition-colors"
@@ -427,7 +427,7 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
                 tab), the consultation may have actually happened — surface
                 Escalate-to-Case (or Open-the-Case if already escalated) so
                 the lawyer can hand off the client without juggling status. */}
-            {appointment.case ? (
+            {appointment.mediationId ? null : appointment.case ? (
               <button
                 onClick={() => navigate(`/lawyer/case/${appointment.case!.id}`)}
                 className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-white hover:bg-primary/90 transition-colors"
@@ -478,7 +478,7 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
                 it reads as the headline action. Flips to Open-the-Case once
                 the case has been created so the lawyer keeps a single
                 obvious action. */}
-            {appointment.case ? (
+            {appointment.mediationId ? null : appointment.case ? (
               <button
                 onClick={() => navigate(`/lawyer/case/${appointment.case!.id}`)}
                 className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-primary text-white hover:bg-primary/90 transition-colors"

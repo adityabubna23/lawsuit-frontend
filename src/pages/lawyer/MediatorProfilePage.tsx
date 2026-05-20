@@ -1,6 +1,6 @@
 import { FC, FormEvent, useEffect, useState } from 'react'
 import { ShieldCheck, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
-import { mediationFlowApi } from '@/services/api'
+import { mediationApi } from '@/services/api'
 import { friendlyError } from '@/utils/errors'
 
 /**
@@ -16,7 +16,6 @@ import { friendlyError } from '@/utils/errors'
 interface Profile {
   id: string
   isMediator: boolean
-  mediatorRegistrationNumber: string | null
   mediatorBio: string | null
   mediationFee: number | null
   mediationSpecializations: string[]
@@ -32,7 +31,6 @@ const MediatorProfilePage: FC = () => {
 
   // Form state (mirrors profile)
   const [isMediator, setIsMediator] = useState(false)
-  const [regNumber, setRegNumber] = useState('')
   const [bio, setBio] = useState('')
   const [feeRupees, setFeeRupees] = useState<string>('')
   const [specsText, setSpecsText] = useState('')
@@ -41,12 +39,11 @@ const MediatorProfilePage: FC = () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await mediationFlowApi.getMyMediatorProfile()
-      const p = (res.data as { profile?: Profile }).profile ?? null
+      const res = await mediationApi.getMyMediatorProfile()
+      const p = (res.data as { data?: Profile }).data ?? null
       setProfile(p)
       if (p) {
         setIsMediator(p.isMediator)
-        setRegNumber(p.mediatorRegistrationNumber || '')
         setBio(p.mediatorBio || '')
         setFeeRupees(p.mediationFee != null ? String(p.mediationFee) : '')
         setSpecsText(p.mediationSpecializations.join(', '))
@@ -64,12 +61,6 @@ const MediatorProfilePage: FC = () => {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    if (isMediator && !regNumber.trim()) {
-      setError(
-        'A registration number is required before opting in to the mediator panel (MA 2023 §10).',
-      )
-      return
-    }
     setSaving(true)
     setError(null)
     try {
@@ -78,14 +69,13 @@ const MediatorProfilePage: FC = () => {
         .map((s) => s.trim())
         .filter(Boolean)
       const fee = feeRupees.trim() ? Number.parseInt(feeRupees, 10) : undefined
-      const res = await mediationFlowApi.updateMediatorProfile({
+      const res = await mediationApi.updateMediatorProfile({
         isMediator,
-        mediatorRegistrationNumber: regNumber.trim() || undefined,
         mediatorBio: bio.trim() || undefined,
         mediationFee: fee && Number.isFinite(fee) ? fee : undefined,
         mediationSpecializations: specs,
       })
-      const p = (res.data as { profile?: Profile }).profile ?? null
+      const p = (res.data as { data?: Profile }).data ?? null
       setProfile(p)
       setSavedAt(new Date())
     } catch (err) {
@@ -116,9 +106,8 @@ const MediatorProfilePage: FC = () => {
       <div className="rounded-xl bg-blue-50/60 border border-blue-100 px-4 py-3 mb-6 flex items-start gap-3">
         <ShieldCheck className="w-5 h-5 text-blue-700 flex-shrink-0 mt-0.5" />
         <div className="text-sm text-blue-900 leading-relaxed">
-          Per <strong>MA 2023 §10</strong>, only accredited mediators may be listed on the
-          panel. You'll need your mediator registration number from the State or Central
-          Mediation Council before you can opt in.
+          Opt in to be discoverable as a mediator. Court-verified lawyers with this
+          toggle on are shown on the mediator shortlist panel disputing parties pick from.
         </div>
       </div>
 
@@ -138,23 +127,6 @@ const MediatorProfilePage: FC = () => {
             </p>
           </div>
         </label>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-800 mb-1">
-            MA 2023 §10 registration number {isMediator && <span className="text-red-500">*</span>}
-          </label>
-          <input
-            type="text"
-            value={regNumber}
-            onChange={(e) => setRegNumber(e.target.value)}
-            placeholder="e.g. MMC/2024/12345"
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/30"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Your accreditation number from a recognised Mediation Council. Required when
-            opting in.
-          </p>
-        </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-800 mb-1">Public bio</label>

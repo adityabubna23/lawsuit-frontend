@@ -42,9 +42,10 @@ const NewMediationInvitePage: FC = () => {
   // hit spam) without creating a new invite. Fetched proactively so
   // Resend is ALWAYS available, not gated behind a failed re-send.
   const [pendingInvite, setPendingInvite] = useState<
-    { respondentEmail: string; respondentName?: string | null; status: string; createdAt: string } | null
+    { id: string; respondentEmail: string; respondentName?: string | null; status: string; createdAt: string } | null
   >(null)
   const [resentAt, setResentAt] = useState<string | null>(null)
+  const [editedAt, setEditedAt] = useState<string | null>(null)
 
   useEffect(() => {
     if (blocked || !caseId) return
@@ -53,7 +54,7 @@ const NewMediationInvitePage: FC = () => {
       try {
         const res = await mediationApi.getInviteForCase(caseId)
         const inv = (res.data?.data ?? res.data) as
-          | { respondentEmail: string; respondentName?: string | null; status: string; createdAt: string }
+          | { id: string; respondentEmail: string; respondentName?: string | null; status: string; createdAt: string }
           | null
         if (!cancelled && inv && inv.status === 'PENDING') {
           setPendingInvite(inv)
@@ -116,6 +117,38 @@ const NewMediationInvitePage: FC = () => {
       setError(err?.response?.data?.error || 'Failed to resend invitation'),
   })
 
+  // Lawyer can edit a still-PENDING invite (recipient + dispute) before
+  // the other party accepts. Uses the canonical PATCH /invites/:id which
+  // re-emails when the recipient address changes.
+  const editMut = useMutation({
+    mutationFn: () => {
+      if (!pendingInvite) throw new Error('No pending invitation to update')
+      return mediationApi.editInvite(pendingInvite.id, {
+        respondentEmail: form.respondentEmail.trim(),
+        respondentName: form.respondentName.trim() || undefined,
+        disputeTitle: form.disputeTitle.trim(),
+        disputeDescription: form.disputeDescription.trim(),
+      })
+    },
+    onSuccess: () => {
+      setError(null)
+      setEditedAt(new Date().toISOString())
+      // Refresh the pending invite snapshot from the patched values so
+      // the email/name shown stays accurate.
+      setPendingInvite((p) =>
+        p
+          ? {
+              ...p,
+              respondentEmail: form.respondentEmail.trim(),
+              respondentName: form.respondentName.trim() || null,
+            }
+          : p,
+      )
+    },
+    onError: (err: any) =>
+      setError(err?.response?.data?.error || 'Failed to update the invitation'),
+  })
+
   // The server returns this exact message when a PENDING invite already
   // exists for the email — that's when we offer "Resend" instead.
   const pendingExists = /pending invite already exists/i.test(error || '')
@@ -123,7 +156,14 @@ const NewMediationInvitePage: FC = () => {
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-    mutation.mutate()
+    // If an invite is still PENDING, the same form acts as the edit
+    // surface (recipient + dispute) — patching the existing invite
+    // rather than creating a duplicate. Server re-emails on email change.
+    if (pendingInvite) {
+      editMut.mutate()
+    } else {
+      mutation.mutate()
+    }
   }
 
   const input =
@@ -181,6 +221,18 @@ const NewMediationInvitePage: FC = () => {
                   ✓ Invitation re-sent at {new Date(resentAt).toLocaleTimeString()}.
                 </p>
               )}
+              {editedAt && (
+                <p className="text-sm text-emerald-700 mt-1">
+                  ✓ Invitation updated at {new Date(editedAt).toLocaleTimeString()}. The
+                  new recipient/dispute is now in effect; the other party gets the email
+                  if the recipient changed.
+                </p>
+              )}
+              <p className="text-xs text-amber-800/80 mt-2">
+                You can also edit this invitation below (recipient or dispute) and click
+                <strong> Update invitation</strong> — the original invite is patched, no
+                duplicate created.
+              </p>
             </div>
             <button
               type="button"
@@ -304,10 +356,16 @@ const NewMediationInvitePage: FC = () => {
           ) : (
             <button
               type="submit"
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || editMut.isPending}
               className="px-5 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark disabled:opacity-60"
             >
-              {mutation.isPending ? 'Sending…' : 'Send invitation now'}
+              {pendingInvite
+                ? editMut.isPending
+                  ? 'Updating…'
+                  : 'Update invitation'
+                : mutation.isPending
+                  ? 'Sending…'
+                  : 'Send invitation now'}
             </button>
           )}
         </div>

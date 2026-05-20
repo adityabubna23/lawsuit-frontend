@@ -50,6 +50,11 @@ const MediationsPage: FC = () => {
     },
   })
 
+  const resendInvite = useMutation({
+    mutationFn: (email: string) => mediationApi.resendInvite(email),
+    onSuccess: () => q.refetch(),
+  })
+
   const items = q.data ?? []
   const filtered = items.filter((m) =>
     tab === 'active'
@@ -155,7 +160,7 @@ const MediationsPage: FC = () => {
                       </span>
                     </div>
                     <p className="text-sm text-gray-600 mt-3 line-clamp-2">{m.disputeDescription}</p>
-                    <div className="mt-3">
+                    <div className="mt-3 flex flex-wrap gap-2">
                       <button
                         onClick={() =>
                           setEditing({
@@ -169,6 +174,13 @@ const MediationsPage: FC = () => {
                         className="px-4 py-1.5 rounded-lg border border-primary text-primary text-sm font-medium hover:bg-primary hover:text-white transition"
                       >
                         Edit invitation
+                      </button>
+                      <button
+                        onClick={() => resendInvite.mutate(rEmail)}
+                        disabled={resendInvite.isPending}
+                        className="px-4 py-1.5 rounded-lg border border-amber-500 text-amber-700 text-sm font-medium hover:bg-amber-500 hover:text-white transition disabled:opacity-60"
+                      >
+                        {resendInvite.isPending ? 'Resending…' : 'Resend invitation'}
                       </button>
                     </div>
                   </div>

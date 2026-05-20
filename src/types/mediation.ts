@@ -81,6 +81,7 @@ export interface Mediation {
   outcome?: MediationOutcome | null
   settlementTerms?: string | null
   closureNotes?: string | null
+  conclusionDocumentUrls?: string[]
   escalatedCaseId?: string | null
   createdAt: string
   updatedAt: string

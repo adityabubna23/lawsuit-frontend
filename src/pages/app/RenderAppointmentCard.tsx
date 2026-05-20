@@ -293,7 +293,10 @@ const RenderAppointmentCard: FC<RenderAppointmentCardProps> = ({
             appointment to a tracked case. Renders for both roles using the
             role-specific case route. The server already includes `case`
             in the appointment listing so no extra fetch is needed. */}
-        {appointment.case && (
+        {/* Mediation-linked appointments NEVER expose the initiator's
+            private Case — the respondent side only sees "Open Mediation"
+            (per spec). When mediationId is set, suppress "Open the Case". */}
+        {appointment.case && !appointment.mediationId && (
           <button
             onClick={() =>
               navigate(

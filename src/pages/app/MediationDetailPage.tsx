@@ -57,10 +57,11 @@ const MediationDetailPage: FC = () => {
   const [showMediators, setShowMediators] = useState(false)
   const [pickerFor, setPickerFor] = useState<null | 'initiator' | 'respondent'>(null)
   const [showConclude, setShowConclude] = useState(false)
-  const [concludeForm, setConcludeForm] = useState<{ outcome: 'RESOLVED' | 'ESCALATED_TO_CASE'; settlementTerms: string; closureNotes: string }>({
+  const [concludeForm, setConcludeForm] = useState<{ outcome: 'RESOLVED' | 'ESCALATED_TO_CASE'; settlementTerms: string; closureNotes: string; documentUrls: string[] }>({
     outcome: 'RESOLVED',
     settlementTerms: '',
     closureNotes: '',
+    documentUrls: [],
   })
 
   // Canonical — respondent side-submission form state.
@@ -71,6 +72,7 @@ const MediationDetailPage: FC = () => {
   // Canonical — shortlist multi-select (1–3).
   const [shortlistPick, setShortlistPick] = useState<string[]>([])
   const [payingFee, setPayingFee] = useState(false)
+  const [concludeUploading, setConcludeUploading] = useState(false)
 
   const q = useQuery({
     queryKey: ['mediation', id],
@@ -131,7 +133,12 @@ const MediationDetailPage: FC = () => {
   })
 
   const conclude = useMutation({
-    mutationFn: () => mediationApi.conclude(id, concludeForm),
+    mutationFn: () => mediationApi.conclude(id, {
+      outcome: concludeForm.outcome,
+      settlementTerms: concludeForm.settlementTerms || undefined,
+      closureNotes: concludeForm.closureNotes || undefined,
+      documentUrls: concludeForm.documentUrls.length > 0 ? concludeForm.documentUrls : undefined,
+    }),
     onSuccess: () => { setShowConclude(false); invalidate() },
     onError: (e: any) => setError(e?.response?.data?.error || 'Failed to conclude'),
   })
@@ -578,12 +585,42 @@ const MediationDetailPage: FC = () => {
             </div>
           )}
           {actingSide && myShortlistDone && (
-            <p className="mt-4 text-xs text-emerald-700">Your shortlist is submitted. Waiting for the other side. ✓</p>
+            <div className="mt-4">
+              <p className="text-xs text-emerald-700 mb-2">Your shortlist is submitted. Waiting for the other side. ✓</p>
+              {(myShortlist?.length ?? 0) > 0 && (
+                <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-100">
+                  <p className="text-xs text-gray-600 uppercase tracking-wide mb-1">Your side's selected mediators</p>
+                  <ul className="space-y-1">
+                    {myShortlist!.map((mid) => {
+                      const med = mediatorsQ.data?.find((x) => x.id === mid)
+                      return (
+                        <li key={mid} className="text-sm text-gray-900">{med?.name || mid}</li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              )}
+            </div>
           )}
           {!actingSide && (
-            <p className="mt-4 text-xs text-gray-500">
-              Your side's lawyer is handling mediator selection. You'll be able to review the choice.
-            </p>
+            <div className="mt-4">
+              <p className="text-xs text-gray-500">
+                Your side's lawyer is handling mediator selection. You'll be able to review the choice.
+              </p>
+              {(myShortlist?.length ?? 0) > 0 && (
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 mt-2">
+                  <p className="text-xs text-gray-600 uppercase tracking-wide mb-1">Your side's selected mediators</p>
+                  <ul className="space-y-1">
+                    {myShortlist!.map((mid) => {
+                      const med = mediatorsQ.data?.find((x) => x.id === mid)
+                      return (
+                        <li key={mid} className="text-sm text-gray-900">{med?.name || mid}</li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -901,6 +938,20 @@ const MediationDetailPage: FC = () => {
               <p className="text-sm text-gray-800 mt-1 whitespace-pre-wrap">{m.closureNotes}</p>
             </div>
           )}
+          {m.conclusionDocumentUrls && m.conclusionDocumentUrls.length > 0 && (
+            <div className="mt-3">
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Documents</p>
+              <ul className="mt-1 space-y-1">
+                {m.conclusionDocumentUrls.map((url, i) => (
+                  <li key={url}>
+                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
+                      Document {i + 1} ↗
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {m.escalatedCaseId && (
             <Link
               to={isLawyer ? `/lawyer/case/${m.escalatedCaseId}` : `/app/case/${m.escalatedCaseId}`}
@@ -1016,13 +1067,53 @@ const MediationDetailPage: FC = () => {
                 placeholder="Observations, next steps, etc."
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Documents (optional)</label>
+              <p className="text-xs text-gray-500 mb-2">Upload the settlement agreement, non-settlement report, or any supporting documents.</p>
+              <label className="inline-flex items-center gap-2 text-sm text-primary cursor-pointer">
+                <input
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={async (e) => {
+                    const files = e.target.files
+                    if (!files || files.length === 0) return
+                    setConcludeUploading(true)
+                    try {
+                      const urls: string[] = []
+                      for (const f of Array.from(files)) {
+                        urls.push(await uploadToCloudinary(f, { folder: 'documents' }))
+                      }
+                      setConcludeForm((prev) => ({ ...prev, documentUrls: [...prev.documentUrls, ...urls] }))
+                    } catch (err: any) {
+                      setError(err?.message || 'Document upload failed')
+                    } finally {
+                      setConcludeUploading(false)
+                    }
+                  }}
+                />
+                <span className="px-3 py-1.5 rounded-lg border border-primary hover:bg-primary hover:text-white transition-colors">
+                  {concludeUploading ? 'Uploading…' : '+ Attach documents'}
+                </span>
+              </label>
+              {concludeForm.documentUrls.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {concludeForm.documentUrls.map((u, i) => (
+                    <li key={u} className="flex items-center justify-between text-xs text-gray-600 bg-gray-50 rounded px-2 py-1">
+                      <span className="truncate">Document {i + 1}</span>
+                      <button onClick={() => setConcludeForm((prev) => ({ ...prev, documentUrls: prev.documentUrls.filter((x) => x !== u) }))} className="text-red-500 hover:text-red-700">remove</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             <div className="flex justify-end gap-3 pt-1">
               <button onClick={() => setShowConclude(false)} className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">
                 Cancel
               </button>
               <button
                 onClick={() => conclude.mutate()}
-                disabled={conclude.isPending}
+                disabled={conclude.isPending || concludeUploading}
                 className="px-5 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark disabled:opacity-60"
               >
                 {conclude.isPending ? 'Submitting…' : 'Submit'}
