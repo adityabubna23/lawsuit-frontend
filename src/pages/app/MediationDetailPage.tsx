@@ -103,10 +103,16 @@ const MediationDetailPage: FC = () => {
   })
 
   // Canonical — respondent's appointments, to attach a lawyer who has
-  // already accepted (CONFIRMED/COMPLETED).
+  // already accepted (CONFIRMED/COMPLETED). The /appointments list
+  // endpoint returns `{ items }`; older mirror endpoints returned
+  // `{ data }`; defensively accept either + raw arrays.
   const apptsQ = useQuery({
     queryKey: ['appointments', 'for-mediation'],
-    queryFn: async () => (await appointmentsApi.getAll()).data.data as ApptLite[],
+    queryFn: async () => {
+      const res = await appointmentsApi.getAll()
+      const body = res.data as any
+      return (body?.items || body?.data || body || []) as ApptLite[]
+    },
     enabled: m?.status === 'RESPONDENT_SIDE_SUBMITTED',
   })
 
