@@ -80,7 +80,9 @@ import CaseDetailsLawyerPage from './pages/lawyer/CaseDetailsLawyerPage'
 import AgreementTemplatesPage from './pages/lawyer/AgreementTemplatesPage'
 import LawyerMediatorSettingsPage from './pages/lawyer/LawyerMediatorSettingsPage'
 import LawyerSalaryPage from './pages/lawyer/LawyerSalaryPage'
-import LawyerOnboardingPage from './pages/lawyer/LawyerOnboardingPage'
+// Lawyer onboarding page retired — verification now lives in the lawyer's
+// profile page (LawyerVerificationSection). Profile is the single home
+// for verifying with a court admin.
 import LawyerAvailabilityPage from './pages/lawyer/LawyerAvailabilityPage'
 import LawyerClientDetailPage from './pages/lawyer/LawyerClientDetailPage'
 // Mediation Pages
@@ -413,7 +415,9 @@ const AppRoutes = () => {
         <Route path="agreement-templates" element={<AgreementTemplatesPage />} />
         <Route path="mediator-settings" element={<LawyerMediatorSettingsPage />} />
         <Route path="salary" element={<LawyerSalaryPage />} />
-        <Route path="onboarding" element={<LawyerOnboardingPage />} />
+        {/* /lawyer/onboarding retired — redirect lingering bookmarks to
+            /lawyer/profile where the verification section lives. */}
+        <Route path="onboarding" element={<Navigate to="/lawyer/profile" replace />} />
         <Route path="availability" element={<LawyerAvailabilityPage />} />
         <Route path="client/:clientId" element={<LawyerClientDetailPage />} />
         <Route path="settings" element={<SettingsPage />} />

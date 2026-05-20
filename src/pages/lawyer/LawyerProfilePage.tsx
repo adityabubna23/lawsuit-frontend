@@ -275,7 +275,9 @@ const LawyerProfilePage: FC = () => {
             <h1 className=" flex justify-center text-lg font-semibold text-midnight mb-2">Additional Information</h1>
             <LawyerInfo />
 
-            <div className="mt-12">
+            {/* Anchor target for the "Verify now" CTA on the header avatar
+                (UserMenu) — link is `/lawyer/profile#verification`. */}
+            <div id="verification" className="mt-12 scroll-mt-24">
               <LawyerVerificationSection />
             </div>
 

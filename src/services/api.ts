@@ -917,6 +917,11 @@ export const courtAdminApi = {
   // approach.
   getAdminsByDistrict: (district: string, state?: string) =>
     api.get('/court-admin/public/admins/by-district', { params: { district, state } }),
+  /** Courts in the district with their active admins inline. Powers the
+   *  lawyer-verification picker (court-first; admin is selected within
+   *  a court). Returns courts even when no admin is mapped yet. */
+  getCourtsByDistrict: (district: string, state?: string) =>
+    api.get('/court-admin/public/courts/by-district', { params: { district, state } }),
   getMe: () => api.get('/court-admin/me'),
   updateMe: (data: { name?: string; email?: string; phone?: string; avatarUrl?: string; registrationNumber?: string }) =>
     api.put('/court-admin/me', data),

@@ -65,7 +65,6 @@ const LawyerLayout: FC = () => {
       items: [
         { name: 'Agreement Templates', path: '/lawyer/agreement-templates' },
         { name: 'Availability', path: '/lawyer/availability' },
-        { name: 'Onboarding', path: '/lawyer/onboarding' },
       ],
     },
     {

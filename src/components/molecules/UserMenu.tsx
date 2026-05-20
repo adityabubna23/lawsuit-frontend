@@ -10,12 +10,21 @@ interface UserMenuProps {
 const UserMenu: FC<UserMenuProps> = ({ user, onLogout }) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false)
 
+  // Verification badge — lawyers only. `isVerified` is a Lawyer-row flag
+  // flipped by a court admin after they approve the verification request
+  // submitted from the profile page. Green dot when verified, amber dot
+  // when not (clicking the amber chip in the drawer routes to
+  // /lawyer/profile#verification).
+  const isLawyer = user?.role === 'LAWYER'
+  const isVerified = (user as any)?.isVerified === true
+
   return (
     <div className="ml-3 relative">
       <button
         type="button"
-        className="bg-white rounded-full flex focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+        className="bg-white rounded-full flex focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary relative"
         onClick={() => setIsProfileOpen(!isProfileOpen)}
+        aria-label={isLawyer ? (isVerified ? 'Profile (verified)' : 'Profile (verification pending)') : 'Open user menu'}
       >
         <span className="sr-only">Open user menu</span>
         {user?.avatar ? (
@@ -28,6 +37,14 @@ const UserMenu: FC<UserMenuProps> = ({ user, onLogout }) => {
           <div className="h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center">
             {user?.name?.charAt(0)}
           </div>
+        )}
+        {isLawyer && (
+          <span
+            className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-white ${
+              isVerified ? 'bg-emerald-500' : 'bg-amber-500'
+            }`}
+            title={isVerified ? 'Verified by court admin' : 'Verification pending'}
+          />
         )}
       </button>
 
@@ -60,6 +77,30 @@ const UserMenu: FC<UserMenuProps> = ({ user, onLogout }) => {
                     <div>
                       <div className="text-lg font-semibold">{user?.name}</div>
                       <div className="text-sm text-gray-500">{user?.email}</div>
+                      {/* Lawyer verification chip — verified → green pill,
+                          unverified → amber CTA that opens the profile's
+                          verification section so the lawyer can pick a
+                          court admin and submit. */}
+                      {isLawyer && (
+                        <div className="mt-1.5">
+                          {isVerified ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                              Verified
+                            </span>
+                          ) : (
+                            <Link
+                              to="/lawyer/profile#verification"
+                              onClick={() => setIsProfileOpen(false)}
+                              className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-800 bg-amber-50 border border-amber-200 hover:bg-amber-100 px-2 py-0.5 rounded-full transition-colors"
+                              title="Submit a verification request to a court admin"
+                            >
+                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                              Not verified — Verify now →
+                            </Link>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
