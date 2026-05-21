@@ -339,13 +339,22 @@ const MediationDetailPage: FC = () => {
 
   const stepIdx = CANONICAL_STEPS.findIndex((s) => s.key === m.status)
   const showStepper = stepIdx >= 0 || (TERMINAL.includes(m.status) && m.status !== 'CANCELLED')
-  // Only lawyers the respondent has APPOINTED (the lawyer accepted the
-  // booking → CONFIRMED) but the consultation hasn't been attended yet
-  // (NOT COMPLETED). Past/attended consultations are excluded so the
-  // list is just the active appointments to choose from. The initiator's
-  // own lawyer is excluded too (conflict of interest).
+  // Only appointments the respondent can attach as their mediation lawyer:
+  //   • status CONFIRMED  → the lawyer accepted the booking (appointed)
+  //   • scheduledAt in the FUTURE → still upcoming, not yet attended /
+  //     missed (a CONFIRMED slot whose time already passed is stale)
+  //   • not the initiator's own lawyer (conflict of interest)
+  // This appointment then serves as the lawyer's engagement for the
+  // mediation; on conclusion the server marks it COMPLETED with an
+  // "Attended for mediation: <id>" note.
+  const nowMs = Date.now()
   const attachableAppts = (apptsQ.data || []).filter(
-    (a) => a.lawyer && a.status === 'CONFIRMED' && a.lawyer.id !== m.initiatorLawyerId,
+    (a) =>
+      a.lawyer &&
+      a.status === 'CONFIRMED' &&
+      a.lawyer.id !== m.initiatorLawyerId &&
+      Number.isFinite(Date.parse(a.scheduledAt)) &&
+      Date.parse(a.scheduledAt) > nowMs,
   )
 
   return (

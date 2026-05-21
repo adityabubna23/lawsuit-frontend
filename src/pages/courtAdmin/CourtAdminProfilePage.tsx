@@ -56,11 +56,18 @@ const CourtAdminProfilePage: FC = () => {
       try {
         const res = await courtAdminApi.getMe()
         const data = (res as { data?: unknown }).data ?? res
-        const me = (data as { user?: unknown; admin?: unknown })?.user ??
-          (data as { admin?: unknown }).admin ?? data
+        // The server returns `{ courtAdmin: { ...fields, court } }`. Accept
+        // that shape first, then fall back to older `{ user }` / `{ admin }`
+        // / flat shapes so this stays robust across deploys.
+        const me =
+          (data as { courtAdmin?: unknown }).courtAdmin ??
+          (data as { user?: unknown }).user ??
+          (data as { admin?: unknown }).admin ??
+          data
         const court =
+          (me as { court?: unknown })?.court ??
           (data as { court?: unknown }).court ??
-          (data as { user?: { court?: unknown } })?.user?.court ?? null
+          null
         if (cancelled) return
         const meRec = me as Record<string, unknown>
         setName((meRec?.name as string) ?? '')
