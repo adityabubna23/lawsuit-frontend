@@ -108,7 +108,10 @@ const NewMediationInvitePage: FC = () => {
   })
 
   const resend = useMutation({
-    mutationFn: () => mediationApi.resendInvite(form.respondentEmail),
+    mutationFn: () => {
+      if (!pendingInvite) throw new Error('No pending invitation to resend')
+      return mediationApi.resendInvite(pendingInvite.id)
+    },
     onSuccess: () => {
       setError(null)
       setResentAt(new Date().toISOString())

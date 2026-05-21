@@ -51,7 +51,7 @@ const MediationsPage: FC = () => {
   })
 
   const resendInvite = useMutation({
-    mutationFn: (email: string) => mediationApi.resendInvite(email),
+    mutationFn: (inviteId: string) => mediationApi.resendInvite(inviteId),
     onSuccess: () => q.refetch(),
   })
 
@@ -176,7 +176,7 @@ const MediationsPage: FC = () => {
                         Edit invitation
                       </button>
                       <button
-                        onClick={() => resendInvite.mutate(rEmail)}
+                        onClick={() => resendInvite.mutate((m as any).inviteId)}
                         disabled={resendInvite.isPending}
                         className="px-4 py-1.5 rounded-lg border border-amber-500 text-amber-700 text-sm font-medium hover:bg-amber-500 hover:text-white transition disabled:opacity-60"
                       >
