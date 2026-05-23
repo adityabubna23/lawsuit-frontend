@@ -229,7 +229,7 @@ const OrganizationMySalaryPage: FC = () => {
           {/* Performance counts */}
           <section>
             <SectionHeader icon={Building2} text="Performance this cycle" />
-            <div className="grid grid-cols-3 gap-3 mt-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2">
               <Mini label="Consultations" value={String(data.performance?.consultationCount ?? 0)} />
               <Mini label="Cases closed" value={String(data.performance?.caseClosedCount ?? 0)} />
               <Mini label="Cases won" value={String(data.performance?.caseWonCount ?? 0)} />

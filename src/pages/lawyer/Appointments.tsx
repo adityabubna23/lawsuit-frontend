@@ -1,7 +1,7 @@
-import { FC, useMemo, useState } from 'react'
+import { FC, useMemo, useState, useEffect } from 'react'
 import { appointmentsApi } from '@/services/api'
 import { parseISO, isValid } from 'date-fns'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import CreateCaseDetail from '@/components/molecules/CreateCaseDetail'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import api, { apiEndpoints } from '@/services/api'
@@ -11,6 +11,7 @@ import UploadInput from '@/components/atoms/UploadButton'
 import { UpdateAgreementUrlInput } from '@/schema/appointment.schema'
 import RescheduleModal from '@/components/molecules/RescheduleModal'
 import RenderAppointmentCard, { AppointmentData } from './RenderAppointmentCard'
+import BrandLoader from '@/components/atoms/BrandLoader'
 
 interface AppointmentResponse {
   data: AppointmentData[]
@@ -175,6 +176,23 @@ const LawyerAppointments: FC = () => {
     return { pending, attendNow, upcoming, attended, missed, cancelled }
   }, [appointments, now])
 
+  // Deep-link: a notification can target a specific appointment via
+  // `?id=<appointmentId>`. Switch to the tab that holds it so the card is
+  // visible (lists are sorted most-recent-first, so it surfaces near the top).
+  const [searchParams] = useSearchParams()
+  const focusId = searchParams.get('id')
+  useEffect(() => {
+    if (!focusId || appointments.length === 0) return
+    const groups: Record<TabType, AppointmentData[]> = {
+      pending, attendNow, upcoming, missed, attended, cancelled,
+    }
+    const tabWith = (Object.keys(groups) as TabType[]).find((k) =>
+      groups[k].some((a) => a.id === focusId),
+    )
+    if (tabWith) setActiveTab(tabWith)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId, appointments])
+
   // "Discuss" on an appointment row now deep-links into the unified
   // /lawyer/chats page using the appointmentId — the page hits the
   // dedicated /chat/appointment/:id endpoint that idempotently creates
@@ -331,10 +349,7 @@ const LawyerAppointments: FC = () => {
         {/* Content */}
         <div className="bg-gray-50">
           {getAppointmentsQuery.isLoading ? (
-            <div className="text-center py-12">
-              <div className="inline-block w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              <p className="mt-4 text-secondary">Loading appointments...</p>
-            </div>
+            <BrandLoader label="Loading appointments…" />
           ) : getAppointmentsQuery.isError ? (
             <div className="text-center py-12">
               <p className="text-red-600">Failed to load appointments</p>
@@ -539,7 +554,7 @@ const LawyerAppointments: FC = () => {
         {/* Upload Agreement Modal */}
         {uploadModalOpen && selectedAppointmentForUpload && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="bg-white rounded-xl p-6 min-w-[500px] w-full max-w-lg mx-auto border border-gray-200">
+            <div className="bg-white rounded-xl p-6 sm:min-w-[500px] w-full max-w-lg mx-auto border border-gray-200">
               <div className="flex justify-between items-center mb-6">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">Upload Agreement</h3>

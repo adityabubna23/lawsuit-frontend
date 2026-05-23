@@ -11,12 +11,14 @@ import {
   Menu,
   LogOut,
   Gavel,
+  X,
 } from 'lucide-react'
 import { useCourtAdminStore } from '../stores/courtAdminStore'
 import { useNotificationStore } from '../stores/notificationStore'
 import { useNotificationSocket } from '../hooks/useNotificationSocket'
 import NotificationModal from '../components/molecules/NotificationModal'
 import ErrorBoundary from '../components/organisms/ErrorBoundary'
+import { useIsMobile } from '../hooks/useMediaQuery'
 
 interface NavItem {
   to: string
@@ -40,7 +42,11 @@ const NAV_ITEMS: NavItem[] = [
  * data tables and forms.
  */
 const CourtAdminLayout: FC = () => {
-  const [collapsed, setCollapsed] = useState(false)
+  // `collapsedState` is the desktop rail toggle. On mobile the sidebar becomes
+  // an off-canvas drawer (`mobileOpen`) and is never "collapsed", so the
+  // effective `collapsed` below is forced false on small screens.
+  const [collapsedState, setCollapsed] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const { logout, user } = useCourtAdminStore()
@@ -48,8 +54,15 @@ const CourtAdminLayout: FC = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const profileRef = useRef<HTMLDivElement>(null)
+  const isMobile = useIsMobile()
+  const collapsed = collapsedState && !isMobile
 
   useNotificationSocket()
+
+  // Close the mobile drawer whenever the route changes.
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [location.pathname])
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -75,9 +88,20 @@ const CourtAdminLayout: FC = () => {
 
   return (
     <div className="min-h-screen flex bg-slate-50">
-      {/* ───── Sidebar (dark platform theme) ───── */}
+      {/* Mobile drawer backdrop */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* ───── Sidebar (dark platform theme) ─────
+          Desktop: sticky in-flow rail (collapsible). Mobile (<md): fixed
+          off-canvas drawer that slides in when `mobileOpen` is set. */}
       <aside
-        className={`${collapsed ? 'w-20' : 'w-64'} bg-gradient-to-b from-slate-900 via-slate-900 to-indigo-950 border-r border-slate-800 transition-all duration-200 flex flex-col sticky top-0 h-screen`}
+        className={`${collapsed ? 'w-20' : 'w-64'} bg-gradient-to-b from-slate-900 via-slate-900 to-indigo-950 border-r border-slate-800 transition-all duration-200 flex flex-col fixed md:sticky top-0 left-0 z-50 h-screen ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}
       >
         {/* Brand */}
         <div className="flex items-center justify-between px-4 h-16 border-b border-white/10">
@@ -101,9 +125,16 @@ const CourtAdminLayout: FC = () => {
           <button
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             onClick={() => setCollapsed((s) => !s)}
-            className="p-1 rounded-md hover:bg-white/10 text-white/60"
+            className="hidden md:block p-1 rounded-md hover:bg-white/10 text-white/60"
           >
             {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
+          <button
+            aria-label="Close menu"
+            onClick={() => setMobileOpen(false)}
+            className="md:hidden p-1 rounded-md hover:bg-white/10 text-white/60"
+          >
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -181,8 +212,8 @@ const CourtAdminLayout: FC = () => {
             <div className="flex items-center gap-3 min-w-0">
               <button
                 className="md:hidden p-2 rounded-md hover:bg-gray-100 text-gray-600"
-                onClick={() => setCollapsed((s) => !s)}
-                aria-label="Toggle navigation"
+                onClick={() => setMobileOpen(true)}
+                aria-label="Open navigation"
               >
                 <Menu className="w-5 h-5" />
               </button>

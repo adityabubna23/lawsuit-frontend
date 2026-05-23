@@ -478,7 +478,7 @@ const AddMoneyModal: FC<{
     <ModalShell title="Add money" icon={Plus} onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">
         <AmountField value={amount} onChange={setAmount} placeholder="₹1000" />
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[500, 1000, 5000, 10000].map((q) => (
             <button
               key={q}

@@ -132,7 +132,7 @@ const AdminCourtsPage: FC = () => {
       ) : courts.length === 0 ? (
         <div className="bg-white border border-gray-100 rounded-xl p-12 text-center text-gray-500">No courts yet.</div>
       ) : (
-        <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-left text-xs uppercase tracking-wider text-gray-500">
               <tr>

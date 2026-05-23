@@ -55,18 +55,27 @@ const NotificationModal: FC<{ open: boolean; onClose: () => void }> = ({ open, o
           : role === 'COURT_ADMIN' ? '/court-admin'
             : '/app'
 
-  // Map a notification onto a concrete route. Returns null when no specific
-  // destination makes sense so the caller can keep the panel open.
-  const resolveRoute = (n: Notification): string | null => {
+  // Where to send the user when nothing more specific matches — the role's
+  // landing page. Guarantees clicking ANY notification navigates somewhere
+  // (never a dead click), which is the behaviour the product requires.
+  const roleHome =
+    role === 'LAWYER' ? '/lawyer/dashboard'
+      : role === 'ORGANIZATION' ? '/organization/dashboard'
+        : role === 'ADMIN' ? '/admin/dashboard'
+          : role === 'COURT_ADMIN' ? '/court-admin/dashboard'
+            : '/app/home'
+
+  // Map a notification onto a concrete route. ALWAYS returns a destination so
+  // clicking any notification navigates somewhere sensible — falling back to
+  // the role's home when nothing more specific matches (never a dead click).
+  const resolveRoute = (n: Notification): string => {
     const { data = {}, type } = n
     const t = String(type || '').toUpperCase()
     const anyData = data as any
 
     // Court-admin-specific routing — these notifications only fire for
-    // COURT_ADMIN users, so we send them straight to the verification queue
-    // regardless of the global rolePrefix logic below. Without this branch
-    // a court admin tapping "new lawyer verification request" was bounced to
-    // /app/cases which doesn't exist in their layout.
+    // COURT_ADMIN users, so we send them straight to the relevant queue
+    // regardless of the global rolePrefix logic below.
     if (role === 'COURT_ADMIN') {
       if (anyData?.lawyerId && (t === 'CASE_UPDATE' || t.includes('VERIFICATION') || t.includes('LAWYER'))) {
         return `/court-admin/verify/${anyData.lawyerId}`
@@ -75,39 +84,55 @@ const NotificationModal: FC<{ open: boolean; onClose: () => void }> = ({ open, o
         return '/court-admin/organization-verifications'
       }
       if (t.includes('SALARY')) return '/court-admin/salary'
+      // The court admin's own authorization status lives on their profile.
+      if (t.includes('COURT_ADMIN') || t.includes('AUTHORIZ')) return '/court-admin/profile'
     }
+
+    // Admin reviewing a court-admin authorization request.
+    if (role === 'ADMIN' && t === 'COURT_ADMIN_AUTHORIZATION_PENDING') return '/admin/court-admins'
 
     // Organisation flows live at fixed paths regardless of caller role.
     if (t === 'ORGANIZATION_VERIFIED') return '/organization/dashboard'
     if (t === 'ORGANIZATION_REJECTED') return '/organization/verification'
     if (t === 'ORG_APPOINTMENT_REQUEST_RECEIVED') return '/organization/requests'
-    if (t === 'ORG_APPOINTMENT_REQUEST_REJECTED') return '/app/firms-requests'
+    if (t === 'ORG_APPOINTMENT_REQUEST_REJECTED') return '/app/appointments?view=firm'
+    // (ORG_APPOINTMENT_REQUEST_ASSIGNED opens Razorpay inline — handled in
+    //  handleNotificationClick, not here.)
 
-    // Chat ID present → open that conversation.
-    if (data.chatId) return `${rolePrefix}/chats?chatId=${data.chatId}`
+    // Mediation INVITE → the public accept page. The invitee is NOT a
+    // mediation participant yet, so routing them to the mediation detail page
+    // 404s (the read query gates on participant membership). Must come BEFORE
+    // the generic mediationId branch below.
+    if (t === 'MEDIATION_INVITE' && anyData?.token) {
+      return `/mediation/invite/${encodeURIComponent(String(anyData.token))}`
+    }
 
-    // Appointment-related types → route to the right appointment detail.
+    // Chat → open the conversation (or the chat list if no id).
+    if (t === 'NEW_MESSAGE' || data.chatId) {
+      return data.chatId ? `${rolePrefix}/chats?chatId=${data.chatId}` : `${rolePrefix}/chats`
+    }
+
+    // Live video / incoming call → the consultation room.
+    if ((t === 'INCOMING_CALL' || t === 'VIDEO_CALL') && data.appointmentId) {
+      return `${rolePrefix}/consultation/${data.appointmentId}`
+    }
+
+    // Appointment / consultation events → the right appointment (or the list).
     if (
       data.appointmentId ||
-      t === 'APPOINTMENT_BOOKED' ||
-      t === 'APPOINTMENT_CONFIRMED' ||
-      t === 'APPOINTMENT_REMINDER' ||
-      t === 'APPOINTMENT_RESCHEDULED' ||
-      t === 'APPOINTMENT_CANCELLED'
+      t.startsWith('APPOINTMENT_') ||
+      t === 'CONSULTATION_COMPLETED' ||
+      t === 'VIDEO_CALL'
     ) {
       return data.appointmentId
         ? `${rolePrefix}/appointments?id=${data.appointmentId}`
         : `${rolePrefix}/appointments`
     }
 
-    // Video call ring-in → consultation room.
-    if (t === 'INCOMING_CALL' && data.appointmentId) {
-      return `${rolePrefix}/consultation/${data.appointmentId}`
-    }
-
     // Case / task / hearing / document → case detail page (singular `case`).
     if (
       data.caseId ||
+      t === 'CASE_UPDATE' ||
       t === 'TASK_ASSIGNED' ||
       t === 'TASK_UPDATED' ||
       t === 'CASE_CLOSED' ||
@@ -118,53 +143,28 @@ const NotificationModal: FC<{ open: boolean; onClose: () => void }> = ({ open, o
       return data.caseId ? `${rolePrefix}/case/${data.caseId}` : `${rolePrefix}/cases`
     }
 
-    // Mediation INVITE → the public accept page. The invitee is NOT a
-    // mediation participant yet, so routing them to the mediation detail
-    // page 404s (the read query gates on participant membership). This
-    // must come BEFORE the generic mediationId branch below.
-    //
-    // The canonical lawyer-initiated invite emits `MEDIATION_INVITE`
-    // with a path token → the public accept page. The Phase-1 DRAFT
-    // flow (`MEDIATION_INVITED` + JWT query token) is fully retired.
-    if (t === 'MEDIATION_INVITE' && anyData?.token) {
-      return `/mediation/invite/${encodeURIComponent(String(anyData.token))}`
-    }
-
-    // Mediation events → mediation detail. (`mediationId` is loose-typed in
-    // the payload — already cast through `anyData` at the top of this fn.)
-    // Phase 1+2 mediation flow notifications use the PLURAL `mediations/:id`
-    // path (which renders the Mediation Act 2023 compliant detail page).
-    // Legacy notifications go to the SINGULAR `mediation/:id` (older
-    // standalone flow). The type prefix disambiguates.
+    // Mediation events → the canonical mediation detail page (singular path;
+    // the plural `mediations/:id` route just redirects here anyway).
+    // `mediationId` is loose-typed in the payload (cast via anyData above).
     if (anyData?.mediationId) {
-      const phase2Types = new Set([
-        'MEDIATION_INITIATED',
-        'MEDIATION_INVITED',
-        'MEDIATION_INVITE_EXPIRED',
-        'MEDIATION_LAWYER_NEEDED',
-        'MEDIATION_MEDIATOR_PROPOSED',
-        'MEDIATION_MEDIATOR_PICKED',
-        'MEDIATION_ACTIVE',
-        'MEDIATION_SETTLEMENT_DRAFT',
-        'MEDIATION_SETTLED',
-        'MEDIATION_NON_SETTLEMENT',
-        'MEDIATION_WITHDRAWN',
-        'MEDIATION_WARNING_14D',
-        'MEDIATION_EXPIRED',
-      ])
-      if (phase2Types.has(t)) {
-        return `${rolePrefix}/mediations/${anyData.mediationId}`
-      }
       return `${rolePrefix}/mediation/${anyData.mediationId}`
     }
+    // Mediation notification without an id → the mediations list. Only the
+    // client and lawyer layouts mount a mediations page.
+    if (t.startsWith('MEDIATION_') && (rolePrefix === '/app' || rolePrefix === '/lawyer')) {
+      return `${rolePrefix}/mediations`
+    }
 
-    // Payment / wallet credits → wallet page.
-    if (t === 'WALLET_CREDIT' || t === 'PAYMENT_RECEIVED') return `${rolePrefix}/wallet`
+    // Payment / wallet movements → wallet page.
+    if (t === 'WALLET_CREDIT' || t === 'WALLET_DEBIT' || t === 'PAYMENT_RECEIVED') {
+      return `${rolePrefix}/wallet`
+    }
 
-    // Review received → public profile.
+    // Review received → the lawyer's public profile.
     if (t === 'REVIEW_RECEIVED' && rolePrefix === '/lawyer') return '/lawyer/profile'
 
-    return null
+    // Nothing more specific matched → role home (never a dead click).
+    return roleHome
   }
 
   const handleNotificationClick = async (n: Notification) => {

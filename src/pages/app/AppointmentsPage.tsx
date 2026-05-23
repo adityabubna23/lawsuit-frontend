@@ -1,4 +1,4 @@
-import { FC, useState, useMemo } from 'react'
+import { FC, useState, useMemo, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import api, { apiEndpoints, appointmentsApi } from '@/services/api'
 import { useQuery } from '@tanstack/react-query'
@@ -6,6 +6,7 @@ import { Briefcase, User } from 'lucide-react'
 import AgreementModal from '@/components/atoms/AgreementModal'
 import RescheduleModal from '@/components/molecules/RescheduleModal'
 import RenderAppointmentCard, { AppointmentData } from './RenderAppointmentCard'
+import BrandLoader from '@/components/atoms/BrandLoader'
 // Firm-appointments view is rendered INLINE from the legacy
 // `MyFirmRequestsPage` component. We keep that component intact so the
 // org-side request flow it implements (Razorpay re-checkout, cancel, etc.)
@@ -117,6 +118,30 @@ const AppointmentsPage: FC = () => {
         .sort(recentFirst),
     }
   }, [appointments])
+
+  // Deep-link: a notification (or any link) can target a specific appointment
+  // via `?id=<appointmentId>`. Switch to the tab that holds it and scroll the
+  // card into view with a highlight, so "open this appointment" lands on the
+  // actual card rather than just the list.
+  const focusId = searchParams.get('id')
+  useEffect(() => {
+    if (!focusId || appointments.length === 0) return
+    const cats = categorizedAppointments
+    const tabWith = (Object.keys(cats) as TabType[]).find((k) =>
+      cats[k].some((a) => a.id === focusId),
+    )
+    if (tabWith) setActiveTab(tabWith)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId, appointments])
+  useEffect(() => {
+    if (!focusId) return
+    const tid = setTimeout(() => {
+      document
+        .getElementById(`appt-${focusId}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 150)
+    return () => clearTimeout(tid)
+  }, [focusId, activeTab])
 
   const handleViewAgreement = ({ appointmentId, aggrementUrl }: { appointmentId: string, aggrementUrl: string | null }) => {
     if (aggrementUrl) {
@@ -262,10 +287,7 @@ const AppointmentsPage: FC = () => {
         {/* Content */}
         <div className="bg-gray-50">
           {getAppointmentsQuery.isLoading ? (
-            <div className="text-center py-12">
-              <div className="inline-block w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              <p className="mt-4 text-secondary">Loading appointments...</p>
-            </div>
+            <BrandLoader label="Loading appointments…" />
           ) : getAppointmentsQuery.isError ? (
             <div className="text-center py-12">
               <p className="text-red-600">Failed to load appointments</p>
@@ -277,16 +299,23 @@ const AppointmentsPage: FC = () => {
           ) : (
             <div className="space-y-4">
               {categorizedAppointments[activeTab].map(appointment =>
-                <RenderAppointmentCard
+                <div
                   key={appointment.id}
-                  appointment={appointment}
-                  tabType={activeTab}
-                  onViewAgreement={handleViewAgreement}
-                  onReschedule={handleReschedule}
-                  onCancel={handleCancel}
-                  onVideoCall={handleVideoCall}
-                  userRole="client"
-                />
+                  id={`appt-${appointment.id}`}
+                  className={focusId === appointment.id
+                    ? 'rounded-xl ring-2 ring-primary ring-offset-2 transition-shadow'
+                    : ''}
+                >
+                  <RenderAppointmentCard
+                    appointment={appointment}
+                    tabType={activeTab}
+                    onViewAgreement={handleViewAgreement}
+                    onReschedule={handleReschedule}
+                    onCancel={handleCancel}
+                    onVideoCall={handleVideoCall}
+                    userRole="client"
+                  />
+                </div>
               )}
             </div>
           )}

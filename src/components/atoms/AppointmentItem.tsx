@@ -278,7 +278,7 @@ const AppointmentItem: FC<Props> = ({
 
       {/* Agreement Upload Modal */}
       <Modal open={open}>
-        <div className="bg-white rounded-xl p-6 min-w-[500px] w-full mx-auto border border-gray-200">
+        <div className="bg-white rounded-xl p-6 sm:min-w-[500px] w-full mx-auto border border-gray-200">
           <div className="flex justify-between items-center mb-6">
             <div>
               <h3 className="text-sm font-semibold text-gray-900">Upload Agreement</h3>

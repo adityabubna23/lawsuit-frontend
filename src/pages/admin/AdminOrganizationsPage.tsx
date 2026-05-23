@@ -174,7 +174,7 @@ const AdminOrganizationsPage: FC = () => {
           {orgs.length === 0 ? 'No organizations on the platform yet.' : 'No matches for this filter.'}
         </div>
       ) : (
-        <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-left text-xs uppercase tracking-wider text-gray-500">
               <tr>
@@ -450,7 +450,7 @@ const OrgDetailDrawer: FC<{ id: string; onClose: () => void }> = ({ id, onClose 
             </Section>
 
             {/* Quick actions */}
-            <div className="pt-2 border-t border-gray-100 grid grid-cols-3 gap-2">
+            <div className="pt-2 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-3 gap-2">
               <Link
                 to={`/admin/organizations/${org.id}/activity`}
                 onClick={onClose}

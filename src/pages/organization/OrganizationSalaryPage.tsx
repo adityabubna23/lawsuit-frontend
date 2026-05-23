@@ -806,7 +806,7 @@ const PreviewPanel: FC<{
           {/* Performance summary */}
           <div>
             <h3 className="text-sm font-semibold text-gray-900 mb-2">Performance this cycle</h3>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <Mini label="Consultations" value={String(preview.performance?.consultationCount ?? 0)} />
               <Mini label="Cases closed" value={String(preview.performance?.caseClosedCount ?? 0)} />
               <Mini label="Cases won" value={String(preview.performance?.caseWonCount ?? 0)} />

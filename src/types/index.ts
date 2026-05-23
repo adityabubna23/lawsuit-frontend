@@ -239,6 +239,9 @@ export interface WalletTransaction {
 
 // ── Push Notifications ───────────────────────────────────────────────
 
+// Mirrors the backend `enum NotificationType` in
+// lawsuit-server/prisma/schema.prisma. Keep in sync when the backend changes —
+// NotificationModal.resolveRoute() maps each of these to a destination.
 export type NotificationType =
   | 'APPOINTMENT_BOOKED'
   | 'APPOINTMENT_CONFIRMED'
@@ -246,27 +249,57 @@ export type NotificationType =
   | 'APPOINTMENT_REMINDER'
   | 'APPOINTMENT_RESCHEDULED'
   | 'NEW_MESSAGE'
+  | 'TASK_ASSIGNED'
+  | 'DOCUMENT_UPLOADED'
+  | 'CASE_UPDATE'
   | 'PAYMENT_RECEIVED'
   | 'WALLET_CREDIT'
   | 'WALLET_DEBIT'
-  | 'CONSULTATION_COMPLETED'
   | 'REVIEW_RECEIVED'
-  | 'CASE_UPDATE'
-  | 'DOCUMENT_UPLOADED'
   | 'VIDEO_CALL'
-  | 'TASK_ASSIGNED'
+  | 'CONSULTATION_COMPLETED'
+  // Mediation — legacy standalone flow
+  | 'MEDIATION_INVITE'
+  | 'MEDIATION_ACCEPTED'
+  | 'MEDIATION_DECLINED'
+  | 'MEDIATION_MEDIATOR_SELECTED'
+  | 'MEDIATION_SESSION_READY'
+  | 'MEDIATION_RESOLVED'
+  | 'MEDIATION_ESCALATED'
+  // Mediation — canonical Mediation Act 2023 flow
+  | 'MEDIATION_INITIATED'
+  | 'MEDIATION_INVITED'
+  | 'MEDIATION_INVITE_EXPIRED'
+  | 'MEDIATION_LAWYER_NEEDED'
+  | 'MEDIATION_MEDIATOR_PROPOSED'
+  | 'MEDIATION_MEDIATOR_PICKED'
+  | 'MEDIATION_ACTIVE'
+  | 'MEDIATION_SETTLEMENT_DRAFT'
+  | 'MEDIATION_SETTLED'
+  | 'MEDIATION_NON_SETTLEMENT'
+  | 'MEDIATION_WITHDRAWN'
+  | 'MEDIATION_WARNING_14D'
+  | 'MEDIATION_EXPIRED'
   // Organization (law-firm) flow
   | 'ORGANIZATION_VERIFIED'
   | 'ORGANIZATION_REJECTED'
   | 'ORG_APPOINTMENT_REQUEST_RECEIVED'
   | 'ORG_APPOINTMENT_REQUEST_ASSIGNED'
   | 'ORG_APPOINTMENT_REQUEST_REJECTED'
+  // Court admin authorization
+  | 'COURT_ADMIN_AUTHORIZATION_PENDING'
+  | 'COURT_ADMIN_AUTHORIZED'
+  | 'COURT_ADMIN_REJECTED'
+  | 'ANNOUNCEMENT'
 
 export interface NotificationData {
   appointmentId?: string
   chatId?: string
   caseId?: string
   referenceId?: string
+  // Mediation flow (mediationId → detail page; token → public invite-accept page)
+  mediationId?: string
+  token?: string
   // Organization-flow extras
   requestId?: string
   paymentId?: string

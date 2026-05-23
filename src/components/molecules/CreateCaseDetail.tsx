@@ -68,7 +68,7 @@ export default function CreateCaseDetail({
 
   return (
     <Modal open={open}>
-        <div className="bg-white rounded-lg w-full min-w-[500px] max-h-[90vh] overflow-y-auto">
+        <div className="bg-white rounded-lg w-full sm:min-w-[500px] max-h-[90vh] overflow-y-auto">
           {/* Header */}
           <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
             <div>

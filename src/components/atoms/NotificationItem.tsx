@@ -3,7 +3,9 @@ import type { Notification, NotificationType } from '@/types'
 
 // ── Icon per notification type ─────────────────────────────────────
 
-const typeIcons: Record<NotificationType, string> = {
+// Partial so future backend NotificationType additions don't break the build;
+// the lookup below falls back to '🔔' for anything not listed here.
+const typeIcons: Partial<Record<NotificationType, string>> = {
   APPOINTMENT_BOOKED: '📅',
   APPOINTMENT_CONFIRMED: '✅',
   APPOINTMENT_CANCELLED: '❌',
@@ -19,11 +21,38 @@ const typeIcons: Record<NotificationType, string> = {
   DOCUMENT_UPLOADED: '📄',
   VIDEO_CALL: '📹',
   TASK_ASSIGNED: '📌',
+  // Mediation
+  MEDIATION_INVITE: '🤝',
+  MEDIATION_INVITED: '🤝',
+  MEDIATION_ACCEPTED: '🤝',
+  MEDIATION_INITIATED: '⚖️',
+  MEDIATION_DECLINED: '🚫',
+  MEDIATION_MEDIATOR_SELECTED: '⚖️',
+  MEDIATION_MEDIATOR_PROPOSED: '⚖️',
+  MEDIATION_MEDIATOR_PICKED: '⚖️',
+  MEDIATION_LAWYER_NEEDED: '⚖️',
+  MEDIATION_SESSION_READY: '📹',
+  MEDIATION_ACTIVE: '⚖️',
+  MEDIATION_SETTLEMENT_DRAFT: '📝',
+  MEDIATION_SETTLED: '🕊️',
+  MEDIATION_RESOLVED: '🕊️',
+  MEDIATION_NON_SETTLEMENT: '⚠️',
+  MEDIATION_ESCALATED: '⚠️',
+  MEDIATION_WITHDRAWN: '🚫',
+  MEDIATION_INVITE_EXPIRED: '⌛',
+  MEDIATION_EXPIRED: '⌛',
+  MEDIATION_WARNING_14D: '⏳',
+  // Organization (law-firm) flow
   ORGANIZATION_VERIFIED: '🏛️',
   ORGANIZATION_REJECTED: '⚠️',
   ORG_APPOINTMENT_REQUEST_RECEIVED: '📥',
   ORG_APPOINTMENT_REQUEST_ASSIGNED: '👤',
   ORG_APPOINTMENT_REQUEST_REJECTED: '🚫',
+  // Court admin authorization
+  COURT_ADMIN_AUTHORIZATION_PENDING: '🏛️',
+  COURT_ADMIN_AUTHORIZED: '✅',
+  COURT_ADMIN_REJECTED: '⚠️',
+  ANNOUNCEMENT: '📢',
 }
 
 function timeAgo(dateStr: string): string {

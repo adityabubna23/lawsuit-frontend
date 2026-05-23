@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, ShieldAlert, Banknote, Coins, Wallet,
   Landmark, UserCog, ShieldCheck, Megaphone, Newspaper, Bug,
   ScrollText, FileText, ChevronLeft, ChevronRight, Bell, Menu,
-  LogOut, Search, Briefcase, Building2,
+  LogOut, Search, Briefcase, Building2, X,
 } from 'lucide-react'
 import NotificationModal from '../components/molecules/NotificationModal'
 import NotificationToast from '../components/atoms/NotificationToast'
@@ -12,6 +12,7 @@ import ErrorBoundary from '../components/organisms/ErrorBoundary'
 import { useNotificationStore } from '../stores/notificationStore'
 import { useNotificationSocket } from '../hooks/useNotificationSocket'
 import { useAuthStore } from '../stores/authStore'
+import { useIsMobile } from '../hooks/useMediaQuery'
 
 interface NavItem {
   to: string
@@ -71,7 +72,12 @@ const SECTIONS: NavSection[] = [
 const ALL_ITEMS = SECTIONS.flatMap((s) => s.items)
 
 const AdminLayout: FC = () => {
-  const [collapsed, setCollapsed] = useState(false)
+  // `collapsedState` is the desktop rail toggle. On mobile the sidebar becomes
+  // an off-canvas drawer (`mobileOpen`) and is never "collapsed", so the
+  // effective `collapsed` below is forced false on small screens — keeping
+  // full labels + full width inside the drawer.
+  const [collapsedState, setCollapsed] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const unreadCount = useNotificationStore((s) => s.unreadCount)
@@ -79,8 +85,16 @@ const AdminLayout: FC = () => {
   const navigate = useNavigate()
   const { user, logout } = useAuthStore()
   const profileRef = useRef<HTMLDivElement>(null)
+  const isMobile = useIsMobile()
+  const collapsed = collapsedState && !isMobile
 
   useNotificationSocket()
+
+  // Close the mobile drawer whenever the route changes (a nav item was tapped)
+  // so it doesn't stay open over the freshly navigated page.
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [location.pathname])
 
   // Close profile dropdown on outside click
   useEffect(() => {
@@ -109,9 +123,20 @@ const AdminLayout: FC = () => {
 
   return (
     <div className="min-h-screen flex bg-slate-50">
-      {/* ───── Sidebar (dark platform theme — mirrors /auth admin pages) ───── */}
+      {/* Mobile drawer backdrop */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* ───── Sidebar (dark platform theme — mirrors /auth admin pages) ─────
+          Desktop: a sticky in-flow rail (collapsible to w-20). Mobile (<md):
+          a fixed off-canvas drawer that slides in when `mobileOpen` is set. */}
       <aside
-        className={`${collapsed ? 'w-20' : 'w-64'} bg-gradient-to-b from-slate-900 via-slate-900 to-indigo-950 border-r border-slate-800 transition-all duration-200 flex flex-col sticky top-0 h-screen`}
+        className={`${collapsed ? 'w-20' : 'w-64'} bg-gradient-to-b from-slate-900 via-slate-900 to-indigo-950 border-r border-slate-800 transition-all duration-200 flex flex-col fixed md:sticky top-0 left-0 z-50 h-screen ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}
       >
         {/* Brand */}
         <div className="flex items-center justify-between px-4 h-16 border-b border-white/10">
@@ -135,9 +160,16 @@ const AdminLayout: FC = () => {
           <button
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             onClick={() => setCollapsed((s) => !s)}
-            className="p-1 rounded-md hover:bg-white/10 text-white/60"
+            className="hidden md:block p-1 rounded-md hover:bg-white/10 text-white/60"
           >
             {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
+          <button
+            aria-label="Close menu"
+            onClick={() => setMobileOpen(false)}
+            className="md:hidden p-1 rounded-md hover:bg-white/10 text-white/60"
+          >
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -228,8 +260,8 @@ const AdminLayout: FC = () => {
             <div className="flex items-center gap-3 min-w-0">
               <button
                 className="md:hidden p-2 rounded-md hover:bg-gray-100 text-gray-600"
-                onClick={() => setCollapsed((s) => !s)}
-                aria-label="Toggle navigation"
+                onClick={() => setMobileOpen(true)}
+                aria-label="Open navigation"
               >
                 <Menu className="w-5 h-5" />
               </button>

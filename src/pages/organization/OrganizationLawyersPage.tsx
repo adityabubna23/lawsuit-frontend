@@ -300,7 +300,7 @@ const OrganizationLawyersPage: FC = () => {
         </form>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
         {loadingLawyers ? (
           <div className="p-8 text-center text-gray-500 text-sm">Loading lawyers…</div>
         ) : lawyers.length === 0 ? (
