@@ -1,6 +1,8 @@
 import { FC, useEffect, useRef, useState } from 'react'
 import { Loader2, MapPin, ChevronDown, Check } from 'lucide-react'
 import { addressApi } from '@/services/api'
+import AddressMap from '@/components/molecules/AddressMap'
+import { reverseGeocode, geocodePincode } from '@/utils/geocode'
 
 export interface AddressValue {
   state?: string
@@ -8,6 +10,11 @@ export interface AddressValue {
   city?: string
   pincode?: string
   country?: string
+  /** Map coordinates of the chosen point (from pincode geocode or map click). */
+  lat?: number
+  lng?: number
+  /** Optional free-text full address the user can type to refine the location. */
+  addressLine?: string
 }
 
 interface AddressPickerProps {
@@ -15,6 +22,8 @@ interface AddressPickerProps {
   onChange: (next: AddressValue) => void
   /** Hide the country field if true (defaults to true — most users are India-only). */
   hideCountry?: boolean
+  /** Hide the interactive map (defaults to false — map is shown). */
+  hideMap?: boolean
   className?: string
 }
 
@@ -29,24 +38,36 @@ interface PostOffice {
   country?: string
 }
 
+// Map India Post's capitalized PostOffice shape → our lowercase shape.
+function fromIndiaPost(po: any): PostOffice {
+  return {
+    name: po.Name,
+    branchType: po.BranchType,
+    deliveryStatus: po.DeliveryStatus,
+    district: po.District,
+    division: po.Division,
+    region: po.Region,
+    state: po.State,
+    country: po.Country,
+  }
+}
+
 /**
- * Address form with India-pincode auto-fetch.
+ * Address form with India-pincode auto-fetch + an interactive OpenStreetMap
+ * picker. Used by every address form in the app (client / lawyer / org /
+ * court-admin / admin), so improvements here apply everywhere.
  *
- * Behaviour:
- *  - States are loaded once, districts cascade on state change.
- *  - Typing a 6-digit pincode auto-triggers the lookup (no Enter needed)
- *    and also runs on blur as a safety net.
- *  - State + district are filled silently when blank, never overwritten.
- *  - City is special: if the pincode lookup returns exactly one post office,
- *    we fill `city` with its name; if it returns multiple (common for
- *    metros), we surface them as a dropdown the user picks from. This
- *    matches the mobile `AddressFormPicker` UX so a user typing
- *    "751006" can pick "Badakhemundi Street" / "Saheed Nagar" / etc.
- *  - The city field stays a free-text input — once a pincode option is
- *    picked it's committed to the value but the user can still type a
- *    landmark / street if they prefer.
+ *  - Pincode (6 digits) → fetch localities (post offices). Tries the backend
+ *    proxy first, then falls back to calling India Post directly from the
+ *    browser, so the lookup is resilient even if the backend is unreachable.
+ *  - The pincode also geocodes (free Nominatim) to CENTER the map on that area.
+ *  - Clicking the map reverse-geocodes the point and fills
+ *    state / district / pincode / locality; the user can then optionally type
+ *    a full address.
+ *  - State + district auto-fill only when blank; city offers a picker when a
+ *    pincode maps to multiple post offices.
  */
-const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = true, className }) => {
+const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = true, hideMap = false, className }) => {
   const [states, setStates] = useState<string[]>([])
   const [districts, setDistricts] = useState<string[]>([])
   const [loadingStates, setLoadingStates] = useState(false)
@@ -55,10 +76,14 @@ const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = 
   const [postOffices, setPostOffices] = useState<PostOffice[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
 
-  // Track which pincode we've already looked up so the on-input trigger
-  // doesn't hammer the upstream service when the user pastes a 6-digit
-  // value and then re-focuses the field.
   const lastLookedUp = useRef<string | null>(null)
+  // Pincodes we've already geocoded to a map centroid — avoids re-centering and
+  // avoids fighting a point the user set by clicking the map.
+  const geocodedPin = useRef<string | null>(null)
+  // Always-current value so async callbacks (geocode / reverse-geocode) merge
+  // into the latest state instead of a stale closure.
+  const valueRef = useRef(value)
+  useEffect(() => { valueRef.current = value }, [value])
 
   // Load states once
   useEffect(() => {
@@ -98,11 +123,27 @@ const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = 
     return () => { cancelled = true }
   }, [value.state])
 
+  // Fetch post offices for a pincode. Backend proxy first; if it errors or
+  // returns nothing, fall back to India Post directly (their API is CORS-enabled).
+  const fetchPostOffices = async (pin: string): Promise<PostOffice[]> => {
+    try {
+      const res = await addressApi.getPincode(pin)
+      const data = (res.data?.data ?? res.data) as any
+      const offices = data?.postOffices ?? data
+      if (Array.isArray(offices) && offices.length) return offices as PostOffice[]
+    } catch { /* fall through to direct lookup */ }
+    try {
+      const res = await fetch(`https://api.postalpincode.in/pincode/${pin}`)
+      const json = await res.json()
+      const po = json?.[0]?.PostOffice
+      if (Array.isArray(po) && po.length) return po.map(fromIndiaPost)
+    } catch { /* ignore — leave fields for manual entry */ }
+    return []
+  }
+
   /**
-   * Pull post-office matches for the current pincode. Runs on both
-   * `onInput` (when the user reaches 6 digits) and `onBlur` (safety net).
-   * Idempotent — `lastLookedUp` prevents a duplicate request for the
-   * same pincode.
+   * Pull post-office matches for the current pincode. Runs on input (6 digits)
+   * and on blur. Idempotent via `lastLookedUp`.
    */
   const lookupPincode = async () => {
     const pin = (value.pincode || '').trim()
@@ -111,37 +152,27 @@ const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = 
     lastLookedUp.current = pin
     setPincodeBusy(true)
     try {
-      const res = await addressApi.getPincode(pin)
-      const data = (res.data?.data ?? res.data) as any
-      const offices: PostOffice[] = data?.postOffices ?? data ?? []
-      setPostOffices(Array.isArray(offices) ? offices : [])
-      const first = offices?.[0]
+      const offices = await fetchPostOffices(pin)
+      setPostOffices(offices)
+      const first = offices[0]
       if (!first) return
-      // Silent autofill for state / district / city when blank.
-      const next: AddressValue = { ...value }
+      const next: AddressValue = { ...valueRef.current }
       if (!next.state && first.state) next.state = first.state
       if (!next.district && first.district) next.district = first.district
       if (offices.length === 1) {
-        // Single match → commit city to the only post-office name. The
-        // user can still edit afterwards.
         if (first.name) next.city = first.name
         setPickerOpen(false)
       } else {
-        // Multiple matches → open the picker so the user can choose.
-        // Don't auto-commit city in this case — the first one is rarely
-        // what users want for metros.
+        // Multiple matches → let the user choose (first is rarely right for metros).
         setPickerOpen(true)
       }
       onChange(next)
-    } catch {
-      /* ignore — leave fields as-is so the user can fill manually */
     } finally {
       setPincodeBusy(false)
     }
   }
 
-  // Reset the lookup cache + close the picker whenever the pincode
-  // changes back to a non-6-digit value.
+  // Reset lookup state whenever the pincode is no longer a 6-digit value.
   useEffect(() => {
     const pin = value.pincode || ''
     if (pin.length !== 6) {
@@ -151,8 +182,7 @@ const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = 
     }
   }, [value.pincode])
 
-  // Auto-trigger when the user reaches the 6th digit. Without this the
-  // user has to blur the field for the lookup to fire — easy to miss.
+  // Auto-trigger the locality lookup at the 6th digit.
   useEffect(() => {
     if ((value.pincode || '').length === 6 && lastLookedUp.current !== value.pincode) {
       lookupPincode()
@@ -160,15 +190,54 @@ const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value.pincode])
 
+  // Center the map on the pincode area. Skipped when the pincode came from a
+  // map click (geocodedPin is primed in onMapPick) so the marker isn't yanked
+  // off the clicked point.
+  useEffect(() => {
+    if (hideMap) return
+    const pin = (value.pincode || '').trim()
+    if (pin.length !== 6 || geocodedPin.current === pin) return
+    geocodedPin.current = pin
+    geocodePincode(pin).then((pt) => {
+      if (pt) onChange({ ...valueRef.current, lat: pt.lat, lng: pt.lng })
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value.pincode, hideMap])
+
   const pickPostOffice = (po: PostOffice) => {
     onChange({
       ...value,
       city: po.name,
-      // Trust the post-office state/district over whatever was guessed.
       state: po.state || value.state,
       district: po.district || value.district,
     })
     setPickerOpen(false)
+  }
+
+  // Map click → reverse-geocode → fill fields + set the point. Prime the dedupe
+  // refs so the resulting pincode change doesn't re-fetch localities / re-center.
+  const onMapPick = async (lat: number, lng: number) => {
+    setPincodeBusy(true)
+    try {
+      const addr = await reverseGeocode(lat, lng)
+      if (addr.pincode) {
+        geocodedPin.current = addr.pincode
+        lastLookedUp.current = addr.pincode
+      }
+      setPostOffices([])
+      setPickerOpen(false)
+      onChange({
+        ...valueRef.current,
+        lat,
+        lng,
+        state: addr.state || valueRef.current.state,
+        district: addr.district || valueRef.current.district,
+        city: addr.city || valueRef.current.city,
+        pincode: addr.pincode || valueRef.current.pincode,
+      })
+    } finally {
+      setPincodeBusy(false)
+    }
   }
 
   return (
@@ -238,9 +307,6 @@ const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">City / Locality</label>
         {postOffices.length > 1 ? (
-          // Multi-match → dropdown picker. The user can still type a
-          // custom value via the "Use custom value" option that opens the
-          // input. Default shows the chosen post-office name.
           <div className="relative">
             <button
               type="button"
@@ -309,6 +375,33 @@ const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = 
             onChange={(e) => onChange({ ...value, country: e.target.value })}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
+        </div>
+      )}
+
+      {/* Full address — optional free text the user can refine after picking. */}
+      <div className="sm:col-span-2">
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          Full address <span className="text-gray-400 font-normal">(optional)</span>
+        </label>
+        <textarea
+          value={value.addressLine || ''}
+          onChange={(e) => onChange({ ...value, addressLine: e.target.value })}
+          rows={2}
+          placeholder="House / flat no., street, landmark…"
+          className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-y"
+        />
+      </div>
+
+      {/* Interactive map — center follows the pincode; click to set / refine. */}
+      {!hideMap && (
+        <div className="sm:col-span-2">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5 text-gray-400" /> Pick on map
+            </span>
+            <span className="text-[11px] text-gray-400">Tap the map to auto-fill the address</span>
+          </div>
+          <AddressMap lat={value.lat} lng={value.lng} onPick={onMapPick} />
         </div>
       )}
     </div>
