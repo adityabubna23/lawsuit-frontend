@@ -38,20 +38,6 @@ interface PostOffice {
   country?: string
 }
 
-// Map India Post's capitalized PostOffice shape → our lowercase shape.
-function fromIndiaPost(po: any): PostOffice {
-  return {
-    name: po.Name,
-    branchType: po.BranchType,
-    deliveryStatus: po.DeliveryStatus,
-    district: po.District,
-    division: po.Division,
-    region: po.Region,
-    state: po.State,
-    country: po.Country,
-  }
-}
-
 /**
  * Address form with a top-down cascade + a two-way reactive OpenStreetMap.
  * Used by every address form in the app (client / lawyer / org / court-admin /
@@ -145,18 +131,14 @@ const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = 
   // Fetch post offices for a pincode. Backend proxy first; if it errors or
   // returns nothing, fall back to India Post directly (their API is CORS-enabled).
   const fetchPostOffices = async (pin: string): Promise<PostOffice[]> => {
+    // The backend proxies India Post server-side. The browser can't call that
+    // API directly (it sends no CORS header), so the backend is the only path.
     try {
       const res = await addressApi.getPincode(pin)
       const data = (res.data?.data ?? res.data) as any
       const offices = data?.postOffices ?? data
       if (Array.isArray(offices) && offices.length) return offices as PostOffice[]
-    } catch { /* fall through to direct lookup */ }
-    try {
-      const res = await fetch(`https://api.postalpincode.in/pincode/${pin}`)
-      const json = await res.json()
-      const po = json?.[0]?.PostOffice
-      if (Array.isArray(po) && po.length) return po.map(fromIndiaPost)
-    } catch { /* ignore — leave fields for manual entry */ }
+    } catch { /* leave fields for manual entry */ }
     return []
   }
 
