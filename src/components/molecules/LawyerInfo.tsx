@@ -724,6 +724,7 @@ const LawyerInfo: React.FC = () => {
                   district: form.district,
                   city: form.city,
                   pincode: form.pincode,
+                  addressLine: form.address,
                 }}
                 onChange={(next) => {
                   setForm((s) => ({
@@ -732,18 +733,10 @@ const LawyerInfo: React.FC = () => {
                     district: next.district,
                     city: next.city,
                     pincode: next.pincode,
+                    address: next.addressLine,
                   }))
                 }}
               />
-              <div>
-                <label className={labelClasses}>Address</label>
-                <input
-                  value={form.address || ''}
-                  onChange={(e) => onChange('address', e.target.value)}
-                  className={inputClasses}
-                  placeholder="Enter your office address"
-                />
-              </div>
             </div>
           ) : (
             // Read-only summary. District is rendered as a first-class

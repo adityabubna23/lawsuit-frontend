@@ -1,8 +1,8 @@
 import { FC, useEffect, useRef, useState } from 'react'
 import { Loader2, MapPin, ChevronDown, Check } from 'lucide-react'
 import { addressApi } from '@/services/api'
-import AddressMap from '@/components/molecules/AddressMap'
-import { reverseGeocode, geocodePincode } from '@/utils/geocode'
+import AddressMap, { MapFocus } from '@/components/molecules/AddressMap'
+import { reverseGeocode, geocodePincode, geocodeText } from '@/utils/geocode'
 
 export interface AddressValue {
   state?: string
@@ -10,19 +10,19 @@ export interface AddressValue {
   city?: string
   pincode?: string
   country?: string
-  /** Map coordinates of the chosen point (from pincode geocode or map click). */
+  /** Map coordinates of the chosen point (from a field geocode or a map click). */
   lat?: number
   lng?: number
-  /** Optional free-text full address the user can type to refine the location. */
+  /** Optional free-text full address the user can type for extra detail. */
   addressLine?: string
 }
 
 interface AddressPickerProps {
   value: AddressValue
   onChange: (next: AddressValue) => void
-  /** Hide the country field if true (defaults to true — most users are India-only). */
+  /** Hide the (locked) country field. Defaults to false — India is shown. */
   hideCountry?: boolean
-  /** Hide the interactive map (defaults to false — map is shown). */
+  /** Hide the interactive map. Defaults to false — the map is shown. */
   hideMap?: boolean
   className?: string
 }
@@ -53,21 +53,24 @@ function fromIndiaPost(po: any): PostOffice {
 }
 
 /**
- * Address form with India-pincode auto-fetch + an interactive OpenStreetMap
- * picker. Used by every address form in the app (client / lawyer / org /
- * court-admin / admin), so improvements here apply everywhere.
+ * Address form with a top-down cascade + a two-way reactive OpenStreetMap.
+ * Used by every address form in the app (client / lawyer / org / court-admin /
+ * admin), so improvements here apply everywhere.
  *
- *  - Pincode (6 digits) → fetch localities (post offices). Tries the backend
- *    proxy first, then falls back to calling India Post directly from the
- *    browser, so the lookup is resilient even if the backend is unreachable.
- *  - The pincode also geocodes (free Nominatim) to CENTER the map on that area.
- *  - Clicking the map reverse-geocodes the point and fills
- *    state / district / pincode / locality; the user can then optionally type
- *    a full address.
- *  - State + district auto-fill only when blank; city offers a picker when a
- *    pincode maps to multiple post offices.
+ * Field order: Country (locked → India) → State → District (populates from the
+ * chosen state) → Pincode → City/Locality → Full address (optional).
+ *
+ * Two-way map sync (loop-guarded via `pickSource`):
+ *   - Fields → Map: choosing state / district / pincode / locality geocodes the
+ *     most-specific value (free Nominatim) and recenters + progressively zooms.
+ *   - Map → Fields: clicking the map reverse-geocodes the point and fills
+ *     state / district / pincode / locality.
+ *
+ * Pincode is not gated behind state/district — typing it back-fills state +
+ * district (and offers localities), so a user can start from the pincode OR the
+ * map and the rest fills in.
  */
-const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = true, hideMap = false, className }) => {
+const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = false, hideMap = false, className }) => {
   const [states, setStates] = useState<string[]>([])
   const [districts, setDistricts] = useState<string[]>([])
   const [loadingStates, setLoadingStates] = useState(false)
@@ -75,15 +78,30 @@ const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = 
   const [pincodeBusy, setPincodeBusy] = useState(false)
   const [postOffices, setPostOffices] = useState<PostOffice[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [focus, setFocus] = useState<MapFocus | null>(null)
 
   const lastLookedUp = useRef<string | null>(null)
-  // Pincodes we've already geocoded to a map centroid — avoids re-centering and
-  // avoids fighting a point the user set by clicking the map.
-  const geocodedPin = useRef<string | null>(null)
-  // Always-current value so async callbacks (geocode / reverse-geocode) merge
-  // into the latest state instead of a stale closure.
+  // 'user' = a field was edited / a value loaded (fields → map geocode runs).
+  // 'map'  = a map click set the fields (skip the geocode so the view doesn't
+  //          jump away from the clicked point). Reset to 'user' after each skip.
+  const pickSource = useRef<'user' | 'map'>('user')
+  // Guards against out-of-order async geocode responses.
+  const geocodeSeq = useRef(0)
+  // Always-current value so async callbacks merge into the latest state.
   const valueRef = useRef(value)
   useEffect(() => { valueRef.current = value }, [value])
+
+  // Merge a field change and mark it user-driven (so the map reacts to it).
+  const userUpdate = (patch: Partial<AddressValue>) => {
+    pickSource.current = 'user'
+    onChange({ ...valueRef.current, ...patch })
+  }
+
+  // Country is fixed to India — ensure it persists even if the form loaded blank.
+  useEffect(() => {
+    if (!valueRef.current.country) onChange({ ...valueRef.current, country: 'India' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Load states once
   useEffect(() => {
@@ -102,7 +120,8 @@ const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = 
     return () => { cancelled = true }
   }, [])
 
-  // When state changes → load districts
+  // When state changes → load that state's districts (the District dropdown is
+  // only meaningful once a state is chosen).
   useEffect(() => {
     if (!value.state) {
       setDistricts([])
@@ -141,12 +160,10 @@ const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = 
     return []
   }
 
-  /**
-   * Pull post-office matches for the current pincode. Runs on input (6 digits)
-   * and on blur. Idempotent via `lastLookedUp`.
-   */
+  // Pincode → localities (+ back-fill state/district when blank). Runs on the
+  // 6th digit and on blur. Idempotent via `lastLookedUp`.
   const lookupPincode = async () => {
-    const pin = (value.pincode || '').trim()
+    const pin = (valueRef.current.pincode || '').trim()
     if (pin.length !== 6) return
     if (lastLookedUp.current === pin) return
     lastLookedUp.current = pin
@@ -156,14 +173,14 @@ const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = 
       setPostOffices(offices)
       const first = offices[0]
       if (!first) return
+      pickSource.current = 'user'
       const next: AddressValue = { ...valueRef.current }
-      if (!next.state && first.state) next.state = first.state
-      if (!next.district && first.district) next.district = first.district
+      if (first.state) next.state = first.state
+      if (first.district) next.district = first.district
       if (offices.length === 1) {
         if (first.name) next.city = first.name
         setPickerOpen(false)
       } else {
-        // Multiple matches → let the user choose (first is rarely right for metros).
         setPickerOpen(true)
       }
       onChange(next)
@@ -172,7 +189,7 @@ const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = 
     }
   }
 
-  // Reset lookup state whenever the pincode is no longer a 6-digit value.
+  // Reset lookup state whenever the pincode is no longer 6 digits.
   useEffect(() => {
     const pin = value.pincode || ''
     if (pin.length !== 6) {
@@ -190,46 +207,70 @@ const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value.pincode])
 
-  // Center the map on the pincode area. Skipped when the pincode came from a
-  // map click (geocodedPin is primed in onMapPick) so the marker isn't yanked
-  // off the clicked point.
+  // Fields → Map. Geocode the most-specific available value and recenter +
+  // progressively zoom. Skipped right after a map click (pickSource === 'map').
   useEffect(() => {
     if (hideMap) return
-    const pin = (value.pincode || '').trim()
-    if (pin.length !== 6 || geocodedPin.current === pin) return
-    geocodedPin.current = pin
-    geocodePincode(pin).then((pt) => {
-      if (pt) onChange({ ...valueRef.current, lat: pt.lat, lng: pt.lng })
-    })
+    if (pickSource.current === 'map') { pickSource.current = 'user'; return }
+    const { state, district, pincode, city } = value
+    if (!state && !(pincode && pincode.length === 6)) return
+    const seq = ++geocodeSeq.current
+    const timer = setTimeout(async () => {
+      let pt: { lat: number; lng: number } | null = null
+      let zoom = 6
+      if (state && city) {
+        pt = await geocodeText([city, district, state, 'India'].filter(Boolean).join(', '))
+        zoom = 14
+      }
+      if (!pt && pincode && pincode.length === 6) {
+        pt = await geocodePincode(pincode)
+        zoom = 12
+      }
+      if (!pt && state && district) {
+        pt = await geocodeText(`${district}, ${state}, India`)
+        zoom = 10
+      }
+      if (!pt && state) {
+        pt = await geocodeText(`${state}, India`)
+        zoom = 6
+      }
+      if (pt && seq === geocodeSeq.current) {
+        setFocus({ lat: pt.lat, lng: pt.lng, zoom })
+        onChange({ ...valueRef.current, lat: pt.lat, lng: pt.lng })
+      }
+    }, 500)
+    return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value.pincode, hideMap])
+  }, [value.state, value.district, value.pincode, value.city, hideMap])
 
   const pickPostOffice = (po: PostOffice) => {
+    pickSource.current = 'user'
     onChange({
-      ...value,
+      ...valueRef.current,
       city: po.name,
-      state: po.state || value.state,
-      district: po.district || value.district,
+      state: po.state || valueRef.current.state,
+      district: po.district || valueRef.current.district,
     })
     setPickerOpen(false)
   }
 
-  // Map click → reverse-geocode → fill fields + set the point. Prime the dedupe
-  // refs so the resulting pincode change doesn't re-fetch localities / re-center.
+  // Map click → drop the pin immediately, then reverse-geocode to fill the
+  // fields. `pickSource = 'map'` stops the fields→map effect from recentering.
   const onMapPick = async (lat: number, lng: number) => {
+    pickSource.current = 'map'
+    onChange({ ...valueRef.current, lat, lng })
     setPincodeBusy(true)
     try {
       const addr = await reverseGeocode(lat, lng)
-      if (addr.pincode) {
-        geocodedPin.current = addr.pincode
-        lastLookedUp.current = addr.pincode
-      }
+      if (addr.pincode) lastLookedUp.current = addr.pincode
       setPostOffices([])
       setPickerOpen(false)
+      pickSource.current = 'map'
       onChange({
         ...valueRef.current,
         lat,
         lng,
+        country: 'India',
         state: addr.state || valueRef.current.state,
         district: addr.district || valueRef.current.district,
         city: addr.city || valueRef.current.city,
@@ -240,56 +281,54 @@ const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = 
     }
   }
 
+  const inputCls = 'w-full px-3 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary'
+  const marker = typeof value.lat === 'number' && typeof value.lng === 'number'
+    ? { lat: value.lat, lng: value.lng }
+    : null
+
   return (
     <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 ${className || ''}`}>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-1.5">
-          <MapPin className="w-3.5 h-3.5 text-gray-400" /> Pincode
-        </label>
-        <div className="relative">
+      {/* 1. Country — fixed to India. */}
+      {!hideCountry && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Country</label>
           <input
-            value={value.pincode || ''}
-            onChange={(e) => onChange({ ...value, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })}
-            onBlur={lookupPincode}
-            maxLength={6}
-            inputMode="numeric"
-            placeholder="6 digits"
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            value={value.country || 'India'}
+            disabled
+            className={`${inputCls} bg-gray-50 text-gray-600 cursor-not-allowed`}
           />
-          {pincodeBusy && <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-gray-400" />}
         </div>
-        {postOffices.length > 0 && (
-          <p className="mt-1 text-xs text-gray-500">
-            {postOffices.length === 1
-              ? `Found ${postOffices[0].district}, ${postOffices[0].state}.`
-              : `Found ${postOffices.length} localities under ${postOffices[0].district || ''}. Pick one below.`}
-          </p>
-        )}
-      </div>
+      )}
 
+      {/* 2. State */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">State</label>
         <select
           value={value.state || ''}
-          onChange={(e) => onChange({ ...value, state: e.target.value, district: '' })}
-          className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+          onChange={(e) => userUpdate({ state: e.target.value, district: '' })}
+          className={`${inputCls} bg-white`}
         >
-          <option value="">{loadingStates ? 'Loading…' : 'Select…'}</option>
+          <option value="">{loadingStates ? 'Loading…' : 'Select state…'}</option>
           {states.map((s) => (
             <option key={s} value={s}>{s}</option>
           ))}
         </select>
       </div>
 
+      {/* 3. District — enabled once a state is chosen. */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">District</label>
-        {districts.length > 0 ? (
+        {!value.state ? (
+          <select disabled className={`${inputCls} bg-gray-50 text-gray-400 cursor-not-allowed`}>
+            <option>Select a state first</option>
+          </select>
+        ) : districts.length > 0 ? (
           <select
             value={value.district || ''}
-            onChange={(e) => onChange({ ...value, district: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+            onChange={(e) => userUpdate({ district: e.target.value })}
+            className={`${inputCls} bg-white`}
           >
-            <option value="">{loadingDistricts ? 'Loading…' : 'Select…'}</option>
+            <option value="">{loadingDistricts ? 'Loading…' : 'Select district…'}</option>
             {districts.map((d) => (
               <option key={d} value={d}>{d}</option>
             ))}
@@ -297,13 +336,41 @@ const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = 
         ) : (
           <input
             value={value.district || ''}
-            onChange={(e) => onChange({ ...value, district: e.target.value })}
+            onChange={(e) => userUpdate({ district: e.target.value })}
             disabled={loadingDistricts}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            placeholder={loadingDistricts ? 'Loading…' : 'District'}
+            className={inputCls}
           />
         )}
       </div>
 
+      {/* 4. Pincode */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-1.5">
+          <MapPin className="w-3.5 h-3.5 text-gray-400" /> Pincode
+        </label>
+        <div className="relative">
+          <input
+            value={value.pincode || ''}
+            onChange={(e) => userUpdate({ pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+            onBlur={lookupPincode}
+            maxLength={6}
+            inputMode="numeric"
+            placeholder="6 digits"
+            className={inputCls}
+          />
+          {pincodeBusy && <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-gray-400" />}
+        </div>
+        {postOffices.length > 0 && (
+          <p className="mt-1 text-xs text-gray-500">
+            {postOffices.length === 1
+              ? `Found ${postOffices[0].district}, ${postOffices[0].state}.`
+              : `Found ${postOffices.length} localities. Pick one below.`}
+          </p>
+        )}
+      </div>
+
+      {/* 5. City / Locality */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">City / Locality</label>
         {postOffices.length > 1 ? (
@@ -346,10 +413,7 @@ const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = 
               Or{' '}
               <button
                 type="button"
-                onClick={() => {
-                  setPostOffices([])
-                  setPickerOpen(false)
-                }}
+                onClick={() => { setPostOffices([]); setPickerOpen(false) }}
                 className="underline text-primary"
               >
                 type a custom value
@@ -360,39 +424,28 @@ const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = 
         ) : (
           <input
             value={value.city || ''}
-            onChange={(e) => onChange({ ...value, city: e.target.value })}
+            onChange={(e) => userUpdate({ city: e.target.value })}
             placeholder="Locality, area, or landmark"
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            className={inputCls}
           />
         )}
       </div>
 
-      {!hideCountry && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Country</label>
-          <input
-            value={value.country || 'India'}
-            onChange={(e) => onChange({ ...value, country: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-          />
-        </div>
-      )}
-
-      {/* Full address — optional free text the user can refine after picking. */}
+      {/* 6. Full address — optional free text the user can add for more detail. */}
       <div className="sm:col-span-2">
         <label className="block text-sm font-medium text-gray-700 mb-1.5">
           Full address <span className="text-gray-400 font-normal">(optional)</span>
         </label>
         <textarea
           value={value.addressLine || ''}
-          onChange={(e) => onChange({ ...value, addressLine: e.target.value })}
+          onChange={(e) => userUpdate({ addressLine: e.target.value })}
           rows={2}
           placeholder="House / flat no., street, landmark…"
-          className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-y"
+          className={`${inputCls} resize-y`}
         />
       </div>
 
-      {/* Interactive map — center follows the pincode; click to set / refine. */}
+      {/* Interactive map — reacts to the fields above; click to set / refine. */}
       {!hideMap && (
         <div className="sm:col-span-2">
           <div className="flex items-center justify-between mb-1.5">
@@ -401,7 +454,7 @@ const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = 
             </span>
             <span className="text-[11px] text-gray-400">Tap the map to auto-fill the address</span>
           </div>
-          <AddressMap lat={value.lat} lng={value.lng} onPick={onMapPick} />
+          <AddressMap marker={marker} focus={focus} onPick={onMapPick} />
         </div>
       )}
     </div>

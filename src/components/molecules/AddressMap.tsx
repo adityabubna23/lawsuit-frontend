@@ -15,8 +15,17 @@ const PIN_ICON = L.divIcon({
   iconAnchor: [10, 20],
 })
 
-// Geographic centroid of India — the initial view before a point is known.
+// Geographic centroid of India — the initial view before anything is known.
 const INDIA_CENTER: [number, number] = [22.9734, 78.6569]
+
+export interface MapPoint {
+  lat: number
+  lng: number
+}
+
+export interface MapFocus extends MapPoint {
+  zoom: number
+}
 
 const ClickHandler: FC<{ onPick: (lat: number, lng: number) => void }> = ({ onPick }) => {
   useMapEvents({
@@ -25,33 +34,36 @@ const ClickHandler: FC<{ onPick: (lat: number, lng: number) => void }> = ({ onPi
   return null
 }
 
-// react-leaflet only reads `center`/`zoom` on first render, so we imperatively
-// recenter whenever the chosen point changes (e.g. after a pincode geocode).
-const Recenter: FC<{ lat: number; lng: number }> = ({ lat, lng }) => {
+// react-leaflet only reads `center`/`zoom` on first render. A `focus` command
+// (set when the user narrows state → district → pincode → locality) imperatively
+// recenters + zooms. A map *click* does NOT set focus, so the view stays put
+// and only the marker moves — that's what keeps the two-way sync from fighting.
+const FocusController: FC<{ focus?: MapFocus | null }> = ({ focus }) => {
   const map = useMap()
   useEffect(() => {
-    map.setView([lat, lng], Math.max(map.getZoom(), 14))
-  }, [lat, lng, map])
+    if (focus) map.setView([focus.lat, focus.lng], focus.zoom)
+  }, [focus?.lat, focus?.lng, focus?.zoom, map])
   return null
 }
 
 interface AddressMapProps {
-  lat?: number
-  lng?: number
+  /** Where the pin sits (the chosen point). */
+  marker?: MapPoint | null
+  /** A recenter/zoom command — changes drive map.setView. */
+  focus?: MapFocus | null
   onPick: (lat: number, lng: number) => void
   /** Pixel height of the map. */
   height?: number
 }
 
-const AddressMap: FC<AddressMapProps> = ({ lat, lng, onPick, height = 240 }) => {
-  const hasPoint = typeof lat === 'number' && typeof lng === 'number'
-  const center: [number, number] = hasPoint ? [lat as number, lng as number] : INDIA_CENTER
+const AddressMap: FC<AddressMapProps> = ({ marker, focus, onPick, height = 240 }) => {
+  const center: [number, number] = marker ? [marker.lat, marker.lng] : INDIA_CENTER
 
   return (
     <div className="rounded-lg overflow-hidden border border-gray-200" style={{ height }}>
       <MapContainer
         center={center}
-        zoom={hasPoint ? 14 : 4}
+        zoom={marker ? 13 : 4}
         scrollWheelZoom
         style={{ height: '100%', width: '100%' }}
       >
@@ -60,12 +72,8 @@ const AddressMap: FC<AddressMapProps> = ({ lat, lng, onPick, height = 240 }) => 
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <ClickHandler onPick={onPick} />
-        {hasPoint && (
-          <>
-            <Marker position={[lat as number, lng as number]} icon={PIN_ICON} />
-            <Recenter lat={lat as number} lng={lng as number} />
-          </>
-        )}
+        <FocusController focus={focus} />
+        {marker && <Marker position={[marker.lat, marker.lng]} icon={PIN_ICON} />}
       </MapContainer>
     </div>
   )

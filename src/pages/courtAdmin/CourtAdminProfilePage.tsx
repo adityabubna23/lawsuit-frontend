@@ -338,9 +338,6 @@ const CourtAdminProfilePage: FC = () => {
               onChange={setCourtType}
               placeholder="District / High Court / Tribunal …"
             />
-            <div className="sm:col-span-2">
-              <Field label="Address" value={courtAddress} onChange={setCourtAddress} />
-            </div>
           </div>
 
           <div className="mt-5">
@@ -350,12 +347,14 @@ const CourtAdminProfilePage: FC = () => {
                 state: courtState,
                 district: courtDistrict,
                 city: courtCity,
+                addressLine: courtAddress,
               }}
               onChange={(next) => {
                 setCourtPincode(next.pincode || '')
                 setCourtState(next.state || '')
                 setCourtDistrict(next.district || '')
                 setCourtCity(next.city || '')
+                setCourtAddress(next.addressLine || '')
               }}
             />
           </div>

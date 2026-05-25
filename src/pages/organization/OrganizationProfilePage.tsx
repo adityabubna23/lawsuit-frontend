@@ -244,6 +244,7 @@ const OrganizationProfilePage: FC = () => {
               state: form.state,
               district: form.district,
               city: form.city,
+              addressLine: form.address,
             }}
             onChange={(next) =>
               setForm((s) => ({
@@ -252,19 +253,9 @@ const OrganizationProfilePage: FC = () => {
                 state: next.state || '',
                 district: next.district || '',
                 city: next.city || '',
+                address: next.addressLine || '',
               }))
             }
-          />
-        </div>
-        <div className="sm:col-span-2">
-          <label className="block text-sm font-medium text-gray-700">Street address</label>
-          <textarea
-            name="address"
-            rows={2}
-            value={form.address}
-            onChange={handleChange}
-            placeholder="Street, building, landmark"
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary sm:text-sm"
           />
         </div>
       </Section>

@@ -213,6 +213,7 @@ const AdminCourtsPage: FC = () => {
                   state: editing.state,
                   district: editing.district,
                   city: editing.city,
+                  addressLine: editing.address,
                 }}
                 onChange={(next) =>
                   setEditing({
@@ -221,18 +222,10 @@ const AdminCourtsPage: FC = () => {
                     state: next.state,
                     district: next.district,
                     city: next.city,
+                    address: next.addressLine,
                   })
                 }
               />
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Address</label>
-                <textarea
-                  rows={2}
-                  value={editing.address || ''}
-                  onChange={(e) => setEditing({ ...editing, address: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-200 resize-none"
-                />
-              </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium hover:bg-gray-50">
                   Cancel

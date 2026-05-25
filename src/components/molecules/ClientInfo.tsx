@@ -38,8 +38,10 @@ const casteOptions: { value: Caste; label: string }[] = [
 interface ClientInfoShape {
   city?: string
   state?: string
+  district?: string
   country?: string
   pincode?: string
+  address?: string
   dob?: string
   gender?: Gender
   income?: number
@@ -155,7 +157,7 @@ const ClientInfo: React.FC = () => {
       const payload: Record<string, any> = {}
       // Plain free-text strings — sent as-is when non-empty.
       const stringKeys: (keyof ClientInfoShape | 'district')[] = [
-        'country', 'state', 'district', 'city', 'dob',
+        'country', 'state', 'district', 'city', 'address', 'dob',
       ]
       for (const k of stringKeys) {
         const v = (form as any)[k]
@@ -325,10 +327,11 @@ const ClientInfo: React.FC = () => {
               hideCountry={false}
               value={{
                 state: form.state,
-                district: (form as any).district,
+                district: form.district,
                 city: form.city,
                 pincode: form.pincode,
                 country: form.country,
+                addressLine: form.address,
               }}
               onChange={(next) => {
                 setForm((s) => ({
@@ -337,6 +340,7 @@ const ClientInfo: React.FC = () => {
                   city: next.city,
                   pincode: next.pincode,
                   country: next.country,
+                  address: next.addressLine,
                   ...(next.district !== undefined ? { district: next.district } : {}),
                 } as any))
               }}

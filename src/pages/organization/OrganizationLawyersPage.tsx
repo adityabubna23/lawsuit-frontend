@@ -34,7 +34,7 @@ const blank = {
   licenseNumber: '', barCouncilId: '',
   specializations: '',
   feePerConsultation: '',
-  pincode: '', city: '', state: '',
+  pincode: '', city: '', state: '', address: '',
   bio: '',
   experienceYears: '',
 }
@@ -88,6 +88,7 @@ const OrganizationLawyersPage: FC = () => {
       if (form.pincode) payload.pincode = form.pincode
       if (form.city) payload.city = form.city
       if (form.state) payload.state = form.state
+      if (form.address) payload.address = form.address
       if (form.bio) payload.bio = form.bio
       if (form.experienceYears) payload.experienceYears = Number(form.experienceYears)
 
@@ -267,6 +268,7 @@ const OrganizationLawyersPage: FC = () => {
                   state: form.state,
                   district: '',
                   city: form.city,
+                  addressLine: form.address,
                 }}
                 onChange={(next) =>
                   setForm((s) => ({
@@ -274,6 +276,7 @@ const OrganizationLawyersPage: FC = () => {
                     pincode: next.pincode || '',
                     state: next.state || '',
                     city: next.city || '',
+                    address: next.addressLine || '',
                   }))
                 }
               />

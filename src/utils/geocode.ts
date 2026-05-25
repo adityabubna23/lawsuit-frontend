@@ -2,14 +2,19 @@
 //
 // Nominatim usage policy: ≤ 1 request/second and identify the app via a valid
 // HTTP Referer (browsers send this automatically). We only call these in
-// response to user actions (typing a pincode / clicking the map), so volume
-// stays well within limits.
+// response to user actions (typing a pincode / picking state-district /
+// clicking the map), so volume stays well within limits.
 
 export interface GeocodedAddress {
   state?: string
   district?: string
   city?: string
   pincode?: string
+}
+
+export interface LatLng {
+  lat: number
+  lng: number
 }
 
 const NOMINATIM = 'https://nominatim.openstreetmap.org'
@@ -44,9 +49,28 @@ export async function reverseGeocode(lat: number, lng: number): Promise<Geocoded
  * Geocode an Indian 6-digit pincode to a lat/lng centroid so the map can
  * center on that area. Returns null if Nominatim has no match.
  */
-export async function geocodePincode(pincode: string): Promise<{ lat: number; lng: number } | null> {
+export async function geocodePincode(pincode: string): Promise<LatLng | null> {
   try {
     const url = `${NOMINATIM}/search?format=jsonv2&country=India&postalcode=${encodeURIComponent(pincode)}&limit=1`
+    const res = await fetch(url, { headers: { Accept: 'application/json' } })
+    if (!res.ok) return null
+    const data = await res.json()
+    const hit = Array.isArray(data) ? data[0] : null
+    if (!hit?.lat || !hit?.lon) return null
+    return { lat: parseFloat(hit.lat), lng: parseFloat(hit.lon) }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Free-text forward geocode within India (e.g. "Ganjam, Odisha, India" or
+ * "Berhampur, Ganjam, Odisha, India"). Used to recenter the map as the user
+ * narrows down state → district → locality.
+ */
+export async function geocodeText(query: string): Promise<LatLng | null> {
+  try {
+    const url = `${NOMINATIM}/search?format=jsonv2&country=India&q=${encodeURIComponent(query)}&limit=1`
     const res = await fetch(url, { headers: { Accept: 'application/json' } })
     if (!res.ok) return null
     const data = await res.json()
