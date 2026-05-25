@@ -60,7 +60,7 @@ const AddressMap: FC<AddressMapProps> = ({ marker, focus, onPick, height = 240 }
   const center: [number, number] = marker ? [marker.lat, marker.lng] : INDIA_CENTER
 
   return (
-    <div className="rounded-lg overflow-hidden border border-gray-200" style={{ height }}>
+    <div className="rounded-lg overflow-hidden border border-gray-200 isolate" style={{ height }}>
       <MapContainer
         center={center}
         zoom={marker ? 13 : 4}

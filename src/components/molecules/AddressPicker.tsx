@@ -225,8 +225,12 @@ const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value.state, value.district, value.pincode, value.city, hideMap])
 
-  const pickPostOffice = (po: PostOffice) => {
-    pickSource.current = 'user'
+  const pickPostOffice = async (po: PostOffice) => {
+    // Selecting a locality is a deliberate action — recenter the map on it
+    // right away (no debounce). `pickSource = 'map'` stops the fields→map
+    // effect from double-firing. Falls back to the pincode centroid when the
+    // locality name doesn't resolve in Nominatim.
+    pickSource.current = 'map'
     onChange({
       ...valueRef.current,
       city: po.name,
@@ -234,6 +238,16 @@ const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = 
       district: po.district || valueRef.current.district,
     })
     setPickerOpen(false)
+    const query = [po.name, po.division || po.district, po.state, 'India'].filter(Boolean).join(', ')
+    let pt = await geocodeText(query)
+    if (!pt) {
+      const pin = (valueRef.current.pincode || '').trim()
+      if (pin.length === 6) pt = await geocodePincode(pin)
+    }
+    if (pt) {
+      setFocus({ lat: pt.lat, lng: pt.lng, zoom: 15 })
+      onChange({ ...valueRef.current, lat: pt.lat, lng: pt.lng })
+    }
   }
 
   // Map click → drop the pin immediately, then reverse-geocode to fill the
@@ -370,7 +384,7 @@ const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = 
               <ChevronDown className={`w-4 h-4 text-gray-400 transition ${pickerOpen ? 'rotate-180' : ''}`} />
             </button>
             {pickerOpen && (
-              <div className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+              <div className="absolute z-[1000] mt-1 w-full max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
                 {postOffices.map((po) => (
                   <button
                     key={`${po.name}-${po.district}`}
@@ -391,17 +405,6 @@ const AddressPicker: FC<AddressPickerProps> = ({ value, onChange, hideCountry = 
                 ))}
               </div>
             )}
-            <p className="mt-1 text-[11px] text-gray-500">
-              Or{' '}
-              <button
-                type="button"
-                onClick={() => { setPostOffices([]); setPickerOpen(false) }}
-                className="underline text-primary"
-              >
-                type a custom value
-              </button>
-              .
-            </p>
           </div>
         ) : (
           <input
