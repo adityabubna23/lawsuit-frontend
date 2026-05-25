@@ -24,6 +24,7 @@ const dotColor = (type: CalendarEvent['type'], status?: string): string => {
 }
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
 const CalendarPage: FC = () => {
   const navigate = useNavigate()
@@ -54,6 +55,18 @@ const CalendarPage: FC = () => {
     return eachDayOfInterval({ start, end })
   }, [cursor])
 
+  // Year options for the picker — a wide range around today, always including
+  // whatever year the user has already navigated to.
+  const years = useMemo(() => {
+    const thisYear = new Date().getFullYear()
+    const cy = cursor.getFullYear()
+    const lo = Math.min(thisYear - 10, cy)
+    const hi = Math.max(thisYear + 10, cy)
+    const out: number[] = []
+    for (let y = lo; y <= hi; y++) out.push(y)
+    return out
+  }, [cursor])
+
   const selectedEvents = eventsByDay.get(format(selected, 'yyyy-MM-dd')) || []
   const goToday = () => { const t = new Date(); setCursor(t); setSelected(t) }
 
@@ -72,7 +85,28 @@ const CalendarPage: FC = () => {
             {/* ── Month grid ── */}
             <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm p-3 sm:p-4">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-semibold text-gray-900">{format(cursor, 'MMMM yyyy')}</h2>
+                <div className="flex items-center gap-1.5">
+                  <select
+                    aria-label="Month"
+                    value={cursor.getMonth()}
+                    onChange={(e) => setCursor(new Date(cursor.getFullYear(), Number(e.target.value), 1))}
+                    className="text-lg font-semibold text-gray-900 bg-transparent border border-transparent hover:border-gray-200 rounded-lg pl-1.5 pr-1 py-1 outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
+                  >
+                    {MONTHS.map((m, i) => (
+                      <option key={m} value={i}>{m}</option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label="Year"
+                    value={cursor.getFullYear()}
+                    onChange={(e) => setCursor(new Date(Number(e.target.value), cursor.getMonth(), 1))}
+                    className="text-lg font-semibold text-gray-900 bg-transparent border border-transparent hover:border-gray-200 rounded-lg pl-1.5 pr-1 py-1 outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
+                  >
+                    {years.map((y) => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
                 <div className="flex items-center gap-1">
                   <button onClick={goToday} className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 hover:bg-gray-50">
                     Today
