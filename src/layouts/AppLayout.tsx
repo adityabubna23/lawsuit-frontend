@@ -66,6 +66,7 @@ const AppLayout: FC = () => {
     // nav — it's a first-class discovery surface, not a sub-page.
     { name: 'Law Firms', path: '/app/firms' },
     { name: 'Appointments', path: '/app/appointments' },
+    { name: 'Calendar', path: '/app/calendar' },
     { name: 'Cases', path: '/app/cases' },
     { name: 'Chats', path: '/app/chats' },
   ]

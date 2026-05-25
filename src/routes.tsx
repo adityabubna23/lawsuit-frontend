@@ -119,6 +119,7 @@ import OrganizationMySalaryPage from './pages/organization/OrganizationMySalaryP
 import ChatListPage from './pages/shared/ChatListPage'
 import DocumentAiPage from './pages/shared/DocumentAiPage'
 import DocumentPreviewPage from './pages/shared/DocumentPreviewPage'
+import CalendarPage from './pages/shared/CalendarPage'
 
 // Client-side firm discovery
 import FirmsListPage from './pages/app/firms/FirmsListPage'
@@ -232,6 +233,7 @@ const AppRoutes = () => {
         }
       >
         <Route path="home" element={<HomePage />} />
+        <Route path="calendar" element={<CalendarPage />} />
         <Route path="search" element={<SearchPage />} />
         <Route path="lawyers/:id" element={<LawyerDetailPage />} />
         {/* Booking, withdrawals, case filing, mediation initiation are all
@@ -326,6 +328,7 @@ const AppRoutes = () => {
       >
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<OrganizationDashboardPage />} />
+        <Route path="calendar" element={<CalendarPage />} />
         <Route path="profile" element={<OrganizationProfilePage />} />
         <Route path="lawyers" element={<OrganizationLawyersPage />} />
         <Route path="salary" element={<OrganizationSalaryPage />} />
@@ -408,6 +411,7 @@ const AppRoutes = () => {
         {/* <Route index element={<Navigate to="appointments" replace />} /> */}
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<LawyerHomePage />} />
+        <Route path="calendar" element={<CalendarPage />} />
         <Route path="appointments" element={<LawyerAppointments />} />
         <Route path="case/:caseId" element={<CaseDetailsLawyerPage />} />
         <Route path="cases" element={<ViewCasePagesLawyer />} />

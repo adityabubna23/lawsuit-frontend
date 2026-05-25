@@ -55,6 +55,7 @@ const OrganizationLayout: FC = () => {
     { name: 'Dashboard', path: '/organization/dashboard' },
     { name: 'Lawyers', path: '/organization/lawyers' },
     { name: 'Requests', path: '/organization/requests' },
+    { name: 'Calendar', path: '/organization/calendar' },
     { name: 'Salary', path: '/organization/salary' },
     { name: 'Profile', path: '/organization/profile' },
   ]

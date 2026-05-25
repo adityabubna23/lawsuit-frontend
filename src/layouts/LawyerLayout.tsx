@@ -54,6 +54,7 @@ const LawyerLayout: FC = () => {
   const primaryNav = [
     { name: 'Dashboard', path: '/lawyer/dashboard' },
     { name: 'Appointments', path: '/lawyer/appointments' },
+    { name: 'Calendar', path: '/lawyer/calendar' },
     { name: 'Cases', path: '/lawyer/cases' },
     { name: 'Chats', path: '/lawyer/chats' },
     { name: 'Mediations', path: '/lawyer/mediations' },
