@@ -12,6 +12,12 @@ export interface EkycSubmission {
   createdAt: string
 }
 
+export interface EkycProviderInfo {
+  name: string
+  /** True when the active provider uses the DigiLocker redirect flow (Surepass). */
+  supportsDigilocker: boolean
+}
+
 export interface EkycStatusData {
   client: {
     ekycVerified: boolean
@@ -20,6 +26,8 @@ export interface EkycStatusData {
     aadhaarName: string | null
   } | null
   latestSubmission: EkycSubmission | null
+  /** Active eKYC provider + capabilities. Null when none is configured. */
+  provider?: EkycProviderInfo | null
 }
 
 /**
@@ -52,11 +60,18 @@ export function useEkycStatus() {
     && !!data.latestSubmission.expiresAt
     && new Date(data.latestSubmission.expiresAt).getTime() > Date.now()
 
+  // Which verification UI to show. DigiLocker (redirect) when the active
+  // provider supports it (Surepass), else the Aadhaar-number + OTP form.
+  const provider = data?.provider ?? null
+  const supportsDigilocker = !!provider?.supportsDigilocker
+
   return {
     isClient,
     isVerified,
     pending,
     pendingSubmission: pending ? data?.latestSubmission ?? null : null,
+    provider,
+    supportsDigilocker,
     data: data ?? null,
     isLoading: query.isLoading,
     isFetching: query.isFetching,

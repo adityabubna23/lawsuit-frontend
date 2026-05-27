@@ -2,7 +2,7 @@ import { FC, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ShieldCheck, Hourglass, AlertCircle, Fingerprint, Phone, Lock, Clock,
-  Loader2, ArrowRight, ArrowLeft, RefreshCw, CheckCircle2,
+  Loader2, ArrowRight, ArrowLeft, RefreshCw, CheckCircle2, Landmark, ExternalLink,
 } from 'lucide-react'
 import useEkycStatus from '@/hooks/useEkycStatus'
 import AadhaarKycModal from '@/components/molecules/AadhaarKycModal'
@@ -20,7 +20,7 @@ import AadhaarKycModal from '@/components/molecules/AadhaarKycModal'
  */
 const EkycPage: FC = () => {
   const navigate = useNavigate()
-  const { isClient, data, isLoading, isFetching, refetch, pending, pendingSubmission } = useEkycStatus()
+  const { isClient, data, isLoading, isFetching, refetch, pending, pendingSubmission, supportsDigilocker } = useEkycStatus()
   const [modalOpen, setModalOpen] = useState(false)
 
   const verified = !!data?.client?.ekycVerified
@@ -55,7 +55,11 @@ const EkycPage: FC = () => {
             <ShieldCheck className="w-6 h-6" />
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold">Identity Verification</h1>
-          <p className="text-white/80 mt-1">Verify your identity with Aadhaar OTP — takes about 60 seconds.</p>
+          <p className="text-white/80 mt-1">
+            {supportsDigilocker
+              ? 'Verify your identity with Aadhaar via DigiLocker — takes about a minute.'
+              : 'Verify your identity with Aadhaar OTP — takes about 60 seconds.'}
+          </p>
         </div>
       </div>
 
@@ -75,6 +79,7 @@ const EkycPage: FC = () => {
           <PendingCard
             onContinue={() => setModalOpen(true)}
             expiresAt={pendingSubmission?.expiresAt}
+            digilocker={supportsDigilocker}
           />
         ) : failed ? (
           <FailedCard
@@ -83,7 +88,7 @@ const EkycPage: FC = () => {
             onRetry={() => setModalOpen(true)}
           />
         ) : (
-          <IntroCard onStart={() => setModalOpen(true)} onSkip={() => navigate(-1)} />
+          <IntroCard onStart={() => setModalOpen(true)} onSkip={() => navigate(-1)} digilocker={supportsDigilocker} />
         )}
 
         {/* Refresh button — useful for clients verifying on a different device */}
@@ -133,7 +138,7 @@ const VerifiedCard: FC<{ name: string; last4?: string | null; verifiedAt?: strin
   </div>
 )
 
-const PendingCard: FC<{ onContinue: () => void; expiresAt?: string | null }> = ({ onContinue, expiresAt }) => (
+const PendingCard: FC<{ onContinue: () => void; expiresAt?: string | null; digilocker?: boolean }> = ({ onContinue, expiresAt, digilocker }) => (
   <div className="bg-white border border-amber-200 rounded-2xl shadow-sm overflow-hidden">
     <div className="bg-amber-50 px-6 py-4 border-b border-amber-100 flex items-center gap-2">
       <Hourglass className="w-5 h-5 text-amber-600" />
@@ -141,12 +146,13 @@ const PendingCard: FC<{ onContinue: () => void; expiresAt?: string | null }> = (
     </div>
     <div className="p-6 space-y-4">
       <p className="text-sm text-gray-700">
-        We sent a 6-digit OTP to your Aadhaar-linked mobile number. Continue where you left off to
-        complete verification.
+        {digilocker
+          ? 'You started verifying with DigiLocker but didn’t finish. Continue to open DigiLocker again and complete your Aadhaar consent.'
+          : 'We sent a 6-digit OTP to your Aadhaar-linked mobile number. Continue where you left off to complete verification.'}
       </p>
       {expiresAt && (
         <p className="text-xs text-gray-500">
-          OTP expires at {new Date(expiresAt).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}.
+          {digilocker ? 'Session' : 'OTP'} expires at {new Date(expiresAt).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}.
         </p>
       )}
       <button
@@ -181,29 +187,40 @@ const FailedCard: FC<{ reason?: string | null; isExpired?: boolean; onRetry: () 
   </div>
 )
 
-const IntroCard: FC<{ onStart: () => void; onSkip: () => void }> = ({ onStart, onSkip }) => (
+const IntroCard: FC<{ onStart: () => void; onSkip: () => void; digilocker?: boolean }> = ({ onStart, onSkip, digilocker }) => (
   <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
     <div className="bg-gradient-to-br from-primary/5 to-white px-6 py-4 border-b border-gray-100 flex items-center gap-2">
-      <Fingerprint className="w-5 h-5 text-primary" />
+      {digilocker ? <Landmark className="w-5 h-5 text-primary" /> : <Fingerprint className="w-5 h-5 text-primary" />}
       <h2 className="font-semibold text-gray-900">Get Verified</h2>
     </div>
     <div className="p-6 space-y-5">
       <p className="text-sm text-gray-700 leading-relaxed">
-        Verify your identity in under a minute using Aadhaar OTP. We never store your full Aadhaar
-        number — only the last four digits and a one-way hash for de-duplication.
+        {digilocker
+          ? "Verify your identity through DigiLocker — the Government of India's secure document wallet. We never store your full Aadhaar number — only the last four digits and your verified name."
+          : 'Verify your identity in under a minute using Aadhaar OTP. We never store your full Aadhaar number — only the last four digits and a one-way hash for de-duplication.'}
       </p>
 
       <ul className="space-y-3">
-        <Bullet icon={Phone} text="OTP delivered to your Aadhaar-linked phone number" />
-        <Bullet icon={Lock} text="Aadhaar number is SHA-256 hashed before storage" />
-        <Bullet icon={Clock} text="Takes about 60 seconds to complete" />
+        {digilocker ? (
+          <>
+            <Bullet icon={Landmark} text="Consent captured securely by DigiLocker (UIDAI)" />
+            <Bullet icon={Lock} text="Only your name + masked Aadhaar (last 4) are stored" />
+            <Bullet icon={Clock} text="Takes about a minute to complete" />
+          </>
+        ) : (
+          <>
+            <Bullet icon={Phone} text="OTP delivered to your Aadhaar-linked phone number" />
+            <Bullet icon={Lock} text="Aadhaar number is SHA-256 hashed before storage" />
+            <Bullet icon={Clock} text="Takes about 60 seconds to complete" />
+          </>
+        )}
       </ul>
 
       <button
         onClick={onStart}
         className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-primary text-white font-medium hover:bg-primary/90"
       >
-        <ShieldCheck className="w-4 h-4" /> Verify with Aadhaar
+        {digilocker ? <><ExternalLink className="w-4 h-4" /> Verify with DigiLocker</> : <><ShieldCheck className="w-4 h-4" /> Verify with Aadhaar</>}
       </button>
       <button
         onClick={onSkip}

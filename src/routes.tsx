@@ -68,6 +68,7 @@ import HelpCenterPage from './pages/HelpCenterPage'
 import AboutPage from './pages/AboutPage'
 import SettingsPage from './pages/app/SettingsPage'
 import EkycPage from './pages/app/EkycPage'
+import EkycDigilockerCallback from './pages/app/EkycDigilockerCallback'
 
 // Lawyer Pages
 import LawyerLayout from './layouts/LawyerLayout'
@@ -273,6 +274,9 @@ const AppRoutes = () => {
         {/* Aadhaar eKYC — full-page version. CLIENT only (page renders an
             empty stub for non-clients). The on-card version lives on /app/profile. */}
         <Route path="ekyc" element={<EkycPage />} />
+        {/* Landing page for the Surepass DigiLocker redirect — completes the
+            verification after the user returns from DigiLocker. */}
+        <Route path="ekyc/digilocker/callback" element={<EkycDigilockerCallback />} />
         <Route path="consultation/:appointmentId" element={
           <EkycGuard action="join the consultation"><VideoConsultationPage /></EkycGuard>
         } />

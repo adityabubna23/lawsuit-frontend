@@ -9,6 +9,10 @@
 export type EkycProviderRaw = string | null | undefined;
 export type EkycVerifiedViaRaw = 'AADHAAR' | 'EMAIL_OTP' | null | undefined;
 
+// sessionStorage key the DigiLocker flow uses to carry the submission id across
+// the cross-origin redirect to DigiLocker and back to the callback route.
+export const EKYC_DIGILOCKER_SESSION_KEY = 'nyayax_ekyc_digilocker';
+
 const PROVIDER_LABELS: Record<string, string> = {
   sandbox: 'Sandbox.co.in',
   email: 'NyayaX Email OTP',
@@ -21,7 +25,7 @@ const PROVIDER_LONG_LABELS: Record<string, string> = {
   sandbox: 'Aadhaar OKYC via Sandbox.co.in',
   email: 'Temporary email-OTP fallback',
   stub: 'Local-dev stub provider',
-  surepass: 'Aadhaar OKYC via Surepass',
+  surepass: 'Aadhaar KYC via DigiLocker (Surepass)',
 };
 
 /** Short label, e.g. "Sandbox.co.in". Used in compact badges + status pills. */
@@ -36,10 +40,10 @@ export function ekycProviderLongLabel(provider: EkycProviderRaw): string {
   return PROVIDER_LONG_LABELS[provider] ?? `Provider: ${provider}`;
 }
 
-/** "Verified via Sandbox.co.in" / "Verified via NyayaX Email OTP". */
+/** "Verified via Aadhaar" / "Verified via NyayaX Email OTP". */
 export function verifiedViaLabel(via: EkycVerifiedViaRaw): string {
   if (via === 'EMAIL_OTP') return 'Verified via NyayaX Email OTP (temporary)';
-  if (via === 'AADHAAR') return 'Verified via Sandbox.co.in';
+  if (via === 'AADHAAR') return 'Verified via Aadhaar';
   return 'Verified';
 }
 

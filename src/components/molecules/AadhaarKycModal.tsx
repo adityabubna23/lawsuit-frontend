@@ -1,9 +1,10 @@
 import { FC, useEffect, useState, useRef } from 'react'
-import { X, ShieldCheck, Loader2, AlertCircle, Check, RefreshCw, Lock, Mail } from 'lucide-react'
+import { X, ShieldCheck, Loader2, AlertCircle, Check, RefreshCw, Lock, Mail, Landmark, ExternalLink } from 'lucide-react'
 import { ekycApi } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
+import useEkycStatus from '@/hooks/useEkycStatus'
 import { friendlyError } from '@/utils/errors'
-import { ekycProviderLabel } from '@/utils/ekycProvider'
+import { ekycProviderLabel, EKYC_DIGILOCKER_SESSION_KEY } from '@/utils/ekycProvider'
 
 interface AadhaarKycModalProps {
   open: boolean
@@ -35,6 +36,10 @@ const formatAadhaar = (raw: string) => {
 const AadhaarKycModal: FC<AadhaarKycModalProps> = ({ open, onClose, resumeSubmission, onVerified }) => {
   const setUser = useAuthStore((s) => s.setUser)
   const me = useAuthStore((s) => s.user)
+  // When the active provider is DigiLocker (Surepass), step 1 becomes a
+  // "Continue with DigiLocker" redirect instead of the Aadhaar-number + OTP
+  // form. The OTP path stays for providers whose plan uses aadhaar-v2.
+  const { supportsDigilocker } = useEkycStatus()
   const [step, setStep] = useState<Step>('aadhaar')
   const [path, setPath] = useState<Path>('AADHAAR')
   const [aadhaar, setAadhaar] = useState('')
@@ -159,6 +164,45 @@ const AadhaarKycModal: FC<AadhaarKycModalProps> = ({ open, onClose, resumeSubmis
         setError(friendlyError(err, "We couldn't send the OTP right now."))
       }
     } finally {
+      setBusy(false)
+    }
+  }
+
+  // DigiLocker (redirect) flow — Surepass. Mints a hosted DigiLocker session,
+  // stashes the submission id so the callback route can complete it, then
+  // sends the browser to DigiLocker. We DON'T reset `busy` on success because
+  // the page navigates away.
+  const handleInitiateDigilocker = async () => {
+    if (!consent) {
+      setError('Please confirm consent to continue.')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await ekycApi.initiateDigilocker()
+      const data = (res.data?.data ?? res.data) as { id: string; url: string }
+      if (!data?.url) throw new Error('No DigiLocker URL returned')
+      try {
+        sessionStorage.setItem(
+          EKYC_DIGILOCKER_SESSION_KEY,
+          JSON.stringify({ submissionId: data.id, ts: Date.now() }),
+        )
+      } catch {
+        /* sessionStorage blocked — the callback can still fall back to client_id */
+      }
+      // Leave the SPA for the provider-hosted DigiLocker page. We come back to
+      // /app/ekyc/digilocker/callback.
+      window.location.assign(data.url)
+    } catch (err: any) {
+      const status = err?.response?.status
+      if (status === 429) {
+        setError("You've started verification too many times. Please wait a bit and try again.")
+      } else if (status === 409) {
+        setError('Your account is already verified — no further action needed.')
+      } else {
+        setError(friendlyError(err, "We couldn't start DigiLocker verification right now. Please try again."))
+      }
       setBusy(false)
     }
   }
@@ -289,7 +333,7 @@ const AadhaarKycModal: FC<AadhaarKycModalProps> = ({ open, onClose, resumeSubmis
                 {path === 'EMAIL_OTP' ? 'Identity verification' : 'Aadhaar eKYC'}
               </h2>
               <p className="text-xs text-gray-500">
-                {step === 'aadhaar' && 'Step 1 of 2 · Aadhaar or email OTP'}
+                {step === 'aadhaar' && (supportsDigilocker ? 'Verify your Aadhaar via DigiLocker' : 'Step 1 of 2 · Aadhaar or email OTP')}
                 {step === 'otp' && 'Step 2 of 2 · Enter Aadhaar OTP'}
                 {step === 'email-otp' && 'Step 2 of 2 · Enter email OTP (temporary)'}
                 {step === 'done' && (path === 'EMAIL_OTP' ? 'Verified (temporary)' : 'Verified')}
@@ -302,7 +346,80 @@ const AadhaarKycModal: FC<AadhaarKycModalProps> = ({ open, onClose, resumeSubmis
         </div>
 
         {/* Step content */}
-        {step === 'aadhaar' && (
+
+        {/* ── DigiLocker (redirect) start — shown when the active provider is
+            Surepass (DigiLocker). Replaces the Aadhaar-number + OTP form. ── */}
+        {(step === 'aadhaar' || step === 'otp') && supportsDigilocker && (
+          <div className="p-5 space-y-4">
+            <div className="flex items-start gap-3 rounded-lg border border-indigo-100 bg-indigo-50/60 p-3">
+              <Landmark className="w-5 h-5 text-indigo-600 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-indigo-900 leading-relaxed">
+                Verify your identity through <strong>DigiLocker</strong> — the Government of India's
+                secure document wallet. You'll be redirected to DigiLocker to grant consent, then
+                brought right back. We never see your Aadhaar password or OTP.
+              </p>
+            </div>
+
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start gap-2">
+                <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                Consent is captured by DigiLocker (UIDAI), not by us.
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                We store only your name, masked Aadhaar (last 4) and verification date.
+              </li>
+            </ul>
+
+            <label className="flex items-start gap-2 cursor-pointer text-xs text-gray-600 leading-relaxed">
+              <input
+                type="checkbox"
+                checked={consent}
+                onChange={(e) => setConsent(e.target.checked)}
+                className="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-200"
+              />
+              <span>
+                I consent to share my Aadhaar details from DigiLocker with NyayaX for identity
+                verification. My consent is recorded for audit purposes.
+              </span>
+            </label>
+
+            {error && (
+              <div className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" /> {error}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleInitiateDigilocker}
+              disabled={busy || !consent}
+              className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
+              {busy ? 'Opening DigiLocker…' : 'Continue with DigiLocker'}
+            </button>
+
+            <p className="text-[10px] text-gray-400 text-center">
+              Powered by <span className="font-medium">{ekycProviderLabel('surepass')}</span> · DigiLocker
+            </p>
+
+            {/* Compact fallback — verify via email OTP if the user can't use
+                DigiLocker. Grants a temporary (EMAIL_OTP) verification. */}
+            <div className="pt-1 text-center">
+              <button
+                type="button"
+                onClick={handleInitiateEmailOtp}
+                disabled={busy}
+                className="text-xs text-gray-500 hover:text-gray-700 underline underline-offset-2 disabled:opacity-50"
+              >
+                Can't use DigiLocker? Verify via email OTP instead
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 'aadhaar' && !supportsDigilocker && (
           <form onSubmit={handleInitiate} className="p-5 space-y-4">
             <p className="text-sm text-gray-600">
               We'll send a one-time OTP to the mobile number linked with your Aadhaar.
@@ -436,7 +553,7 @@ const AadhaarKycModal: FC<AadhaarKycModalProps> = ({ open, onClose, resumeSubmis
           </form>
         )}
 
-        {step === 'otp' && (
+        {step === 'otp' && !supportsDigilocker && (
           <form onSubmit={handleSubmitOtp} className="p-5 space-y-4">
             <p className="text-sm text-gray-600">
               Enter the 6-digit OTP sent to your Aadhaar-linked mobile number.

@@ -669,6 +669,14 @@ export const ekycApi = {
   submitOtp: (submissionId: string, otp: string) =>
     api.post('/ekyc/aadhaar/submit-otp', { submissionId, otp }),
 
+  // DigiLocker (redirect) flow — active path for Surepass. `initiate` returns
+  // { id, url, expiresAt }: stash `id`, then send the browser to `url`. After
+  // consent the provider redirects back to /app/ekyc/digilocker/callback, which
+  // calls `complete` to download + persist the verified Aadhaar profile.
+  initiateDigilocker: () => api.post('/ekyc/digilocker/initiate', {}),
+  completeDigilocker: (params: { submissionId?: string; clientId?: string }) =>
+    api.post('/ekyc/digilocker/complete', params),
+
   // Temporary email-OTP fallback while the Aadhaar provider key is
   // unavailable. Server sends a 6-digit OTP to the registered email and
   // flips ekycVerified=true on success with ekycVerifiedVia='EMAIL_OTP'.
