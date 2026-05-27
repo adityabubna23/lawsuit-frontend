@@ -24,6 +24,7 @@ const EkycDigilockerCallback: FC = () => {
   const [phase, setPhase] = useState<Phase>('loading')
   const [message, setMessage] = useState<string>('')
   const ranRef = useRef(false)
+  const autoRetriesRef = useRef(0)
 
   const readSubmissionId = (): string | undefined => {
     try {
@@ -61,6 +62,16 @@ const EkycDigilockerCallback: FC = () => {
       }
 
       if (body?.pending) {
+        // `status=success` but the one-time download wasn't ready on the first
+        // hit — usually a brief provider lag. Auto-retry a couple of times
+        // before falling back to the manual "Check again" button.
+        if (autoRetriesRef.current < 2) {
+          autoRetriesRef.current += 1
+          setPhase('loading')
+          setMessage('Finalizing with DigiLocker…')
+          setTimeout(() => { void complete() }, 2500)
+          return
+        }
         setPhase('pending')
         setMessage('Your DigiLocker consent is still being processed. Give it a few seconds, then check again.')
         return
@@ -148,7 +159,7 @@ const EkycDigilockerCallback: FC = () => {
               <h2 className="text-lg font-semibold text-gray-900">Almost there…</h2>
               <p className="text-sm text-gray-600 mt-1">{message}</p>
               <button
-                onClick={() => void complete()}
+                onClick={() => { autoRetriesRef.current = 0; void complete() }}
                 className="mt-5 w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-amber-600 text-white font-medium hover:bg-amber-700"
               >
                 Check again
