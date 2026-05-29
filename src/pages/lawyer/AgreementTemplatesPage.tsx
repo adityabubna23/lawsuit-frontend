@@ -1,6 +1,7 @@
 import { FC, useEffect, useState, useMemo } from 'react'
 import { useAgreementTemplateStore } from '@/stores/agreementTemplateStore'
 import { AgreementTemplate } from '@/types'
+import ClauseAiPanel from '@/components/molecules/ClauseAiPanel'
 
 /* ─── Category presets ─── */
 const CATEGORIES = [
@@ -155,6 +156,8 @@ const TemplateModal: FC<ModalProps> = ({ open, template, onClose, onSave, saving
                             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition font-mono resize-y"
                             placeholder="Write or paste your agreement template text here..."
                         />
+                        {/* AI clause assistant — suggest/improve/redraft over the draft. */}
+                        <ClauseAiPanel content={content} onChange={setContent} context={title} />
                     </div>
                 </form>
 

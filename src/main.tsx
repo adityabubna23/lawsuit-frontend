@@ -5,6 +5,8 @@ import { BrowserRouter } from 'react-router-dom'
 import { queryClient } from './lib/queryClient'
 import App from './App'
 import './index.css'
+// Initialise i18n (English bundled; other languages lazy-load on demand).
+import './i18n'
 // import { startMockServer } from './mocks/browser'
 
 async function startApp() {

@@ -2,6 +2,7 @@ import AppRoutes from './routes'
 import ErrorBoundary from './components/organisms/ErrorBoundary'
 import GlobalProcessingIndicator from './components/organisms/GlobalProcessingIndicator'
 import DpdpNoticeGate from './components/organisms/DpdpNoticeGate'
+import LegalEagleWidget from './components/organisms/LegalEagleWidget'
 
 function App() {
   return (
@@ -13,6 +14,9 @@ function App() {
           acknowledged the privacy notice. Idempotent on the server. */}
       <DpdpNoticeGate />
       <AppRoutes />
+      {/* Floating Legal Eagle AI — bottom-right launcher → panel → full screen.
+          Renders only for authenticated users. */}
+      <LegalEagleWidget />
     </ErrorBoundary>
   )
 }

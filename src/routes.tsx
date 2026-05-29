@@ -51,6 +51,7 @@ import AdminUserModerationPage from './pages/admin/AdminUserModerationPage'
 import AdminLegalUpdatesPage from './pages/admin/AdminLegalUpdatesPage'
 import AdminReportsPage from './pages/admin/AdminReportsPage'
 import AdminConsentsPage from './pages/admin/AdminConsentsPage'
+import AdminCompliancePage from './pages/admin/AdminCompliancePage'
 import AdminConfigPage from './pages/admin/AdminConfigPage'
 import AdminCourtAdminsPage from './pages/admin/AdminCourtAdminsPage'
 import AdminSalaryPage from './pages/admin/AdminSalaryPage'
@@ -70,6 +71,7 @@ import AboutPage from './pages/AboutPage'
 import SettingsPage from './pages/app/SettingsPage'
 import EkycPage from './pages/app/EkycPage'
 import EkycDigilockerCallback from './pages/app/EkycDigilockerCallback'
+import SignDocumentPage from './pages/app/SignDocumentPage'
 
 // Lawyer Pages
 import LawyerLayout from './layouts/LawyerLayout'
@@ -278,6 +280,8 @@ const AppRoutes = () => {
         {/* Landing page for the Surepass DigiLocker redirect — completes the
             verification after the user returns from DigiLocker. */}
         <Route path="ekyc/digilocker/callback" element={<EkycDigilockerCallback />} />
+        {/* E-signature — a party signs a document via OTP. */}
+        <Route path="sign/:id" element={<SignDocumentPage />} />
         <Route path="consultation/:appointmentId" element={
           <EkycGuard action="join the consultation"><VideoConsultationPage /></EkycGuard>
         } />
@@ -380,6 +384,8 @@ const AppRoutes = () => {
         <Route path="reports" element={<AdminReportsPage />} />
         {/* Consent / provenance audit — every consent event captured platform-wide. */}
         <Route path="consents" element={<AdminConsentsPage />} />
+        {/* Compliance report pack — SUPER_ADMIN CSV exports. */}
+        <Route path="compliance" element={<AdminCompliancePage />} />
         <Route path="settings" element={<AdminConfigPage />} />
         <Route path="salary" element={<AdminSalaryPage />} />
         <Route path="courts" element={<AdminCourtsPage />} />

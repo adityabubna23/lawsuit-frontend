@@ -1,5 +1,6 @@
 import { FC, useState, useEffect, useRef } from 'react'
 import { ChevronDown } from 'lucide-react'
+import LanguageSwitcher from '../components/molecules/LanguageSwitcher'
 import NotificationModal from '../components/molecules/NotificationModal'
 import NotificationToast from '../components/atoms/NotificationToast'
 import VideoCallProvider from '../components/organisms/VideoCallProvider'
@@ -210,6 +211,8 @@ const LawyerLayout: FC = () => {
                   </span>
                 )}
               </Link>
+
+              <LanguageSwitcher />
 
               <button
                 type="button"

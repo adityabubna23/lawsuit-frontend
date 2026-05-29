@@ -1,6 +1,7 @@
 import { FC, useEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { Outlet, Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
+import LanguageSwitcher from '../components/molecules/LanguageSwitcher'
 import NotificationModal from '../components/molecules/NotificationModal'
 import NotificationToast from '../components/atoms/NotificationToast'
 import { useAuthStore } from '../stores/authStore'
@@ -199,6 +200,8 @@ const OrganizationLayout: FC = () => {
                   Verification pending — complete now
                 </Link>
               )}
+
+              <LanguageSwitcher />
 
               <button
                 type="button"

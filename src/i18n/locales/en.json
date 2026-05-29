@@ -1,0 +1,38 @@
+{
+  "language": {
+    "change": "Change the app language here",
+    "select": "Select language"
+  },
+  "nav": {
+    "home": "Home",
+    "findLawyers": "Find Lawyers",
+    "lawFirms": "Law Firms",
+    "appointments": "Appointments",
+    "calendar": "Calendar",
+    "cases": "Cases",
+    "chats": "Chats",
+    "more": "More",
+    "profile": "Profile",
+    "settings": "Settings",
+    "logout": "Log out"
+  },
+  "legalEagle": {
+    "title": "Legal Eagle AI",
+    "subtitle": "Your AI legal assistant",
+    "placeholder": "Ask a legal question…",
+    "send": "Send",
+    "expand": "Expand to full screen",
+    "minimize": "Minimize",
+    "close": "Close",
+    "open": "Open Legal Eagle AI",
+    "greeting": "Hi! I'm Legal Eagle, your AI legal assistant. How can I help you today?",
+    "disclaimer": "AI guidance — not a substitute for advice from a licensed lawyer.",
+    "thinking": "Thinking…"
+  },
+  "common": {
+    "loading": "Loading…",
+    "cancel": "Cancel",
+    "save": "Save",
+    "error": "Something went wrong. Please try again."
+  }
+}

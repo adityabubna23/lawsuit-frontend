@@ -248,6 +248,9 @@ export const appointmentsApi = {
 export const casesApi = {
   getAll: () => api.get('/cases'),
   getById: (id: string) => api.get(`/cases/${id}`),
+  /** Set a document's share-scope (PRIVATE/COUNSEL/SHARED). Uploader/admin only. */
+  setDocumentScope: (documentId: string, scope: 'PRIVATE' | 'COUNSEL' | 'SHARED') =>
+    api.patch(`/cases/documents/${documentId}/scope`, { scope }),
   create: (data: { title: string; lawyerId: string }) =>
     api.post('/cases', data),
   uploadDocument: (caseId: string, formData: FormData) =>
@@ -365,6 +368,18 @@ export const agreementTemplatesApi = {
   update: (id: string, data: { title?: string; description?: string; content?: string; category?: string }) =>
     api.put(`/agreement-templates/${id}`, data),
   delete: (id: string) => api.delete(`/agreement-templates/${id}`),
+  /** AI clause assistant — suggest a new clause, or improve/redraft a selection. */
+  clauseAi: (data: {
+    action: 'suggest' | 'improve' | 'redraft'
+    clauseType?: string
+    selection?: string
+    context?: string
+    tone?: string
+  }) => api.post('/agreement-templates/ai', data),
+  /** Version history (snapshots taken on every save). */
+  listVersions: (id: string) => api.get(`/agreement-templates/${id}/versions`),
+  restoreVersion: (id: string, version: number) =>
+    api.post(`/agreement-templates/${id}/restore/${version}`),
 }
 
 export const adminApi = {
@@ -375,6 +390,13 @@ export const adminApi = {
   listConsents: (params?: { userId?: string; kind?: string; from?: string; to?: string; page?: number; limit?: number }) =>
     api.get('/consents/admin', { params }),
   getConsent: (id: string) => api.get(`/consents/admin/${id}`),
+  /** Compliance report pack (SUPER_ADMIN). Summary is JSON; exports are CSV blobs. */
+  complianceSummary: (params?: { from?: string; to?: string }) =>
+    api.get('/compliance/summary', { params }),
+  complianceExport: (
+    kind: 'consents' | 'verifications' | 'sla-breaches' | 'payments',
+    params?: { from?: string; to?: string },
+  ) => api.get(`/compliance/export/${kind}`, { params, responseType: 'blob' }),
   verifyClient: (id: string) => api.put(`/admin/${id}/verifyclient`),
   verifyLawyer: (id: string) => api.put(`/admin/${id}/verifylawyer`),
 
@@ -698,6 +720,23 @@ export const ekycApi = {
   initiateEmailOtp: () => api.post('/ekyc/email-otp/initiate', {}),
   submitEmailOtp: (submissionId: string, otp: string) =>
     api.post('/ekyc/email-otp/submit', { submissionId, otp }),
+}
+
+// ── E-signature ────────────────────────────────────────────────────────────
+export const esignApi = {
+  createRequest: (data: {
+    consumerType: 'MEDIATION_MSA' | 'LAWYER_DOCUMENT' | 'ENTERPRISE_CONTRACT'
+    consumerRef?: string
+    title: string
+    bodyText?: string
+    sourceUrl?: string
+    parties: Array<{ email: string; name: string; userId?: string; roleLabel?: string; signOrder?: number }>
+    expiresInHours?: number
+  }) => api.post('/esign/requests', data),
+  getRequest: (id: string) => api.get(`/esign/requests/${id}`),
+  sendOtp: (id: string, partyId?: string) => api.post(`/esign/requests/${id}/send-otp`, { partyId }),
+  sign: (id: string, otp: string, partyId?: string) => api.post(`/esign/requests/${id}/sign`, { otp, partyId }),
+  signedUrl: (id: string) => api.get(`/esign/requests/${id}/signed-url`),
 }
 
 export const storageApi = {
