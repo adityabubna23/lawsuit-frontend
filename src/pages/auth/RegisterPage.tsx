@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/authStore'
 import Button from '@/components/atoms/Button'
 import BrandLogo from '@/components/atoms/BrandLogo'
 import LanguageSwitcher from '@/components/molecules/LanguageSwitcher'
+import { useTranslation } from 'react-i18next'
 import { User as UserIcon, Scale, Building2, ArrowLeft, ArrowRight, ShieldCheck } from 'lucide-react'
 
 const EyeIcon: FC<{ className?: string }> = ({ className }) => (
@@ -53,6 +54,7 @@ const ROLE_CARDS: {
 
 const RegisterPage: FC = () => {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const { register, isLoading, error, clearError } = useAuthStore()
   const [showPassword, setShowPassword] = useState(false)
@@ -128,6 +130,12 @@ const RegisterPage: FC = () => {
           <p className="mt-1 text-sm text-gray-500">
             {step === 'pick' ? 'Tell us what you want to be on NyayaX' : 'Just a few details to get you started'}
           </p>
+          {/* Explicit language choice during sign-up — sets the app language
+              for the whole session (persists). Same switcher as the top-right. */}
+          <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5">
+            <span className="text-xs text-gray-500">{t('language.select')}:</span>
+            <LanguageSwitcher />
+          </div>
         </div>
 
         {step === 'pick' ? (

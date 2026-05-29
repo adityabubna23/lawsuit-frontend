@@ -52,7 +52,10 @@ i18n
       lookupLocalStorage: 'nyayax_lang',
       caches: ['localStorage'],
     },
-    react: { useSuspense: false },
+    // bindI18nStore: 'added' makes components re-render when a lazy-loaded
+    // catalog is added AFTER the language switch — without it, switching to a
+    // not-yet-loaded language would stay stuck on the English fallback.
+    react: { useSuspense: false, bindI18nStore: 'added' },
   })
 
 // Lazy-load the detected language on boot, then keep direction + catalog in

@@ -1,7 +1,9 @@
 import { FC, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useMutation } from '@tanstack/react-query'
 import { Globe, Check, Search } from 'lucide-react'
 import { LANGUAGES, languageByCode } from '@/i18n/languages'
+import { loadCatalog } from '@/i18n'
 
 /**
  * App language switcher. The button shows the CURRENT language in its own
@@ -15,6 +17,12 @@ const LanguageSwitcher: FC = () => {
   const [query, setQuery] = useState('')
   const ref = useRef<HTMLDivElement>(null)
 
+  // Loading a not-yet-fetched catalog runs as a react-query mutation, so the
+  // platform-wide processing animation (driven by useIsMutating) shows ONLY
+  // while the chunk is actually downloading. Already-cached languages skip it
+  // entirely → instant switch, no animation.
+  const loadMutation = useMutation({ mutationFn: (code: string) => loadCatalog(code) })
+
   const current = languageByCode(i18n.language) || LANGUAGES[0]
 
   // Close on outside click.
@@ -27,10 +35,22 @@ const LanguageSwitcher: FC = () => {
     return () => document.removeEventListener('mousedown', onDown)
   }, [open])
 
-  const choose = (code: string) => {
-    void i18n.changeLanguage(code)
+  const choose = async (code: string) => {
     setOpen(false)
     setQuery('')
+    const base = code.split('-')[0]
+    // Only show the processing animation when the catalog genuinely needs
+    // loading (first pick of a language). English + already-loaded languages
+    // switch instantly with no animation.
+    const needsLoad = base !== 'en' && !i18n.hasResourceBundle(base, 'translation')
+    if (needsLoad) {
+      try {
+        await loadMutation.mutateAsync(code)
+      } catch {
+        /* fall through — i18n will use the English fallback */
+      }
+    }
+    await i18n.changeLanguage(code)
   }
 
   const filtered = query
@@ -74,7 +94,7 @@ const LanguageSwitcher: FC = () => {
               return (
                 <li key={l.code}>
                   <button
-                    onClick={() => choose(l.code)}
+                    onClick={() => { void choose(l.code) }}
                     className={`w-full flex items-center justify-between px-3 py-2 text-left hover:bg-gray-50 ${active ? 'bg-primary/5' : ''}`}
                     dir={l.rtl ? 'rtl' : 'ltr'}
                   >

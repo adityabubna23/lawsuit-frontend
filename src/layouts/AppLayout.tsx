@@ -13,10 +13,12 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import UserMenu from '../components/molecules/UserMenu'
 import BrandLogo from '../components/atoms/BrandLogo'
+import { useTranslation } from 'react-i18next'
 
 const AppLayout: FC = () => {
   const location = useLocation()
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const { user, logout } = useAuthStore()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
@@ -61,15 +63,15 @@ const AppLayout: FC = () => {
    *    don't have to maintain two source lists.
    */
   const primaryNav = [
-    { name: 'Home', path: '/app/home' },
-    { name: 'Find Lawyers', path: '/app/search' },
+    { name: 'Home', path: '/app/home', key: 'nav.home' },
+    { name: 'Find Lawyers', path: '/app/search', key: 'nav.findLawyers' },
     // Law Firms promoted out of the "More → Browse" group into the top
     // nav — it's a first-class discovery surface, not a sub-page.
-    { name: 'Law Firms', path: '/app/firms' },
-    { name: 'Appointments', path: '/app/appointments' },
-    { name: 'Calendar', path: '/app/calendar' },
-    { name: 'Cases', path: '/app/cases' },
-    { name: 'Chats', path: '/app/chats' },
+    { name: 'Law Firms', path: '/app/firms', key: 'nav.lawFirms' },
+    { name: 'Appointments', path: '/app/appointments', key: 'nav.appointments' },
+    { name: 'Calendar', path: '/app/calendar', key: 'nav.calendar' },
+    { name: 'Cases', path: '/app/cases', key: 'nav.cases' },
+    { name: 'Chats', path: '/app/chats', key: 'nav.chats' },
   ]
 
   const moreGroups: { heading: string; items: { name: string; path: string }[] }[] = [
@@ -174,7 +176,7 @@ const AppLayout: FC = () => {
                       : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
                       } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium flex-shrink-0`}
                   >
-                    {item.name}
+                    {t(item.key, item.name)}
                   </Link>
                 ))}
 
@@ -190,7 +192,7 @@ const AppLayout: FC = () => {
                       : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
                       } inline-flex items-center gap-1 px-1 pt-1 border-b-2 text-sm font-medium`}
                   >
-                    More
+                    {t('nav.more', 'More')}
                     <ChevronDown
                       className={`w-4 h-4 transition-transform ${isMoreOpen ? 'rotate-180' : ''}`}
                     />
@@ -347,7 +349,7 @@ const AppLayout: FC = () => {
                       : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
                       } block pl-3 pr-4 py-2 border-l-4 text-base font-medium`}
                   >
-                    {item.name}
+                    {t(item.key, item.name)}
                   </Link>
                 ))}
 
