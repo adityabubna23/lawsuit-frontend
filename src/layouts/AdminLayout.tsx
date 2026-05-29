@@ -6,6 +6,7 @@ import {
   ScrollText, FileText, ChevronLeft, ChevronRight, Bell, Menu,
   LogOut, Search, Briefcase, Building2, X,
 } from 'lucide-react'
+import LanguageSwitcher from '../components/molecules/LanguageSwitcher'
 import NotificationModal from '../components/molecules/NotificationModal'
 import NotificationToast from '../components/atoms/NotificationToast'
 import ErrorBoundary from '../components/organisms/ErrorBoundary'
@@ -284,6 +285,8 @@ const AdminLayout: FC = () => {
                 <Search className="w-3.5 h-3.5" />
                 Search users
               </button>
+
+              <LanguageSwitcher />
 
               {/* Notification bell */}
               <button

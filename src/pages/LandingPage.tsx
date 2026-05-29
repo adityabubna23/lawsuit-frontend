@@ -2,6 +2,7 @@ import { FC, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Button from '@/components/atoms/Button'
 import { useAuthStore } from '@/stores/authStore'
+import LanguageSwitcher from '@/components/molecules/LanguageSwitcher'
 
 /**
  * Map an authenticated user's role to the page they belong on when they
@@ -181,6 +182,8 @@ const LandingPage: FC = () => {
                   {item}
                 </a>
               ))}
+              {/* Language switcher — available to logged-out visitors too. */}
+              <LanguageSwitcher />
               <div className="w-px h-6 bg-gray-300/30 mx-2" />
               {isAuthenticated ? (
                 // Logged-in shortcut → route to whichever dashboard

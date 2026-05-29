@@ -17,6 +17,7 @@ import { useCourtAdminStore } from '../stores/courtAdminStore'
 import { useNotificationStore } from '../stores/notificationStore'
 import { useNotificationSocket } from '../hooks/useNotificationSocket'
 import NotificationModal from '../components/molecules/NotificationModal'
+import LanguageSwitcher from '../components/molecules/LanguageSwitcher'
 import ErrorBoundary from '../components/organisms/ErrorBoundary'
 import { useIsMobile } from '../hooks/useMediaQuery'
 
@@ -225,6 +226,8 @@ const CourtAdminLayout: FC = () => {
             </div>
 
             <div className="flex items-center gap-2">
+              <LanguageSwitcher />
+
               {/* Notification bell */}
               <button
                 onClick={() => setShowNotifications(true)}

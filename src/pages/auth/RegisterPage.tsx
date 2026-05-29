@@ -3,6 +3,7 @@ import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import Button from '@/components/atoms/Button'
 import BrandLogo from '@/components/atoms/BrandLogo'
+import LanguageSwitcher from '@/components/molecules/LanguageSwitcher'
 import { User as UserIcon, Scale, Building2, ArrowLeft, ArrowRight, ShieldCheck } from 'lucide-react'
 
 const EyeIcon: FC<{ className?: string }> = ({ className }) => (
@@ -112,6 +113,10 @@ const RegisterPage: FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-10 px-4 sm:px-6 lg:px-8">
+      {/* Language switcher — top-right corner, same behaviour as the in-app one. */}
+      <div className="absolute top-4 right-4 z-50">
+        <LanguageSwitcher />
+      </div>
       <div className={`${step === 'pick' ? 'max-w-3xl' : 'max-w-xl'} w-full`}>
         <div className="text-center mb-6">
           <div className="flex justify-center mb-3">

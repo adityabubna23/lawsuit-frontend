@@ -1,0 +1,38 @@
+{
+  "language": {
+    "change": "Badilisha lugha ya programu hapa",
+    "select": "Chagua lugha"
+  },
+  "nav": {
+    "home": "Nyumbani",
+    "findLawyers": "Pata Wataalamu wa Sheria",
+    "lawFirms": "Mashirika ya Wanasheria",
+    "appointments": "Mikutano",
+    "calendar": "Kalenda",
+    "cases": "Kesi",
+    "chats": "Majadiliano",
+    "more": "Zaidi",
+    "profile": "Wasifu",
+    "settings": "Mipangilio",
+    "logout": "Ondoka"
+  },
+  "legalEagle": {
+    "title": "Legal Eagle AI",
+    "subtitle": "Msaada wako wa kisheria wa AI",
+    "placeholder": "Uliza swali la kisheria…",
+    "send": "Tuma",
+    "expand": "Panua hadi kwenye skrini nzima",
+    "minimize": "Punguza",
+    "close": "Funga",
+    "open": "Fungua Legal Eagle AI",
+    "greeting": "Habari! Mimi ni Legal Eagle, msaada wako wa kisheria wa AI. Ninaweza kukusaidia nini leo?",
+    "disclaimer": "Uongozi wa AI — sio mbadala ya ushauri kutoka kwa mwanasheria aliyeajiriwa.",
+    "thinking": "Nakifikiria…"
+  },
+  "common": {
+    "loading": "Inachukua…",
+    "cancel": "Futa",
+    "save": "Hifadhi",
+    "error": "Kulikuwa na hitilafu. Tafadhali jaribu tena."
+  }
+}
