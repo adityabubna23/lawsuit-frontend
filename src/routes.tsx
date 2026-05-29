@@ -50,6 +50,7 @@ import AdminPayoutsPage from './pages/admin/AdminPayoutsPage'
 import AdminUserModerationPage from './pages/admin/AdminUserModerationPage'
 import AdminLegalUpdatesPage from './pages/admin/AdminLegalUpdatesPage'
 import AdminReportsPage from './pages/admin/AdminReportsPage'
+import AdminConsentsPage from './pages/admin/AdminConsentsPage'
 import AdminConfigPage from './pages/admin/AdminConfigPage'
 import AdminCourtAdminsPage from './pages/admin/AdminCourtAdminsPage'
 import AdminSalaryPage from './pages/admin/AdminSalaryPage'
@@ -377,6 +378,8 @@ const AppRoutes = () => {
         <Route path="court-admins" element={<AdminCourtAdminsPage />} />
         <Route path="legal-updates" element={<AdminLegalUpdatesPage />} />
         <Route path="reports" element={<AdminReportsPage />} />
+        {/* Consent / provenance audit — every consent event captured platform-wide. */}
+        <Route path="consents" element={<AdminConsentsPage />} />
         <Route path="settings" element={<AdminConfigPage />} />
         <Route path="salary" element={<AdminSalaryPage />} />
         <Route path="courts" element={<AdminCourtsPage />} />

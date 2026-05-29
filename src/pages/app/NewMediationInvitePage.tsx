@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import api, { apiEndpoints, mediationApi } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
+import MediationSuitabilityWidget from '@/components/molecules/MediationSuitabilityWidget'
 
 /**
  * Send a mediation invitation — lawyer-initiated, from a Case ONLY.
@@ -202,6 +203,10 @@ const NewMediationInvitePage: FC = () => {
           invitation goes out on the first click. A mediation record is created when they accept.
         </p>
       </div>
+
+      {/* Mediation suitability check (heuristic). Run it before sending the
+          invite so both sides go in with realistic expectations. */}
+      <MediationSuitabilityWidget className="mb-6" />
 
       {/* Always-available Resend — shown whenever an invite for this case
           is still PENDING (the other party hasn't accepted). If they

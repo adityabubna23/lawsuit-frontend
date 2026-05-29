@@ -29,6 +29,13 @@ const VideoConsultationPage: FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [fetching, setFetching] = useState(true)
   const [provisioning, setProvisioning] = useState(false)
+  // No-recording acknowledgement gate. The server returns 412 NO_RECORDING_ACK_REQUIRED
+  // until the caller posts the ack; we show a blocking modal until they do.
+  const [needsNoRecAck, setNeedsNoRecAck] = useState(false)
+  const [noRecAckText, setNoRecAckText] = useState('')
+  const [noRecAgreed, setNoRecAgreed] = useState(false)
+  const [noRecAckBusy, setNoRecAckBusy] = useState(false)
+  const [meetingRefetchKey, setMeetingRefetchKey] = useState(0)
   /**
    * Fallback flips on automatically when /video/meeting fails (Daily.co unavailable
    * or appointment doesn't have a Daily room) — or via the manual toggle.
@@ -53,6 +60,7 @@ const VideoConsultationPage: FC = () => {
       .then((res) => {
         if (cancelled) return
         const data = res.data as MeetingResponse
+        setNeedsNoRecAck(false)
         if (!data?.meetingLink) {
           // Daily room not provisioned — fall back to peer-to-peer WebRTC.
           setUseFallback(true)
@@ -62,9 +70,18 @@ const VideoConsultationPage: FC = () => {
       })
       .catch((err: any) => {
         if (cancelled) return
+        const status = err?.response?.status
+        const body = err?.response?.data as { error?: string; text?: string } | undefined
+        // 412 = no-recording ack required. Show the ack modal and let the user
+        // confirm; the meeting refetches after they post the ack.
+        if (status === 412 && body?.error === 'NO_RECORDING_ACK_REQUIRED') {
+          setNoRecAckText(body?.text ?? '')
+          setNeedsNoRecAck(true)
+          return
+        }
         // Network / 5xx / Daily unavailable — switch to WebRTC fallback rather
         // than dead-ending the user. They can still leave via the back button.
-        const msg = err?.response?.data?.error || err?.message || 'Failed to join the meeting'
+        const msg = body?.error || err?.message || 'Failed to join the meeting'
         console.warn('[Video] Daily meeting fetch failed, switching to WebRTC fallback:', msg)
         setUseFallback(true)
       })
@@ -75,7 +92,29 @@ const VideoConsultationPage: FC = () => {
     return () => {
       cancelled = true
     }
-  }, [appointmentId])
+  }, [appointmentId, meetingRefetchKey])
+
+  // No-recording acknowledgement: confirm + refetch.
+  const handleNoRecAckConfirm = useCallback(async () => {
+    if (!appointmentId) return
+    if (!noRecAgreed) {
+      setError('Please tick the acknowledgement to continue.')
+      return
+    }
+    setNoRecAckBusy(true)
+    setError(null)
+    try {
+      await videoApi.recordNoRecordingAck(appointmentId)
+      setNeedsNoRecAck(false)
+      setNoRecAgreed(false)
+      // Bump the refetch key to re-run the getMeeting effect.
+      setMeetingRefetchKey((k) => k + 1)
+    } catch (err: any) {
+      setError(err?.response?.data?.error || err?.message || "Couldn't record acknowledgement. Please try again.")
+    } finally {
+      setNoRecAckBusy(false)
+    }
+  }, [appointmentId, noRecAgreed])
 
   /**
    * On leave, the LAWYER (consultation host) hits the end-meeting endpoint so
@@ -140,6 +179,42 @@ const VideoConsultationPage: FC = () => {
   }
 
   return (
+    <>
+      {needsNoRecAck && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden">
+            <div className="bg-gradient-to-br from-primary to-[#0a3d50] text-white px-6 py-4">
+              <h2 className="text-base font-semibold">Before you join</h2>
+              <p className="text-xs text-white/80">Privacy acknowledgement (DPDP)</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-gray-700 leading-relaxed">{noRecAckText}</p>
+              <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={noRecAgreed}
+                  onChange={(e) => setNoRecAgreed(e.target.checked)}
+                  className="mt-0.5 rounded border-gray-300 text-primary focus:ring-primary/30"
+                />
+                <span>I understand and agree.</span>
+              </label>
+              <button
+                onClick={handleNoRecAckConfirm}
+                disabled={noRecAckBusy || !noRecAgreed}
+                className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-primary text-white font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {noRecAckBusy ? 'Recording…' : 'Acknowledge and join'}
+              </button>
+              <button
+                onClick={() => navigate(-1)}
+                className="w-full text-sm text-gray-500 hover:text-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     <div className="flex flex-col h-[calc(100vh-80px)] w-full max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-4">
       <div className="flex justify-between items-center mb-4">
         <div>
@@ -206,6 +281,7 @@ const VideoConsultationPage: FC = () => {
         )}
       </div>
     </div>
+    </>
   )
 }
 

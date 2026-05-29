@@ -1,8 +1,9 @@
 import { FC, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Scale, Phone, Globe, Shield, CheckCircle, XCircle, ChevronRight, Users, Info, Heart } from 'lucide-react';
+import { Scale, Phone, Globe, Shield, CheckCircle, XCircle, ChevronRight, Users, Info, Heart, UserCheck } from 'lucide-react';
 import { teleLawApi } from '@/services/api';
 import EkycStatusCard from '@/components/molecules/EkycStatusCard';
+import { useAuthStore } from '@/stores/authStore';
 
 interface EligibilityResult {
     eligible: boolean;
@@ -31,13 +32,32 @@ const GENDER_OPTIONS = [
 ];
 
 const TeleLawPage: FC = () => {
+    const authUser = useAuthStore((s) => s.user);
     const [income, setIncome] = useState('');
     const [caste, setCaste] = useState('');
     const [gender, setGender] = useState('');
     const [state, setState] = useState('');
     const [loading, setLoading] = useState(false);
+    const [profileLoading, setProfileLoading] = useState(false);
     const [result, setResult] = useState<EligibilityResult | null>(null);
     const [error, setError] = useState<string | null>(null);
+
+    // One-click eligibility using the client's saved profile data (income +
+    // caste + gender + state). Server reads from Client and applies the same
+    // rules as the anonymous form.
+    const handleUseProfile = async () => {
+        setError(null);
+        setResult(null);
+        setProfileLoading(true);
+        try {
+            const res = await teleLawApi.checkEligibility({ useProfile: true });
+            setResult(res.data?.data ?? res.data);
+        } catch (err: any) {
+            setError(err?.response?.data?.error || err?.message || 'Failed to check eligibility from your profile');
+        } finally {
+            setProfileLoading(false);
+        }
+    };
 
     const handleCheck = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -114,6 +134,25 @@ const TeleLawPage: FC = () => {
                             </div>
 
                             <form onSubmit={handleCheck} className="p-6 space-y-5">
+                                {/* Authenticated quick-check: skip the form and let the server use
+                                    the income/caste/gender/state from the client's saved profile. */}
+                                {authUser?.id && (
+                                    <div className="-mt-1 mb-1 rounded-lg border border-primary/20 bg-primary/5 p-3 flex items-start gap-3">
+                                        <UserCheck className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-sm font-semibold text-primary">Already on NyayaX?</div>
+                                            <p className="text-xs text-gray-600 mt-0.5">Use the income, category and address from your profile — no need to re-enter.</p>
+                                            <button
+                                                type="button"
+                                                onClick={handleUseProfile}
+                                                disabled={profileLoading || loading}
+                                                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-white text-xs font-medium hover:bg-midnight disabled:opacity-50"
+                                            >
+                                                {profileLoading ? 'Checking…' : 'Use my profile'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                                 {/* Income */}
                                 <div>
                                     <label htmlFor="income" className="block text-sm font-medium text-gray-700 mb-1">

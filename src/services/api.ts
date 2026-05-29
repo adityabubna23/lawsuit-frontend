@@ -275,6 +275,9 @@ export const usersApi = {
   // it to flip phoneVerified. Required even for an Aadhaar-noted number.
   sendPhoneOtp: () => api.post('/users/me/phone/send-otp', {}),
   verifyPhoneOtp: (code: string) => api.post('/users/me/phone/verify-otp', { code }),
+  // DPDP first-login privacy notice — status (consented?) + record.
+  getDpdpConsentStatus: () => api.get('/consents/dpdp'),
+  recordDpdpConsent: () => api.post('/consents/dpdp', {}),
   // Client information (read & update)
   getClientInformation: () => api.get('/users/client-information'),
   postClientInformation: (payload: any) => api.post('/users/client-information', payload),
@@ -368,6 +371,10 @@ export const adminApi = {
   // Existing
   getNotVerifiedClients: () => api.get('/admin/not-verified-client'),
   getNotVerifiedLawyers: () => api.get('/admin/not-verified-lawyers'),
+  /** Consent / provenance views — lists ConsentEvent rows across the platform. */
+  listConsents: (params?: { userId?: string; kind?: string; from?: string; to?: string; page?: number; limit?: number }) =>
+    api.get('/consents/admin', { params }),
+  getConsent: (id: string) => api.get(`/consents/admin/${id}`),
   verifyClient: (id: string) => api.put(`/admin/${id}/verifyclient`),
   verifyLawyer: (id: string) => api.put(`/admin/${id}/verifylawyer`),
 
@@ -657,6 +664,10 @@ export const videoApi = {
    *  server can release escrow / mark the consultation completed. */
   endMeeting: (appointmentId: string) =>
     api.post(`/video/meeting/${appointmentId}/end`),
+  /** No-recording acknowledgement — must be sent before getMeeting will return
+   *  a room (server enforces with a 412 NO_RECORDING_ACK_REQUIRED). */
+  recordNoRecordingAck: (appointmentId: string) =>
+    api.post(`/video/meeting/${appointmentId}/no-recording-ack`, {}),
   getCallHistory: (params?: { page?: number; limit?: number }) =>
     api.get('/video/call-history', { params }),
 }
@@ -828,6 +839,15 @@ export const documentAiApi = {
 }
 
 export const mediationApi = {
+  /** Suitability scorer (heuristic). Surfaces a 0-100 score + reasons before
+   *  someone commits to mediation. AI-backed scorer can replace later — same body. */
+  scoreSuitability: (input: {
+    caseType?: string
+    amount?: number
+    cooperation?: 'YES' | 'NO' | 'UNKNOWN'
+    urgency?: 'URGENT' | 'STANDARD'
+    priorAttempt?: boolean
+  }) => api.post('/mediations/suitability', input),
   // Invites
   createInvite: (data: {
     respondentEmail: string

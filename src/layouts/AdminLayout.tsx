@@ -64,6 +64,7 @@ const SECTIONS: NavSection[] = [
     heading: 'System',
     items: [
       { to: '/admin/reports', label: 'Reports', icon: Bug },
+      { to: '/admin/consents', label: 'Consent Audit', icon: ShieldCheck },
       { to: '/admin/settings', label: 'Settings & Audit', icon: ScrollText },
     ],
   },
