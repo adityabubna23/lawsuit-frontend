@@ -157,6 +157,35 @@ const ProfilePage: FC = () => {
     }
   }
 
+  // Phone verification via SMS OTP. A number auto-noted from Aadhaar is NOT
+  // trusted until the client confirms it here. We persist the number first (so
+  // we OTP the saved value), send the code, then verify.
+  const [verifyingPhone, setVerifyingPhone] = useState(false)
+  const handleVerifyPhone = async () => {
+    setError(null)
+    setVerifyingPhone(true)
+    try {
+      const savedPhone = user?.phone != null ? String(user.phone) : ''
+      if (phone && phone !== savedPhone) {
+        await updateUser({ phone })
+      }
+      await usersApi.sendPhoneOtp()
+      const code = window.prompt(`Enter the 6-digit code sent to ${phone}`) || ''
+      if (!code) return
+      await usersApi.verifyPhoneOtp(code)
+      await getUser()
+      const refreshed = useUserStore.getState().user || useAuthStore.getState().user
+      if (refreshed) {
+        setUser(refreshed)
+        setPhone(refreshed.phone ? String(refreshed.phone) : '')
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.error || err.message || 'Phone verification failed')
+    } finally {
+      setVerifyingPhone(false)
+    }
+  }
+
   return (
     <div className="max-w-5xl mx-auto py-12 px-4">
       <div className="bg-white rounded-t-lg  p-8 flex gap-8">
@@ -253,7 +282,9 @@ const ProfilePage: FC = () => {
                 {user?.phoneVerified && phone === (user?.phone != null ? String(user.phone) : '') ? (
                   <span className="text-green-600 text-sm">Verified</span>
                 ) : (
-                  <Button onClick={() => handleRequestAndVerify(phone)} disabled={!phone}>Verify</Button>
+                  <Button onClick={handleVerifyPhone} disabled={!phone || verifyingPhone}>
+                    {verifyingPhone ? 'Verifying…' : 'Verify'}
+                  </Button>
                 )}
               </div>
             </div>

@@ -59,6 +59,10 @@ const EkycDigilockerCallback: FC = () => {
         ekycVerifiedVia?: 'AADHAAR' | 'EMAIL_OTP'
         aadhaarLast4?: string
         aadhaarName?: string
+        // Profile fields synced from Aadhaar on success (name always; phone
+        // only when Aadhaar returned a usable mobile).
+        name?: string
+        phone?: string
       }
 
       if (body?.pending) {
@@ -89,6 +93,9 @@ const EkycDigilockerCallback: FC = () => {
                 ekycVerifiedVia: body.ekycVerifiedVia ?? 'AADHAAR',
                 aadhaarLast4: body.aadhaarLast4,
                 aadhaarName: body.aadhaarName,
+                // Reflect the Aadhaar-synced profile fields without a /auth/me round-trip.
+                ...(body.name ? { name: body.name } : {}),
+                ...(body.phone ? { phone: body.phone } : {}),
               } as any)
             : prev,
         )

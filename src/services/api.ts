@@ -271,6 +271,10 @@ export const usersApi = {
     api.get(`/cases/${userId}/getpresignedUrl`, { params }),
   // Cloudinary signed upload: returns { timestamp, signature, cloudName, apiKey, folder }
   getUploadSignature: () => api.get('/users/me/upload-signature'),
+  // Phone verification (OTP) — sends a code to the saved phone, then confirms
+  // it to flip phoneVerified. Required even for an Aadhaar-noted number.
+  sendPhoneOtp: () => api.post('/users/me/phone/send-otp', {}),
+  verifyPhoneOtp: (code: string) => api.post('/users/me/phone/verify-otp', { code }),
   // Client information (read & update)
   getClientInformation: () => api.get('/users/client-information'),
   postClientInformation: (payload: any) => api.post('/users/client-information', payload),
