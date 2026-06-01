@@ -5,7 +5,7 @@ import Button from '@/components/atoms/Button'
 import BrandLogo from '@/components/atoms/BrandLogo'
 import LanguageSwitcher from '@/components/molecules/LanguageSwitcher'
 import { useTranslation } from 'react-i18next'
-import { User as UserIcon, Scale, Building2, ArrowLeft, ArrowRight, ShieldCheck } from 'lucide-react'
+import { User as UserIcon, Scale, Building2, ArrowLeft, ArrowRight, ShieldCheck, Check } from 'lucide-react'
 
 const EyeIcon: FC<{ className?: string }> = ({ className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
@@ -19,6 +19,25 @@ const EyeOffIcon: FC<{ className?: string }> = ({ className }) => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
   </svg>
 )
+
+// Password strength — mirrors lawsuit-app's RegisterScreen so the rules feel
+// identical across web + mobile. One point each for length ≥ 8, an uppercase
+// letter, a lowercase letter, a digit, and a special character. score ≤ 2 →
+// Weak, ≤ 3 → Medium, else Strong.
+const PASSWORD_RULES: { id: string; label: string; test: (p: string) => boolean }[] = [
+  { id: 'len', label: 'At least 8 characters', test: (p) => p.length >= 8 },
+  { id: 'upper', label: 'One uppercase letter', test: (p) => /[A-Z]/.test(p) },
+  { id: 'lower', label: 'One lowercase letter', test: (p) => /[a-z]/.test(p) },
+  { id: 'number', label: 'One number', test: (p) => /[0-9]/.test(p) },
+  { id: 'special', label: 'One special character', test: (p) => /[^A-Za-z0-9]/.test(p) },
+]
+
+const getPasswordStrength = (pw: string) => {
+  const score = PASSWORD_RULES.reduce((acc, r) => acc + (r.test(pw) ? 1 : 0), 0)
+  if (score <= 2) return { score, label: 'Weak', percent: 33, barClass: 'bg-red-500', textClass: 'text-red-600' }
+  if (score <= 3) return { score, label: 'Medium', percent: 66, barClass: 'bg-amber-500', textClass: 'text-amber-600' }
+  return { score, label: 'Strong', percent: 100, barClass: 'bg-green-600', textClass: 'text-green-600' }
+}
 
 type RegisterRole = 'client' | 'lawyer' | 'organization'
 
@@ -58,6 +77,11 @@ const RegisterPage: FC = () => {
   const [searchParams] = useSearchParams()
   const { register, isLoading, error, clearError } = useAuthStore()
   const [showPassword, setShowPassword] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [confirmPassword, setConfirmPassword] = useState('')
+  // Client-side validation errors (password rules / mismatch) shown separately
+  // from the server `error` so they clear independently as the user types.
+  const [formError, setFormError] = useState<string | null>(null)
 
   // `?role=` from a deep-link (e.g. from the login page's "Sign up" CTA).
   const initialRole = (() => {
@@ -91,10 +115,25 @@ const RegisterPage: FC = () => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
     if (error) clearError()
+    if (formError) setFormError(null)
   }
+
+  const strength = getPasswordStrength(formData.password)
+  // Only flag a mismatch once the user has started typing the confirmation —
+  // don't shout "Passwords do not match" at an empty field.
+  const passwordsMismatch = confirmPassword.length > 0 && formData.password !== confirmPassword
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setFormError(null)
+    if (formData.password.length < 8) {
+      setFormError('Password must be at least 8 characters.')
+      return
+    }
+    if (formData.password !== confirmPassword) {
+      setFormError('Passwords do not match.')
+      return
+    }
     try {
       const payload: any = { ...formData, role }
       if (role === 'organization') {
@@ -204,9 +243,9 @@ const RegisterPage: FC = () => {
                 </div>
               </div>
 
-              {error && (
+              {(error || formError) && (
                 <div className="rounded-md p-3 bg-red-50 border border-red-100">
-                  <div className="text-sm text-red-700">{error}</div>
+                  <div className="text-sm text-red-700">{formError || error}</div>
                 </div>
               )}
 
@@ -280,9 +319,76 @@ const RegisterPage: FC = () => {
                     {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
                   </button>
                 </div>
-                <p className="mt-1 text-xs text-gray-500">
-                  At least 8 characters. Mixing letters, numbers, and a special character is recommended.
-                </p>
+                {/* Strength meter + live requirements — only once the user
+                    starts typing, to avoid a wall of red on an empty field. */}
+                {formData.password.length > 0 ? (
+                  <div className="mt-2 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                        <div
+                          className={`h-full ${strength.barClass} transition-all`}
+                          style={{ width: `${strength.percent}%` }}
+                        />
+                      </div>
+                      <span className={`text-xs font-medium ${strength.textClass}`}>{strength.label}</span>
+                    </div>
+                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1">
+                      {PASSWORD_RULES.map(rule => {
+                        const met = rule.test(formData.password)
+                        return (
+                          <li
+                            key={rule.id}
+                            className={`flex items-center gap-1.5 text-xs ${met ? 'text-green-600' : 'text-gray-400'}`}
+                          >
+                            {met ? (
+                              <Check className="w-3.5 h-3.5 shrink-0" />
+                            ) : (
+                              <span className="w-3.5 h-3.5 shrink-0 rounded-full border border-gray-300" />
+                            )}
+                            {rule.label}
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-xs text-gray-500">
+                    At least 8 characters. Mixing letters, numbers, and a special character is recommended.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+                <div className="relative">
+                  <input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type={showConfirm ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    required
+                    className={`block w-full px-3 py-2 pr-10 border placeholder-gray-400 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary sm:text-sm ${passwordsMismatch ? 'border-red-400' : 'border-gray-300'}`}
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value)
+                      if (error) clearError()
+                      if (formError) setFormError(null)
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm(p => !p)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                    tabIndex={-1}
+                    aria-label={showConfirm ? 'Hide password' : 'Show password'}
+                  >
+                    {showConfirm ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                  </button>
+                </div>
+                {passwordsMismatch && (
+                  <p className="mt-1 text-xs text-red-600">Passwords do not match</p>
+                )}
               </div>
 
               {role === 'organization' && (
@@ -318,7 +424,7 @@ const RegisterPage: FC = () => {
                 </div>
               )}
 
-              <Button type="submit" variant="primary" className="w-full" disabled={isLoading}>
+              <Button type="submit" variant="primary" className="w-full" disabled={isLoading || passwordsMismatch}>
                 <span className="inline-flex items-center justify-center gap-2">
                   {isLoading ? 'Creating account…' : 'Create account'}
                   {!isLoading && <ArrowRight className="w-4 h-4" />}

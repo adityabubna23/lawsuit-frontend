@@ -87,6 +87,10 @@ const normalizeResponse = (data: any): ClientInfoShape => {
 const ClientInfo: React.FC = () => {
   const authUser = useAuthStore((s) => s.user)
   const userId = authUser?.id
+  // Once Aadhaar-verified, DOB + gender are locked to the verified identity and
+  // can't be edited here (the server also rejects changes). Everything else
+  // (address, income, caste, proofs) stays editable.
+  const aadhaarLocked = !!(authUser as any)?.ekycVerified
 
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
@@ -290,21 +294,27 @@ const ClientInfo: React.FC = () => {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className={labelClasses}>Date of Birth</label>
-              <input 
-                disabled={!editing} 
-                type="date" 
-                value={form.dob ? form.dob.split('T')[0] : ''} 
-                onChange={(e) => onChange('dob', e.target.value)} 
+              <label className={labelClasses}>
+                Date of Birth
+                {aadhaarLocked && <span className="ml-2 text-xs font-normal text-gray-400">🔒 Aadhaar-verified</span>}
+              </label>
+              <input
+                disabled={!editing || aadhaarLocked}
+                type="date"
+                value={form.dob ? form.dob.split('T')[0] : ''}
+                onChange={(e) => onChange('dob', e.target.value)}
                 className={inputClasses}
               />
             </div>
             <div>
-              <label className={labelClasses}>Gender</label>
-              <select 
-                disabled={!editing} 
-                value={form.gender || ''} 
-                onChange={(e) => onChange('gender', e.target.value || undefined)} 
+              <label className={labelClasses}>
+                Gender
+                {aadhaarLocked && <span className="ml-2 text-xs font-normal text-gray-400">🔒 Aadhaar-verified</span>}
+              </label>
+              <select
+                disabled={!editing || aadhaarLocked}
+                value={form.gender || ''}
+                onChange={(e) => onChange('gender', e.target.value || undefined)}
                 className={selectClasses}
               >
                 <option value="">Select gender</option>
@@ -314,6 +324,11 @@ const ClientInfo: React.FC = () => {
               </select>
             </div>
           </div>
+          {aadhaarLocked && (
+            <p className="mt-2 text-xs text-gray-500">
+              Name, date of birth and gender are locked to your Aadhaar-verified identity. Contact support to change them.
+            </p>
+          )}
         </section>
 
         {/* Location Section */}

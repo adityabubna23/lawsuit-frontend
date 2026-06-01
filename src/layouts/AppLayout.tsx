@@ -146,7 +146,7 @@ const AppLayout: FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow relative z-50">
+      <nav className="bg-white shadow sticky top-0 z-50">
         {/*
           Use the full viewport width (not max-w-7xl) so 15+ nav items don't
           push the right-side wallet/notification/profile controls off-screen.

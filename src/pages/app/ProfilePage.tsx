@@ -242,22 +242,40 @@ const ProfilePage: FC = () => {
 
           <div className="space-y-4">
             <div >
-              <label className="block text-sm text-gray-600 mb-1">Full name</label>
+              <label className="block text-sm text-gray-600 mb-1">
+                Full name
+                {(user as any)?.ekycVerified && (
+                  <span className="ml-2 text-xs font-normal text-gray-400">🔒 Aadhaar-verified</span>
+                )}
+              </label>
               <div className="flex gap-2 items-center">
-                <input name="fullName" value={name} onChange={(e) => setName(e.target.value)} className="w-full border rounded p-2" />
-              <Button
-                onClick={() => {
-                  // focus name input in form
-                  const el = document.querySelector('input[name="fullName"]') as HTMLInputElement | null
-                  if (el) {
-                    el.focus()
-                    el.select()
-                  }
-                }}
-              >
-                Edit
-              </Button>
+                <input
+                  name="fullName"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  disabled={!!(user as any)?.ekycVerified}
+                  className="w-full border rounded p-2 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                />
+              {!(user as any)?.ekycVerified && (
+                <Button
+                  onClick={() => {
+                    // focus name input in form
+                    const el = document.querySelector('input[name="fullName"]') as HTMLInputElement | null
+                    if (el) {
+                      el.focus()
+                      el.select()
+                    }
+                  }}
+                >
+                  Edit
+                </Button>
+              )}
               </div>
+              {(user as any)?.ekycVerified && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Locked to your Aadhaar-verified identity. Contact support to change it.
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm text-gray-600 mb-1">Phone</label>
