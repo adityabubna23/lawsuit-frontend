@@ -74,6 +74,8 @@ const EkycPage: FC = () => {
             name={data?.client?.aadhaarName || '—'}
             last4={data?.client?.aadhaarLast4}
             verifiedAt={data?.client?.ekycVerifiedAt}
+            detailsMissing={!data?.client?.aadhaarName}
+            onReverify={() => setModalOpen(true)}
           />
         ) : pending ? (
           <PendingCard
@@ -120,7 +122,13 @@ const EkycPage: FC = () => {
 
 // ─── State cards ─────────────────────────────────────────────────────────
 
-const VerifiedCard: FC<{ name: string; last4?: string | null; verifiedAt?: string | null }> = ({ name, last4, verifiedAt }) => (
+const VerifiedCard: FC<{
+  name: string
+  last4?: string | null
+  verifiedAt?: string | null
+  detailsMissing?: boolean
+  onReverify?: () => void
+}> = ({ name, last4, verifiedAt, detailsMissing, onReverify }) => (
   <div className="bg-white border border-green-200 rounded-2xl shadow-sm overflow-hidden">
     <div className="bg-green-50 px-6 py-4 border-b border-green-100 flex items-center gap-2">
       <CheckCircle2 className="w-5 h-5 text-green-600" />
@@ -130,10 +138,26 @@ const VerifiedCard: FC<{ name: string; last4?: string | null; verifiedAt?: strin
       <Row label="Name" value={name} />
       <Row label="Aadhaar" value={last4 ? `XXXX XXXX ${last4}` : '—'} mono />
       <Row label="Verified on" value={verifiedAt ? new Date(verifiedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'} />
-      <p className="text-xs text-gray-500 leading-relaxed pt-3 border-t border-gray-100">
-        Your identity is locked to your Aadhaar profile. You cannot change name, date of birth, or
-        gender without contacting support.
-      </p>
+
+      {detailsMissing ? (
+        <div className="pt-3 border-t border-gray-100 space-y-2">
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+            Your identity is verified, but we couldn't capture your Aadhaar name/number details. Re-run
+            DigiLocker to complete your profile.
+          </p>
+          <button
+            onClick={onReverify}
+            className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-amber-600 text-white font-medium hover:bg-amber-700"
+          >
+            <RefreshCw className="w-4 h-4" /> Complete verification details
+          </button>
+        </div>
+      ) : (
+        <p className="text-xs text-gray-500 leading-relaxed pt-3 border-t border-gray-100">
+          Your identity is locked to your Aadhaar profile. You cannot change name, date of birth, or
+          gender without contacting support.
+        </p>
+      )}
     </div>
   </div>
 )

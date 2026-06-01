@@ -189,6 +189,13 @@ const LoginPage: FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-10 px-4 sm:px-6 lg:px-8">
+      {/* Back to the landing page — top-left, mirrors the language switcher. */}
+      <Link
+        to="/"
+        className="absolute top-4 left-4 z-50 inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-primary"
+      >
+        <ArrowLeft className="w-4 h-4" /> Back to home
+      </Link>
       {/* Language switcher — top-right corner, same behaviour as the in-app one. */}
       <div className="absolute top-4 right-4 z-50">
         <LanguageSwitcher />
@@ -196,7 +203,8 @@ const LoginPage: FC = () => {
       <div className={`${step === 'pick' ? 'max-w-3xl' : 'max-w-md'} w-full`}>
         <div className="text-center mb-6">
           <div className="flex justify-center mb-3">
-            <BrandLogo to={null} size="lg" />
+            {/* Clickable brand → landing page (universal convention). */}
+            <BrandLogo to="/" size="lg" />
           </div>
           <h2 className="text-3xl font-extrabold text-gray-900">
             {step === 'pick' ? 'Welcome back' : `Sign in as ${activeCard.short}`}
