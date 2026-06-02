@@ -75,6 +75,7 @@ const EkycPage: FC = () => {
             last4={data?.client?.aadhaarLast4}
             verifiedAt={data?.client?.ekycVerifiedAt}
             detailsMissing={!data?.client?.aadhaarName}
+            via={(data?.client as any)?.ekycVerifiedVia}
             onReverify={() => setModalOpen(true)}
           />
         ) : pending ? (
@@ -127,29 +128,40 @@ const VerifiedCard: FC<{
   last4?: string | null
   verifiedAt?: string | null
   detailsMissing?: boolean
+  via?: 'AADHAAR' | 'EMAIL_OTP' | null
   onReverify?: () => void
-}> = ({ name, last4, verifiedAt, detailsMissing, onReverify }) => (
-  <div className="bg-white border border-green-200 rounded-2xl shadow-sm overflow-hidden">
-    <div className="bg-green-50 px-6 py-4 border-b border-green-100 flex items-center gap-2">
-      <CheckCircle2 className="w-5 h-5 text-green-600" />
-      <h2 className="font-semibold text-green-900">Identity Verified</h2>
+}> = ({ name, last4, verifiedAt, detailsMissing, via, onReverify }) => {
+  // EMAIL_OTP is the temporary fallback (no Aadhaar details captured). Offer a
+  // first-class "upgrade to Aadhaar via DigiLocker" path. detailsMissing is
+  // also true for an Aadhaar attempt that failed to capture the name — that
+  // keeps the older "complete your details" wording.
+  const isTemp = via === 'EMAIL_OTP'
+  const showUpgrade = detailsMissing || isTemp
+  return (
+  <div className={`bg-white border ${isTemp ? 'border-amber-200' : 'border-green-200'} rounded-2xl shadow-sm overflow-hidden`}>
+    <div className={`${isTemp ? 'bg-amber-50 border-amber-100' : 'bg-green-50 border-green-100'} px-6 py-4 border-b flex items-center gap-2`}>
+      <CheckCircle2 className={`w-5 h-5 ${isTemp ? 'text-amber-600' : 'text-green-600'}`} />
+      <h2 className={`font-semibold ${isTemp ? 'text-amber-900' : 'text-green-900'}`}>
+        {isTemp ? 'Identity Verified — Temporary' : 'Identity Verified'}
+      </h2>
     </div>
     <div className="p-6 space-y-3">
       <Row label="Name" value={name} />
       <Row label="Aadhaar" value={last4 ? `XXXX XXXX ${last4}` : '—'} mono />
       <Row label="Verified on" value={verifiedAt ? new Date(verifiedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'} />
 
-      {detailsMissing ? (
+      {showUpgrade ? (
         <div className="pt-3 border-t border-gray-100 space-y-2">
           <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-            Your identity is verified, but we couldn't capture your Aadhaar name/number details. Re-run
-            DigiLocker to complete your profile.
+            {isTemp
+              ? "You're verified via the temporary email-OTP path. Upgrade to full Aadhaar verification via DigiLocker for complete, locked identity verification."
+              : "Your identity is verified, but we couldn't capture your Aadhaar name/number details. Re-run DigiLocker to complete your profile."}
           </p>
           <button
             onClick={onReverify}
             className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-amber-600 text-white font-medium hover:bg-amber-700"
           >
-            <RefreshCw className="w-4 h-4" /> Complete verification details
+            <RefreshCw className="w-4 h-4" /> {isTemp ? 'Upgrade to Aadhaar via DigiLocker' : 'Complete verification details'}
           </button>
         </div>
       ) : (
@@ -160,7 +172,8 @@ const VerifiedCard: FC<{
       )}
     </div>
   </div>
-)
+  )
+}
 
 const PendingCard: FC<{ onContinue: () => void; expiresAt?: string | null; digilocker?: boolean }> = ({ onContinue, expiresAt, digilocker }) => (
   <div className="bg-white border border-amber-200 rounded-2xl shadow-sm overflow-hidden">

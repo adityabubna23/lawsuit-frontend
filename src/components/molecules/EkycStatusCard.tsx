@@ -94,12 +94,25 @@ const EkycStatusCard: FC<EkycStatusCardProps> = ({ compact, onVerified, classNam
         {!compact && (
           <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">
             {isTempPath
-              ? 'You verified via the temporary email-OTP path. Once Aadhaar verification is back online we may ask you to upgrade.'
+              ? 'You\'re verified via the temporary email-OTP path. Upgrade to full Aadhaar verification via DigiLocker for complete identity verification.'
               : 'Your identity is locked to your Aadhaar profile. Contact support to change your name, date of birth, or gender.'}
           </p>
         )}
       </>
     )
+    // Temporary (email-OTP) verifications can be upgraded to a full Aadhaar
+    // verification via DigiLocker. The modal opens straight into the DigiLocker
+    // flow and the server allows re-verification while aadhaarName is blank.
+    if (isTempPath) {
+      cta = (
+        <button
+          onClick={() => setModalOpen(true)}
+          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-amber-600 text-white text-xs font-medium hover:bg-amber-700 whitespace-nowrap"
+        >
+          <ShieldCheck className="w-3.5 h-3.5" /> Upgrade to Aadhaar
+        </button>
+      )
+    }
   } else if (pending) {
     icon = <Clock className="w-5 h-5 text-amber-600" />
     pillText = 'OTP pending'
