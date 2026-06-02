@@ -144,6 +144,19 @@ const AppLayout: FC = () => {
     setIsMoreOpen(false)
   }, [location.pathname])
 
+  // Reset scroll to the top on every route change. React Router v6 preserves
+  // the previous scroll position by default, so navigating to Home (or any
+  // page) from a scrolled-down page used to land mid-page. This covers the
+  // cross-route case; `scrollToTop` below covers re-clicking the page you're
+  // already on (no route change → this effect doesn't fire).
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [location.pathname])
+
+  // Smooth scroll to the very top — wired to the brand logo + primary nav links
+  // so tapping the logo / an active tab returns you to the top of the page.
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
+
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white shadow sticky top-0 z-50">
@@ -159,7 +172,7 @@ const AppLayout: FC = () => {
             <div className="flex items-center min-w-0 flex-1">
               {/* Brand — animated NyayaX wordmark links to home. */}
               <div className="flex-shrink-0 flex items-center">
-                <BrandLogo to="/app/home" subtitle="Client" />
+                <BrandLogo to="/app/home" subtitle="Client" onClick={scrollToTop} />
               </div>
 
               {/* Desktop Navigation — 5 primary items + a grouped "More"
@@ -171,6 +184,7 @@ const AppLayout: FC = () => {
                   <Link
                     key={item.name}
                     to={item.path}
+                    onClick={scrollToTop}
                     className={`${location.pathname === item.path
                       ? 'border-primary text-gray-900'
                       : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
@@ -343,7 +357,7 @@ const AppLayout: FC = () => {
                   <Link
                     key={item.name}
                     to={item.path}
-                    onClick={() => setIsMobileMenuOpen(false)}
+                    onClick={() => { setIsMobileMenuOpen(false); scrollToTop() }}
                     className={`${location.pathname === item.path
                       ? 'bg-primary-50 border-primary text-primary'
                       : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'

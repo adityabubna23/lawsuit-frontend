@@ -87,10 +87,13 @@ const normalizeResponse = (data: any): ClientInfoShape => {
 const ClientInfo: React.FC = () => {
   const authUser = useAuthStore((s) => s.user)
   const userId = authUser?.id
-  // Once Aadhaar-verified, DOB + gender are locked to the verified identity and
-  // can't be edited here (the server also rejects changes). Everything else
-  // (address, income, caste, proofs) stays editable.
-  const aadhaarLocked = !!(authUser as any)?.ekycVerified
+  // Lock DOB + gender ONLY for users who cleared real Aadhaar eKYC via DigiLocker
+  // (ekycVerifiedVia === 'AADHAAR') — the only path that pulls these from the
+  // Aadhaar record. The temporary email-OTP fallback and non-Aadhaar paths keep
+  // them editable (those values are self-entered). The server also rejects
+  // changes for Aadhaar-verified clients. Everything else (address, income,
+  // caste, proofs) stays editable regardless.
+  const aadhaarLocked = (authUser as any)?.ekycVerifiedVia === 'AADHAAR'
 
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)

@@ -30,6 +30,8 @@ interface BrandLogoProps {
   size?: 'sm' | 'md' | 'lg'
   /** Extra classes applied to the outermost element. */
   className?: string
+  /** Optional click handler (e.g. scroll-to-top when already on the target). */
+  onClick?: () => void
 }
 
 const SIZE_CLASSES: Record<NonNullable<BrandLogoProps['size']>, string> = {
@@ -104,13 +106,14 @@ const BrandLogo: FC<BrandLogoProps> = ({
   subtitle,
   size = 'lg',
   className,
+  onClick,
 }) => {
   const content = <BrandWordmark subtitle={subtitle} size={size} />
   if (to === null) {
     return <div className={className}>{content}</div>
   }
   return (
-    <Link to={to} className={`nyx-brand-link ${className ?? ''}`} aria-label="NyayaX home">
+    <Link to={to} onClick={onClick} className={`nyx-brand-link ${className ?? ''}`} aria-label="NyayaX home">
       {content}
     </Link>
   )

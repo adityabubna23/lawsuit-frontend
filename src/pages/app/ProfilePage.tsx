@@ -186,6 +186,16 @@ const ProfilePage: FC = () => {
     }
   }
 
+  // Identity fields are locked ONLY for users who cleared real Aadhaar eKYC via
+  // DigiLocker (ekycVerifiedVia === 'AADHAAR') — that's the only path that
+  // actually pulls name/DOB/gender/mobile from the Aadhaar record. The temporary
+  // email-OTP fallback (EMAIL_OTP) and any non-Aadhaar path keep everything
+  // editable, since those fields there are just self-entered.
+  const aadhaarKyc = (user as any)?.ekycVerifiedVia === 'AADHAAR'
+  // The number is frozen for Aadhaar users, but they can still tap "Verify" to
+  // OTP-confirm it for SMS flows.
+  const phoneLocked = aadhaarKyc && !!phone
+
   return (
     <div className="max-w-5xl mx-auto py-12 px-4">
       <div className="bg-white rounded-t-lg  p-8 flex gap-8">
@@ -244,7 +254,7 @@ const ProfilePage: FC = () => {
             <div >
               <label className="block text-sm text-gray-600 mb-1">
                 Full name
-                {(user as any)?.ekycVerified && (
+                {aadhaarKyc && (
                   <span className="ml-2 text-xs font-normal text-gray-400">🔒 Aadhaar-verified</span>
                 )}
               </label>
@@ -253,10 +263,10 @@ const ProfilePage: FC = () => {
                   name="fullName"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  disabled={!!(user as any)?.ekycVerified}
+                  disabled={aadhaarKyc}
                   className="w-full border rounded p-2 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                 />
-              {!(user as any)?.ekycVerified && (
+              {!aadhaarKyc && (
                 <Button
                   onClick={() => {
                     // focus name input in form
@@ -271,14 +281,19 @@ const ProfilePage: FC = () => {
                 </Button>
               )}
               </div>
-              {(user as any)?.ekycVerified && (
+              {aadhaarKyc && (
                 <p className="mt-1 text-xs text-gray-500">
                   Locked to your Aadhaar-verified identity. Contact support to change it.
                 </p>
               )}
             </div>
             <div>
-              <label className="block text-sm text-gray-600 mb-1">Phone</label>
+              <label className="block text-sm text-gray-600 mb-1">
+                Phone
+                {phoneLocked && (
+                  <span className="ml-2 text-xs font-normal text-gray-400">🔒 Aadhaar-verified</span>
+                )}
+              </label>
               <div className="flex gap-2 items-center">
                 <input
                   name="phone"
@@ -286,8 +301,9 @@ const ProfilePage: FC = () => {
                   inputMode="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
+                  disabled={phoneLocked}
                   placeholder="10-digit phone number"
-                  className="flex-1 border rounded p-2"
+                  className="flex-1 border rounded p-2 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                 />
                 {/*
                   Show "Verified" only when the server-side phone matches what's
@@ -305,6 +321,11 @@ const ProfilePage: FC = () => {
                   </Button>
                 )}
               </div>
+              {phoneLocked && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Locked to your Aadhaar-verified mobile. Contact support to change it.
+                </p>
+              )}
             </div>
 
             <div>
